@@ -24,7 +24,20 @@ class FixtureSummary(BaseModel):
 
 
 class BatchPredictionRequest(BaseModel):
-    fixture_ids: list[str] = Field(min_length=1, max_length=100)
+    fixture_ids: list[str] = Field(default_factory=list, max_length=100)
+    date: str | None = None
+    competition: str | None = None
+    timezone: str = "UTC"
+    workers: int = Field(default=4, ge=1, le=32)
+    allow_historical_replay: bool = False
+    force: bool = False
+
+
+class LiveIngestResponse(BaseModel):
+    accepted: bool
+    event: dict[str, Any] | None = None
+    state: dict[str, Any]
+    prediction: dict[str, Any]
 
 
 class CatalogResponse(BaseModel):

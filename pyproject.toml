@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "global-soccer-prediction-engine"
-version = "0.3.0"
+version = "0.3.5"
 description = "Time-safe soccer match, scoreline, and award prediction platform"
 readme = "README.md"
 requires-python = ">=3.11"

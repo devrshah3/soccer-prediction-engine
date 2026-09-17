@@ -14,13 +14,25 @@ from soccer_engine.api.models import (
     CatalogResponse,
     FixtureSummary,
     HealthResponse,
+    LiveIngestResponse,
     StatusResponse,
 )
+from soccer_engine.batch import BatchEngine, BatchJob, BatchJobRequest, DailySummary
 from soccer_engine.config import coverage_report
+from soccer_engine.live import LiveEngine, StatsBombReplay
+from soccer_engine.live.schemas import (
+    CommentaryInput,
+    FeedMode,
+    LiveEvent,
+    LiveMatchState,
+    LivePrediction,
+    ReplayRequest,
+    ReplayResult,
+)
 from soccer_engine.schemas import FixturePrediction
 from soccer_engine.services import SoccerService
 
-VERSION = "0.3.0"
+VERSION = "0.3.5"
 app = FastAPI(
     title="Global Soccer Prediction Engine",
     version=VERSION,
@@ -97,9 +109,50 @@ def prediction(fixture_id: str) -> FixturePrediction:
     return _prediction(fixture_id)
 
 
-@router.post("/predictions/batch", response_model=list[FixturePrediction])
-def batch_predictions(request: BatchPredictionRequest) -> list[FixturePrediction]:
-    return [_prediction(fixture_id) for fixture_id in request.fixture_ids]
+@router.post("/predictions/batch", response_model=list[FixturePrediction] | BatchJob)
+def batch_predictions(request: BatchPredictionRequest) -> list[FixturePrediction] | BatchJob:
+    if request.fixture_ids:
+        return [_prediction(fixture_id) for fixture_id in request.fixture_ids]
+    if not request.date:
+        raise HTTPException(status_code=422, detail="provide fixture_ids or a date")
+    try:
+        return BatchEngine().run(
+            BatchJobRequest(
+                date=request.date,
+                competition=request.competition,
+                timezone=request.timezone,
+                workers=request.workers,
+                allow_historical_replay=request.allow_historical_replay,
+                force=request.force,
+            )
+        )
+    except (FileNotFoundError, ValueError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@router.get("/predictions/batch/{job_id}", response_model=BatchJob)
+def batch_status(job_id: str) -> BatchJob:
+    try:
+        return BatchEngine().get_job(job_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="batch job not found") from error
+
+
+@router.get("/predictions/daily/{date}", response_model=BatchJob)
+def daily_predictions(date: str) -> BatchJob:
+    job = BatchEngine().find_daily_job(date)
+    if job is None:
+        raise HTTPException(status_code=404, detail="no batch job found for date")
+    return job
+
+
+@router.get("/predictions/daily/{date}/summary", response_model=DailySummary)
+def daily_summary(date: str) -> DailySummary:
+    engine = BatchEngine()
+    job = engine.find_daily_job(date)
+    if job is None:
+        raise HTTPException(status_code=404, detail="no batch job found for date")
+    return engine.summary(job)
 
 
 @router.get("/teams/{team_id}/form", response_model=StatusResponse)
@@ -213,6 +266,99 @@ def data_quality() -> StatusResponse:
         },
         warnings=["Coverage is provider- and season-specific; adapter-ready is not ingested data."],
     )
+
+
+def _live_engine() -> LiveEngine:
+    return LiveEngine()
+
+
+@router.post("/live/events", response_model=LiveIngestResponse)
+def live_event(event: LiveEvent) -> LiveIngestResponse:
+    engine = _live_engine()
+    try:
+        engine.state(event.fixture_id)
+    except KeyError:
+        try:
+            engine.register_fixture(
+                event.fixture_id,
+                provider=event.provider,
+                mode=FeedMode.LIVE,
+                feed_timestamp=event.provider_timestamp,
+            )
+        except (KeyError, FileNotFoundError) as error:
+            raise HTTPException(
+                status_code=404, detail="fixture or pre-match model unavailable"
+            ) from error
+    state, accepted, prediction_value = engine.ingest_event(event)
+    return LiveIngestResponse(
+        accepted=accepted,
+        event=event.model_dump(mode="json"),
+        state=state.model_dump(mode="json"),
+        prediction=prediction_value.model_dump(mode="json"),
+    )
+
+
+@router.post("/live/commentary", response_model=LiveIngestResponse)
+def live_commentary(commentary: CommentaryInput) -> LiveIngestResponse:
+    engine = _live_engine()
+    try:
+        engine.state(commentary.fixture_id)
+    except KeyError:
+        try:
+            engine.register_fixture(
+                commentary.fixture_id,
+                provider=commentary.provider,
+                mode=FeedMode.LIVE,
+                feed_timestamp=commentary.provider_timestamp,
+            )
+        except (KeyError, FileNotFoundError) as error:
+            raise HTTPException(
+                status_code=404, detail="fixture or pre-match model unavailable"
+            ) from error
+    state, event, accepted, prediction_value = engine.ingest_commentary(commentary)
+    return LiveIngestResponse(
+        accepted=accepted,
+        event=event.model_dump(mode="json") if event else None,
+        state=state.model_dump(mode="json"),
+        prediction=prediction_value.model_dump(mode="json"),
+    )
+
+
+@router.get("/live/matches", response_model=list[LiveMatchState])
+def live_matches() -> list[LiveMatchState]:
+    return _live_engine().matches()
+
+
+@router.get("/live/matches/{fixture_id}", response_model=LiveMatchState)
+def live_match(fixture_id: str) -> LiveMatchState:
+    try:
+        return _live_engine().state(fixture_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="live match state not found") from error
+
+
+@router.get("/live/matches/{fixture_id}/prediction", response_model=LivePrediction)
+def live_prediction(fixture_id: str) -> LivePrediction:
+    try:
+        return _live_engine().prediction(fixture_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="live prediction not found") from error
+
+
+@router.get("/live/matches/{fixture_id}/timeline", response_model=list[LiveEvent])
+def live_timeline(fixture_id: str) -> list[LiveEvent]:
+    try:
+        return _live_engine().timeline(fixture_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="live timeline not found") from error
+
+
+@router.post("/live/replay/{match_id}", response_model=ReplayResult)
+def live_replay(match_id: str, request: ReplayRequest) -> ReplayResult:
+    try:
+        return StatsBombReplay().run(match_id, request.interval_minutes)
+    except (KeyError, FileNotFoundError) as error:
+        raise HTTPException(status_code=404, detail=f"replay unavailable: {error}") from error
 
 
 app.include_router(router)

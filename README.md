@@ -28,9 +28,14 @@ flowchart LR
   E --> F[Chronological model selection]
   F --> G[Versioned artifacts + evaluation]
   G --> H[Shared inference service]
-  H --> I[CLI]
-  H --> J[FastAPI /api/v1]
-  H --> K[Streamlit API-compatible views]
+  H --> Q[Concurrent resumable batch engine]
+  Q --> I[CLI]
+  Q --> J[FastAPI /api/v1]
+  J --> K[Streamlit API-compatible views]
+  L[Licensed live feed or StatsBomb replay] --> M[Validated normalized events]
+  M --> N[Separate live-state model]
+  H --> N
+  N --> J
 ```
 
 The local implementation uses Parquet for columnar tables and DuckDB for analytical access. Domain
@@ -38,7 +43,7 @@ schemas and provider-neutral IDs keep a future PostgreSQL deployment straightfor
 coverage is configured in [`configs/competitions.yaml`](configs/competitions.yaml), not embedded in
 model code.
 
-## Implemented capabilities (Phases 1–3)
+## Implemented capabilities (Phases 1–3.5)
 
 - Match outcome probabilities: home win, draw, away win
 - Independent Poisson expected goals and a normalized scoreline distribution
@@ -66,6 +71,13 @@ model code.
 - Versioned `/api/v1` catalog, fixture, prediction, form, player, freshness, model, and health APIs
 - Expanding-window, rolling-window, future-season, cross-league, and tournament evaluations
 - Global coverage, fixtures, provider health, and cross-league dashboard pages
+- Concurrent, cached, resumable, and idempotent daily inference with per-fixture failure isolation
+- Evidence-gated `full`, `standard`, `basic`, and `unavailable` prediction tiers
+- A provider-neutral live-event contract with commentary parsing, correction/VAR handling, circuit
+  breaking, feed latency, and explicit live/delayed/replay states
+- A strictly sequential StatsBomb event replay simulator and clustered-bootstrap backtesting against
+  static, time-decay, current-score Poisson, and event-count baselines
+- Daily slate, batch progress, replay timeline, probability movement, pace, and pressure dashboards
 
 Award ranking remains a Phase 4 module. Its interface is present, but the application does not
 invent outputs before cutoff-safe labels and candidate data exist.
@@ -188,15 +200,36 @@ soccer-engine fixtures --date 2026-09-19 --timezone America/New_York
 soccer-engine predict-date --date 2026-09-19
 ```
 
+Daily inference can also run entirely from locally stored fixtures. Finished fixtures require the
+explicit historical-replay switch so they cannot be mistaken for upcoming predictions:
+
+```bash
+soccer-engine predict-date --date 2015-12-05 --historical-replay --workers 8
+soccer-engine predict-date --date 2015-12-05 --competition "Premier League" --historical-replay
+soccer-engine batch-status --job-id 08601e2f8bd24a29
+soccer-engine daily-summary --date 2015-12-05
+```
+
+Run an accelerated, leakage-safe historical live demonstration and its evaluation with:
+
+```bash
+soccer-engine live-replay --match-id statsbomb:3913185 --interval 10
+soccer-engine evaluate-live-replay --limit 50 --interval 10
+```
+
+Real live mode is intentionally disabled without a contractually legitimate feed. Set
+`LIVE_SOCCER_API_KEY` only for a reviewed adapter; the included offline replay requires no key.
+
 ## API example
 
 ```bash
 curl http://127.0.0.1:8000/api/v1/predictions/statsbomb:3913082
 ```
 
-The versioned API also exposes `/competitions`, `/seasons`, `/fixtures`, batch predictions, team and
-player form, expected lineups, goalscorers, first goalscorers, goal timing, freshness, providers,
-model versions, evaluation, health, and data quality beneath `/api/v1`.
+The versioned API also exposes `/competitions`, `/seasons`, `/fixtures`, team/player form, lineups,
+scorers, timing, freshness, providers, models, evaluation, and health. Phase 3.5 adds
+`POST /predictions/batch`, batch status, daily results/summary, live event/commentary ingestion,
+live state/prediction/timeline reads, and `POST /live/replay/{match_id}`, all beneath `/api/v1`.
 
 ```json
 {
@@ -218,7 +251,7 @@ model versions, evaluation, health, and data quality beneath `/api/v1`.
   "goal_intervals": [
     {"interval": "0-15", "home_goal_probability": 0.19, "away_goal_probability": 0.14, "any_goal_probability": 0.30}
   ],
-  "model_version": "0.3.0",
+  "model_version": "0.3.5",
   "reliability": "medium",
   "warnings": ["Current injury and suspension data are unavailable; lineup probabilities use prior squads."]
 }
@@ -253,11 +286,27 @@ top-3, top-5, and top-10 hit rates were 34.1%, 55.3%, 70.5%, and 84.1%. Baseline
 0.215 historical-rate, 0.215 equal team-xG allocation, and 0.200 position allocation. Sparse labels
 and single-competition coverage mean these results must not be generalized.
 
+### Measured Phase 3.5 replay results
+
+The live-state backtest replays **50 real 2023/24 WSL matches** from **2024-02-18 through
+2024-05-18**, yielding **1,417 sequential snapshots**. Snapshots see only events already revealed;
+95% intervals resample whole matches to account for within-match dependence. The event-state model
+recorded 74.24% outcome accuracy, **0.601 log loss (95% CI 0.429–0.779)**, 0.341 multiclass Brier,
+and 0.054 calibration error. Comparator log losses were 0.827 static pre-match, 0.711 time-decay,
+0.618 current-score Poisson, and 0.669 event-count heuristic. The wide, overlapping intervals mean
+this is preliminary evidence, not a proven improvement.
+
+For goals within 5, 10, and 15 minutes, event-state Brier scores were **0.146, 0.210, and 0.232**;
+clustered 95% intervals were 0.126–0.171, 0.193–0.229, and 0.217–0.246. Next-scoring-team accuracy
+was 73.28% over 1,048 eligible snapshots. These observations come from one competition and are not
+evidence of production live-feed performance.
+
 ## Dashboard screenshots
 
-Screenshots will be added after deployment. The dashboard includes global coverage, upcoming
-fixtures, provider status, cross-league evaluation, predictions, lineups, scorers, timing, and
-freshness.
+Screenshots will be added after deployment. The dashboard includes global coverage, upcoming and
+daily fixtures, batch progress, tier coverage, provider status, cross-league evaluation,
+predictions, lineups, scorers, timing, replay probability movement, event timelines, and feed
+freshness warnings.
 
 ## Development
 
@@ -283,6 +332,11 @@ Parquet, secrets, and model binaries are ignored by Git.
 - Independent Poisson goals do not yet model low-score correlation (Dixon–Coles is a roadmap item).
 - Historical dashboard selections are time-safe replays, not claims that those matches are upcoming.
 - football-data.org coverage, rate limits, and terms depend on the user's current account.
+- No licensed live provider is bundled. `LIVE_SOCCER_API_KEY` is a protected adapter boundary, not a
+  claim of live coverage; the dashboard labels cached StatsBomb demonstrations as replay.
+- Live coefficients are currently transparent heuristics evaluated on 50 WSL matches. They require
+  broader competition data, probability calibration, and prospective validation before production
+  claims.
 - Explanations describe associations the model used; they do not establish causation.
 
 ## Roadmap

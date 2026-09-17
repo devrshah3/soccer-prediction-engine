@@ -10,12 +10,15 @@ from typing import Annotated, Any
 import pandas as pd
 import typer
 
+from soccer_engine.batch import BatchEngine, BatchJobRequest
 from soccer_engine.config import coverage_report, get_settings
 from soccer_engine.evaluation.global_report import generate_global_evaluation
+from soccer_engine.evaluation.live import evaluate_live_replays
 from soccer_engine.evaluation.scorer_report import generate_scorer_evaluation
 from soccer_engine.features.team import build_match_features
 from soccer_engine.inference import predict_fixture
 from soccer_engine.ingestion import FootballDataOrgProvider, StatsBombOpenDataProvider
+from soccer_engine.live import StatsBombReplay
 from soccer_engine.normalization import deduplicate_matches, records_to_frame
 from soccer_engine.normalization.players import normalize_statsbomb_players
 from soccer_engine.services import SoccerService
@@ -298,21 +301,82 @@ def predict(fixture_id: Annotated[str, typer.Option(help="Provider-qualified fix
 @app.command("predict-date")
 def predict_date(
     target_date: Annotated[str, typer.Option("--date", help="UTC date: YYYY-MM-DD")],
+    competition: Annotated[
+        str | None, typer.Option(help="Competition name or provider code")
+    ] = None,
+    workers: Annotated[int, typer.Option(min=1, max=32)] = 4,
+    timezone: Annotated[str, typer.Option(help="IANA timezone for the selected date")] = "UTC",
+    historical_replay: Annotated[
+        bool, typer.Option(help="Allow time-safe predictions for completed historical fixtures")
+    ] = False,
+    force: Annotated[
+        bool, typer.Option(help="Regenerate even when the input fingerprint is cached")
+    ] = False,
 ) -> None:
-    """Predict all scheduled fixtures on a UTC calendar date."""
+    """Run or resume concurrent, tiered inference for every fixture on a date."""
 
-    matches = _store().read_frame("matches")
-    kickoff = pd.to_datetime(matches["kickoff"], utc=True)
     try:
-        parsed_date = pd.Timestamp(target_date).date()
-    except ValueError as error:
-        raise typer.BadParameter("date must use YYYY-MM-DD") from error
-    selected = matches[(kickoff.dt.date == parsed_date) & (matches["status"] == "scheduled")]
-    if selected.empty:
-        typer.echo("No scheduled fixtures found for that date.")
-        raise typer.Exit()
-    for fixture_id in selected["match_id"]:
-        typer.echo(_prediction_for_id(str(fixture_id)))
+        request = BatchJobRequest(
+            date=target_date,
+            competition=competition,
+            workers=workers,
+            timezone=timezone,
+            allow_historical_replay=historical_replay,
+            force=force,
+        )
+        engine = BatchEngine()
+        job = engine.run(request)
+    except (FileNotFoundError, ValueError) as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(job.model_dump_json(indent=2))
+
+
+@app.command("batch-status")
+def batch_status(job_id: Annotated[str, typer.Option(help="Deterministic batch job ID")]) -> None:
+    """Inspect an interrupted, running, or completed daily job."""
+
+    try:
+        typer.echo(BatchEngine().get_job(job_id).model_dump_json(indent=2))
+    except KeyError as error:
+        raise typer.BadParameter(f"unknown batch job: {job_id}") from error
+
+
+@app.command("daily-summary")
+def daily_summary(
+    target_date: Annotated[str, typer.Option("--date", help="Date used for batch inference")],
+) -> None:
+    """Report prediction tiers, failures, caching, providers, and processing time."""
+
+    engine = BatchEngine()
+    job = engine.find_daily_job(target_date)
+    if job is None:
+        raise typer.BadParameter(f"no batch job found for {target_date}")
+    typer.echo(engine.summary(job).model_dump_json(indent=2))
+
+
+@app.command("live-replay")
+def live_replay(
+    match_id: Annotated[str, typer.Option(help="StatsBomb-qualified normalized match ID")],
+    interval: Annotated[int, typer.Option(min=1, max=45)] = 5,
+) -> None:
+    """Run an accelerated historical event replay; output is explicitly not live."""
+
+    try:
+        result = StatsBombReplay().run(match_id, interval)
+    except (KeyError, FileNotFoundError) as error:
+        raise typer.BadParameter(f"replay unavailable: {error}") from error
+    typer.echo(result.model_dump_json(indent=2))
+
+
+@app.command("evaluate-live-replay")
+def evaluate_live_replay(
+    limit: Annotated[int, typer.Option(min=1, max=500)] = 50,
+    interval: Annotated[int, typer.Option(min=1, max=45)] = 10,
+) -> None:
+    """Backtest live-state probabilities on a chronological historical replay holdout."""
+
+    report = evaluate_live_replays(StatsBombReplay(), limit=limit, interval_minutes=interval)
+    typer.echo(json.dumps(report, indent=2))
 
 
 @app.command("rank-awards")
