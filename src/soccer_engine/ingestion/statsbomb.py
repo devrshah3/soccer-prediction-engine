@@ -22,6 +22,7 @@ class StatsBombOpenDataProvider(DataProvider):
 
     name = "statsbomb_open_data"
     base_url = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
+    attribution_url = "https://github.com/statsbomb/open-data"
 
     def __init__(self, cache_dir: Path = Path("data/raw/statsbomb"), timeout: float = 30.0):
         self.cache_dir = cache_dir
@@ -47,6 +48,16 @@ class StatsBombOpenDataProvider(DataProvider):
             target.parent.mkdir(parents=True, exist_ok=True)
             url = f"{self.base_url}/matches/{competition_id}/{season_id}.json"
             target.write_bytes(self._download(url))
+        value: list[dict[str, Any]] = json.loads(target.read_text())
+        return value
+
+    def fetch_catalog(self) -> list[dict[str, Any]]:
+        """Read the cached catalog, downloading it incrementally when absent."""
+
+        target = self.cache_dir / "competitions.json"
+        if not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(self._download(f"{self.base_url}/competitions.json"))
         value: list[dict[str, Any]] = json.loads(target.read_text())
         return value
 

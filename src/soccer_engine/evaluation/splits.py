@@ -39,3 +39,22 @@ def expanding_window_splits(
         valid_end = size if split == n_splits - 1 else min(size, train_end + fold_size)
         if train_end < valid_end:
             yield np.arange(0, train_end), np.arange(train_end, valid_end)
+
+
+def rolling_window_splits(
+    frame: pd.DataFrame,
+    train_size: int,
+    test_size: int,
+    step: int | None = None,
+) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+    """Yield fixed-width chronological training windows followed by future tests."""
+
+    if train_size < 1 or test_size < 1:
+        raise ValueError("rolling window sizes must be positive")
+    step = step or test_size
+    ordered_size = len(frame)
+    for test_start in range(train_size, ordered_size - test_size + 1, step):
+        yield (
+            np.arange(test_start - train_size, test_start),
+            np.arange(test_start, test_start + test_size),
+        )

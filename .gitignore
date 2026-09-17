@@ -24,3 +24,5 @@ reports/*
 *.duckdb
 *.duckdb.wal
 src/soccer_engine/sample_data/bundesliga_2023_24.json
+src/soccer_engine/sample_data/statsbomb_global_matches.json
+src/soccer_engine/sample_data/statsbomb_wsl_players.json

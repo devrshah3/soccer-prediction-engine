@@ -4,6 +4,7 @@ from collections.abc import Iterable
 
 import pandas as pd
 
+from soccer_engine.identity import IdentityResolver
 from soccer_engine.schemas import MatchRecord, MatchStatus
 
 
@@ -18,6 +19,30 @@ def deduplicate_matches(records: Iterable[MatchRecord]) -> list[MatchRecord]:
             raise ValueError(f"conflicting match records for {key}")
         unique[key] = record
     return list(unique.values())
+
+
+def deduplicate_cross_provider_matches(
+    records: Iterable[MatchRecord], resolver: IdentityResolver | None = None
+) -> tuple[list[MatchRecord], list[tuple[str, str]]]:
+    """Flag same-day/team overlaps for review; never silently merge ambiguous sources."""
+
+    resolver = resolver or IdentityResolver()
+    unique: list[MatchRecord] = []
+    fingerprints: dict[tuple[str, str, str], MatchRecord] = {}
+    review: list[tuple[str, str]] = []
+    for record in deduplicate_matches(records):
+        key = (
+            record.kickoff.date().isoformat(),
+            resolver.resolve_team(record.home_team_name),
+            resolver.resolve_team(record.away_team_name),
+        )
+        previous = fingerprints.get(key)
+        if previous is not None and previous.provider != record.provider:
+            review.append((previous.match_id, record.match_id))
+            continue
+        fingerprints[key] = record
+        unique.append(record)
+    return unique, review
 
 
 def records_to_frame(records: Iterable[MatchRecord], finished_only: bool = False) -> pd.DataFrame:

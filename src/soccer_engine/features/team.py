@@ -12,6 +12,7 @@ BASE_FEATURES = (
     "elo",
     "rest_days",
     "form_ewm",
+    "opponent_adjusted_form",
     *(f"points_avg_{window}" for window in LOOKBACKS),
     *(f"goals_for_avg_{window}" for window in LOOKBACKS),
     *(f"goals_against_avg_{window}" for window in LOOKBACKS),
@@ -21,6 +22,11 @@ FEATURE_COLUMNS = [
     "neutral_venue",
     "month",
     "day_of_week",
+    "competition_strength",
+    "international_context",
+    "knockout_match",
+    "promoted_home",
+    "promoted_away",
     *(f"home_{name}" for name in BASE_FEATURES),
     *(f"away_{name}" for name in BASE_FEATURES),
     *(f"delta_{name}" for name in BASE_FEATURES if name != "rest_days"),
@@ -43,6 +49,7 @@ def _state(history: list[dict[str, Any]], elo: float, kickoff: pd.Timestamp) -> 
         "elo": elo,
         "rest_days": 7.0,
         "form_ewm": 0.0,
+        "opponent_adjusted_form": 0.0,
     }
     if history:
         values["rest_days"] = float(
@@ -51,6 +58,10 @@ def _state(history: list[dict[str, Any]], elo: float, kickoff: pd.Timestamp) -> 
         weights = np.power(1 - 0.35, np.arange(len(history) - 1, -1, -1))
         points = np.array([item["points"] for item in history])
         values["form_ewm"] = float(np.average(points, weights=weights))
+        adjusted = np.array(
+            [item["points"] * item.get("opponent_elo", 1500.0) / 1500.0 for item in history]
+        )
+        values["opponent_adjusted_form"] = float(np.average(adjusted, weights=weights))
     for window in LOOKBACKS:
         recent = history[-window:]
         for source in ("points", "goals_for", "goals_against"):
@@ -84,17 +95,43 @@ def build_match_features(matches: pd.DataFrame) -> pd.DataFrame:
     ordered = ordered.sort_values(["kickoff", "match_id"]).reset_index(drop=True)
     histories: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
     ratings: defaultdict[str, float] = defaultdict(lambda: 1500.0)
+    competition_strengths: defaultdict[str, float] = defaultdict(lambda: 1500.0)
+    seen_team_seasons: set[tuple[str, str, str]] = set()
+    last_season: dict[str, str] = {}
     rows: list[dict[str, object]] = []
     for raw_match in ordered.itertuples(index=False):
         match: Any = raw_match
         kickoff = pd.Timestamp(match.kickoff)
         home_id = str(match.home_team_id)
         away_id = str(match.away_team_id)
+        season = str(getattr(match, "season", "unknown"))
+        competition_id = str(getattr(match, "competition_id", "unknown"))
+        competition_name = str(getattr(match, "competition_name", competition_id))
+        for team_id in (home_id, away_id):
+            previous_season = last_season.get(team_id)
+            if previous_season is not None and previous_season != season:
+                ratings[team_id] = 1500.0 + 0.75 * (ratings[team_id] - 1500.0)
+            last_season[team_id] = season
         home = _state(histories[home_id], ratings[home_id], kickoff)
         away = _state(histories[away_id], ratings[away_id], kickoff)
+        stage = str(getattr(match, "stage", "") or "").lower()
+        international = float(
+            any(
+                token in competition_name.lower()
+                for token in ("world cup", "euro", "copa america", "nations", "african cup")
+            )
+        )
+        knockout = float(
+            any(token in stage for token in ("round", "final", "quarter", "semi", "knockout"))
+        )
+        home_new = (competition_id, season, home_id) not in seen_team_seasons
+        away_new = (competition_id, season, away_id) not in seen_team_seasons
         row: dict[str, object] = {
             "match_id": match.match_id,
             "kickoff": kickoff,
+            "competition_id": competition_id,
+            "competition_name": competition_name,
+            "season": season,
             "home_team_id": match.home_team_id,
             "away_team_id": match.away_team_id,
             "home_score": match.home_score,
@@ -103,6 +140,11 @@ def build_match_features(matches: pd.DataFrame) -> pd.DataFrame:
             "neutral_venue": float(bool(match.neutral_venue)),
             "month": float(kickoff.month),
             "day_of_week": float(kickoff.dayofweek),
+            "competition_strength": competition_strengths[competition_id],
+            "international_context": international,
+            "knockout_match": knockout,
+            "promoted_home": float(home_new and bool(histories[home_id])),
+            "promoted_away": float(away_new and bool(histories[away_id])),
         }
         for name in BASE_FEATURES:
             row[f"home_{name}"] = home[name]
@@ -127,6 +169,7 @@ def build_match_features(matches: pd.DataFrame) -> pd.DataFrame:
                     "goals_for": float(home_score),
                     "goals_against": float(away_score),
                     "points": float(_result_points(home_score, away_score)),
+                    "opponent_elo": away["elo"],
                 }
             )
             histories[away_id].append(
@@ -135,6 +178,7 @@ def build_match_features(matches: pd.DataFrame) -> pd.DataFrame:
                     "goals_for": float(away_score),
                     "goals_against": float(home_score),
                     "points": float(_result_points(away_score, home_score)),
+                    "opponent_elo": home["elo"],
                 }
             )
             advantage = 0.0 if bool(match.neutral_venue) else 65.0
@@ -147,6 +191,11 @@ def build_match_features(matches: pd.DataFrame) -> pd.DataFrame:
             change = 24.0 * (actual_home - expected_home)
             ratings[home_id] += change
             ratings[away_id] -= change
+            competition_strengths[competition_id] = 0.98 * competition_strengths[
+                competition_id
+            ] + 0.02 * ((ratings[home_id] + ratings[away_id]) / 2)
+            seen_team_seasons.add((competition_id, season, home_id))
+            seen_team_seasons.add((competition_id, season, away_id))
     frame = pd.DataFrame(rows)
     frame[FEATURE_COLUMNS] = frame[FEATURE_COLUMNS].replace([np.inf, -np.inf], np.nan).fillna(0.0)
     return frame

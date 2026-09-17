@@ -2,7 +2,8 @@
 
 import json
 import os
-from datetime import datetime
+import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -29,17 +30,23 @@ class FootballDataOrgProvider(DataProvider):
 
     name = "football_data_org"
     base_url = "https://api.football-data.org/v4"
+    requires_credentials = True
+    attribution_url = "https://www.football-data.org/"
 
     def __init__(
         self, cache_dir: Path = Path("data/raw/football_data_org"), api_key: str | None = None
     ):
         self.cache_dir = cache_dir
+        self._last_request = 0.0
         self.api_key = api_key or os.getenv("FOOTBALL_DATA_ORG_API_KEY")
         if not self.api_key:
             raise ValueError("FOOTBALL_DATA_ORG_API_KEY is required for live fixture refresh")
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=16), reraise=True)
     def _get(self, path: str, parameters: dict[str, str] | None = None) -> dict[str, Any]:
+        elapsed = time.monotonic() - self._last_request
+        if elapsed < 6.1:  # conservative free-tier ceiling
+            time.sleep(6.1 - elapsed)
         with httpx.Client(timeout=30, follow_redirects=True) as client:
             response = client.get(
                 f"{self.base_url}/{path.lstrip('/')}",
@@ -47,6 +54,7 @@ class FootballDataOrgProvider(DataProvider):
                 headers={"X-Auth-Token": self.api_key or "", "User-Agent": "soccer-engine/0.1"},
             )
             response.raise_for_status()
+            self._last_request = time.monotonic()
             result: dict[str, Any] = response.json()
             return result
 
@@ -81,11 +89,26 @@ class FootballDataOrgProvider(DataProvider):
 
     def fetch_matches(self, competition_id: str, season_id: str) -> list[MatchRecord]:
         payload = self._get(f"competitions/{competition_id}/matches", {"season": season_id})
+        target = self.cache_dir / "matches" / competition_id / f"{season_id}.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload, indent=2))
         return [self._normalize(row) for row in payload.get("matches", [])]
 
     def fetch_upcoming_fixtures(self, competition_id: str) -> list[MatchRecord]:
-        payload = self._get(f"competitions/{competition_id}/matches", {"status": "SCHEDULED"})
+        now = datetime.now(UTC)
+        payload = self._get(
+            f"competitions/{competition_id}/matches",
+            {
+                "dateFrom": (now - timedelta(days=1)).date().isoformat(),
+                "dateTo": (now + timedelta(days=60)).date().isoformat(),
+            },
+        )
         target = self.cache_dir / f"fixtures_{competition_id}.json"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(payload, indent=2))
         return [self._normalize(row) for row in payload.get("matches", [])]
+
+    def status(self) -> dict[str, str | bool]:
+        value = super().status()
+        value["available"] = bool(self.api_key)
+        return value

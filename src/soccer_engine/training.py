@@ -28,7 +28,7 @@ from soccer_engine.features.team import build_match_features
 from soccer_engine.models.goals import PoissonGoalModel
 from soccer_engine.models.outcome import MostCommonBaseline, OutcomeModel
 
-MODEL_VERSION = "0.2.0"
+MODEL_VERSION = "0.3.0"
 
 
 @dataclass
@@ -211,7 +211,7 @@ def train_and_evaluate(
             ),
         },
         "warning": (
-            "Single-season sample results are illustrative, not evidence of global performance."
+            "Curated open-data results are not evidence of representative global performance."
         ),
     }
     report_path.parent.mkdir(parents=True, exist_ok=True)

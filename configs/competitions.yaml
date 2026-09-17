@@ -1,30 +1,42 @@
+schema_version: 1
 competitions:
-  - key: womens_super_league
-    name: FA Women's Super League
-    country: England
-    provider_ids:
-      statsbomb: "37"
-    seasons:
-      statsbomb: ["281"]
-    enabled: true
-  - key: bundesliga
-    name: Bundesliga
-    country: Germany
-    provider_ids:
-      statsbomb: "9"
-    seasons:
-      statsbomb: ["281"]
-    enabled: false
-  - key: premier_league
-    name: English Premier League
-    country: England
-    provider_ids:
-      football_data_org: "PL"
-    enabled: false
-  - key: champions_league
-    name: UEFA Champions League
-    country: Europe
-    provider_ids:
-      statsbomb: "16"
-      football_data_org: "CL"
-    enabled: false
+  # Status describes the best configured route; it is not a claim of complete history.
+  - {key: premier_league, name: Premier League, region: Europe, country: England, kind: club_league, status: partial, providers: {statsbomb_open_data: "2", football_data_uk: E0, football_data_org: PL}}
+  - {key: la_liga, name: La Liga, region: Europe, country: Spain, kind: club_league, status: partial, providers: {statsbomb_open_data: "11", football_data_uk: SP1, football_data_org: PD}}
+  - {key: serie_a, name: Serie A, region: Europe, country: Italy, kind: club_league, status: partial, providers: {statsbomb_open_data: "12", football_data_uk: I1, football_data_org: SA}}
+  - {key: bundesliga, name: Bundesliga, region: Europe, country: Germany, kind: club_league, status: partial, providers: {statsbomb_open_data: "9", football_data_uk: D1, football_data_org: BL1}}
+  - {key: ligue_1, name: Ligue 1, region: Europe, country: France, kind: club_league, status: partial, providers: {statsbomb_open_data: "7", football_data_uk: F1, football_data_org: FL1}}
+  - {key: eredivisie, name: Eredivisie, region: Europe, country: Netherlands, kind: club_league, status: credential-required, providers: {football_data_uk: N1, football_data_org: DED}}
+  - {key: primeira_liga, name: Primeira Liga, region: Europe, country: Portugal, kind: club_league, status: credential-required, providers: {football_data_uk: P1, football_data_org: PPL}}
+  - {key: scottish_premiership, name: Scottish Premiership, region: Europe, country: Scotland, kind: club_league, status: partial, providers: {football_data_uk: SC0}}
+  - {key: womens_super_league, name: FA Women's Super League, region: Europe, country: England, kind: club_league, status: supported, providers: {statsbomb_open_data: "37"}}
+  - {key: champions_league, name: Champions League, region: Europe, country: UEFA, kind: club_knockout, status: partial, providers: {statsbomb_open_data: "16", football_data_org: CL}}
+  - {key: europa_league, name: UEFA Europa League, region: Europe, country: UEFA, kind: club_knockout, status: partial, providers: {statsbomb_open_data: "35"}}
+  - {key: conference_league, name: UEFA Conference League, region: Europe, country: UEFA, kind: club_knockout, status: adapter-ready, providers: {api_football: null, sportmonks: null}}
+  - {key: fa_cup, name: FA Cup, region: Europe, country: England, kind: club_knockout, status: adapter-ready, providers: {api_football: null}}
+  - {key: copa_del_rey, name: Copa del Rey, region: Europe, country: Spain, kind: club_knockout, status: partial, providers: {statsbomb_open_data: "87"}}
+  - {key: mls, name: Major League Soccer, region: Americas, country: USA, kind: club_league, status: partial, providers: {statsbomb_open_data: "44"}}
+  - {key: liga_mx, name: Liga MX, region: Americas, country: Mexico, kind: club_league, status: adapter-ready, providers: {api_football: null, sportmonks: null}}
+  - {key: brasileirao, name: Brazilian Serie A, region: Americas, country: Brazil, kind: club_league, status: adapter-ready, providers: {api_football: null, sportmonks: null}}
+  - {key: argentina_primera, name: Argentine Primera Division, region: Americas, country: Argentina, kind: club_league, status: partial, providers: {statsbomb_open_data: "81"}}
+  - {key: libertadores, name: Copa Libertadores, region: Americas, country: CONMEBOL, kind: club_knockout, status: adapter-ready, providers: {api_football: null, sportmonks: null}}
+  - {key: sudamericana, name: Copa Sudamericana, region: Americas, country: CONMEBOL, kind: club_knockout, status: adapter-ready, providers: {api_football: null, sportmonks: null}}
+  - {key: saudi_pro_league, name: Saudi Pro League, region: Asia, country: Saudi Arabia, kind: club_league, status: adapter-ready, providers: {api_football: null, sportmonks: null}}
+  - {key: uae_pro_league, name: UAE Pro League, region: Asia, country: UAE, kind: club_league, status: adapter-ready, providers: {api_football: null}}
+  - {key: qatar_stars_league, name: Qatar Stars League, region: Asia, country: Qatar, kind: club_league, status: adapter-ready, providers: {api_football: null}}
+  - {key: indian_super_league, name: Indian Super league, region: Asia, country: India, kind: club_league, status: supported, providers: {statsbomb_open_data: "1238"}}
+  - {key: j1_league, name: J1 League, region: Asia, country: Japan, kind: club_league, status: adapter-ready, providers: {api_football: null, sportmonks: null}}
+  - {key: k_league, name: K League 1, region: Asia, country: South Korea, kind: club_league, status: adapter-ready, providers: {api_football: null}}
+  - {key: chinese_super_league, name: Chinese Super League, region: Asia, country: China, kind: club_league, status: adapter-ready, providers: {api_football: null}}
+  - {key: afc_champions_league, name: AFC Champions League, region: Asia, country: AFC, kind: club_knockout, status: adapter-ready, providers: {api_football: null, sportmonks: null}}
+  - {key: world_cup, name: FIFA World Cup, region: International, country: FIFA, kind: international_knockout, status: supported, providers: {statsbomb_open_data: "43", football_data_org: WC}}
+  - {key: world_cup_qualification, name: FIFA World Cup Qualification, region: International, country: FIFA, kind: international_qualifying, status: adapter-ready, providers: {api_football: null}}
+  - {key: european_championship, name: UEFA Euro, region: International, country: UEFA, kind: international_knockout, status: supported, providers: {statsbomb_open_data: "55", football_data_org: EC}}
+  - {key: copa_america, name: Copa America, region: International, country: CONMEBOL, kind: international_knockout, status: supported, providers: {statsbomb_open_data: "223"}}
+  - {key: afcon, name: African Cup of Nations, region: International, country: CAF, kind: international_knockout, status: supported, providers: {statsbomb_open_data: "1267"}}
+  - {key: afc_asian_cup, name: AFC Asian Cup, region: International, country: AFC, kind: international_knockout, status: adapter-ready, providers: {api_football: null}}
+  - {key: concacaf_gold_cup, name: CONCACAF Gold Cup, region: International, country: CONCACAF, kind: international_knockout, status: adapter-ready, providers: {api_football: null}}
+  - {key: uefa_nations_league, name: UEFA Nations League, region: International, country: UEFA, kind: international_league, status: adapter-ready, providers: {api_football: null}}
+  - {key: concacaf_nations_league, name: CONCACAF Nations League, region: International, country: CONCACAF, kind: international_league, status: adapter-ready, providers: {api_football: null}}
+  - {key: international_friendlies, name: International Friendlies, region: International, country: FIFA, kind: international_friendly, status: adapter-ready, providers: {api_football: null}}
+  - {key: olympic_soccer, name: Olympic Soccer, region: International, country: IOC, kind: international_knockout, status: unavailable, providers: {}}

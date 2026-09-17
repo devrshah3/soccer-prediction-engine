@@ -7,10 +7,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from soccer_engine.features.team import build_match_features
-from soccer_engine.inference.predictor import predict_fixture
+from soccer_engine.config import coverage_report
+from soccer_engine.services import SoccerService
 from soccer_engine.storage import LocalStore
-from soccer_engine.training import ModelBundle
 
 st.set_page_config(page_title="Global Soccer Prediction Engine", page_icon="⚽", layout="wide")
 st.markdown(
@@ -32,23 +31,32 @@ st.caption(
 )
 
 page = st.sidebar.radio(
-    "Explore", ["Match predictions", "Model performance", "Data quality", "Award rankings"]
+    "Explore",
+    [
+        "Match predictions",
+        "Upcoming fixtures",
+        "Global competitions",
+        "Model performance",
+        "Cross-league evaluation",
+        "Provider health",
+        "Data quality",
+        "Award rankings",
+    ],
 )
 
 
-def load_assets() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, ModelBundle]:
-    store = LocalStore()
-    matches = store.read_frame("matches")
-    try:
-        players = store.read_frame("player_match_stats")
-        goals = store.read_frame("goal_events")
-    except FileNotFoundError:
-        players, goals = pd.DataFrame(), pd.DataFrame()
-    return matches, players, goals, ModelBundle.load(Path("models/champion.joblib"))
+def load_assets() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, SoccerService]:
+    service = SoccerService(LocalStore())
+    return (
+        service.matches(),
+        service.optional_table("player_match_stats"),
+        service.optional_table("goal_events"),
+        service,
+    )
 
 
 try:
-    matches, player_matches, goal_events, bundle = load_assets()
+    matches, player_matches, goal_events, service = load_assets()
 except FileNotFoundError:
     st.error("No trained demo found. Run `soccer-engine demo`, then refresh this page.")
     st.stop()
@@ -71,15 +79,7 @@ if page == "Match predictions":
         format_func=lambda value: labels.get(value, str(value)),
     )
     fixture = matches[matches["match_id"] == fixture_id].iloc[0]
-    feature = build_match_features(matches)
-    feature = feature[feature["match_id"] == fixture_id]
-    prediction = predict_fixture(
-        fixture,
-        feature,
-        bundle,
-        player_matches=player_matches,
-        goal_events=goal_events,
-    )
+    prediction = service.predict(str(fixture_id))
     st.subheader(f"{prediction.home_team} vs {prediction.away_team}")
     st.caption(f"{prediction.competition} · {prediction.kickoff:%Y-%m-%d %H:%M %Z}")
     left, middle, right = st.columns(3)
@@ -177,6 +177,30 @@ if page == "Match predictions":
     st.info("The model assigns probability partly from: " + "; ".join(prediction.important_factors))
     for warning in prediction.warnings:
         st.warning(warning)
+elif page == "Upcoming fixtures":
+    st.subheader("Upcoming fixtures")
+    timezone = st.selectbox("Timezone", ["UTC", "America/New_York", "Europe/London", "Asia/Tokyo"])
+    fixtures = service.fixtures(timezone=timezone)
+    if fixtures.empty:
+        st.warning(
+            "No active fixtures are cached. Set FOOTBALL_DATA_ORG_API_KEY and run "
+            "`soccer-engine update-fixtures`, or continue with historical replays."
+        )
+    else:
+        st.dataframe(fixtures, hide_index=True, width="stretch")
+elif page == "Global competitions":
+    st.subheader("Global competition and season coverage")
+    report = coverage_report()
+    st.metric("Registered priority competitions", report["registered_competitions"])
+    st.metric("Observed StatsBomb competition-seasons", report["observed_statsbomb_pairs"])
+    coverage_frame = pd.DataFrame(report["rows"])
+    region = st.selectbox("Region", ["All", *sorted(coverage_frame["region"].unique())])
+    if region != "All":
+        coverage_frame = coverage_frame[coverage_frame["region"] == region]
+    st.dataframe(coverage_frame, hide_index=True, width="stretch")
+    st.caption(
+        "Adapter-ready is capability metadata, not a claim that records are locally ingested."
+    )
 elif page == "Model performance":
     report_file = Path("reports/evaluation.json")
     if not report_file.exists():
@@ -186,6 +210,30 @@ elif page == "Model performance":
         st.subheader("Untouched chronological holdout")
         st.json(report["test"])
         st.caption(report["warning"])
+elif page == "Cross-league evaluation":
+    path = Path("reports/global_evaluation.json")
+    st.subheader("Cross-league and chronological evaluation")
+    if not path.exists():
+        st.warning("Run `soccer-engine evaluate-global` to generate this report.")
+    else:
+        report = json.loads(path.read_text())
+        st.json(report["chronological_holdout"])
+        st.subheader("Leave-one-competition-out results")
+        st.json(report["cross_league_holdouts"])
+elif page == "Provider health":
+    st.subheader("Provider health and credentials")
+    providers = pd.DataFrame(
+        [
+            ["StatsBomb Open Data", "Available", "No", "Historical matches/events"],
+            ["football-data.co.uk", "Adapter ready", "No", "User-supplied CSV only"],
+            ["football-data.org", "Credential required", "Yes", "Upcoming fixtures"],
+            ["API-Football", "Adapter ready", "Yes", "Licensed future integration"],
+            ["Sportmonks", "Adapter ready", "Yes", "Licensed future integration"],
+            ["OpenLigaDB", "Adapter ready", "No", "Future public integration"],
+        ],
+        columns=["Provider", "Status", "Credential", "Scope"],
+    )
+    st.dataframe(providers, hide_index=True, width="stretch")
 elif page == "Data quality":
     st.subheader("Freshness and coverage")
     st.metric("Normalized matches", f"{len(matches):,}")

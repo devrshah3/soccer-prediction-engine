@@ -10,12 +10,15 @@ from typing import Annotated, Any
 import pandas as pd
 import typer
 
-from soccer_engine.config import get_settings
+from soccer_engine.config import coverage_report, get_settings
+from soccer_engine.evaluation.global_report import generate_global_evaluation
+from soccer_engine.evaluation.scorer_report import generate_scorer_evaluation
 from soccer_engine.features.team import build_match_features
 from soccer_engine.inference import predict_fixture
 from soccer_engine.ingestion import FootballDataOrgProvider, StatsBombOpenDataProvider
 from soccer_engine.normalization import deduplicate_matches, records_to_frame
 from soccer_engine.normalization.players import normalize_statsbomb_players
+from soccer_engine.services import SoccerService
 from soccer_engine.storage import LocalStore
 from soccer_engine.training import ModelBundle, train_and_evaluate
 from soccer_engine.utils.logging import configure_logging
@@ -47,6 +50,24 @@ def ingest(
     typer.echo(f"Cached and validated {len(matches)} StatsBomb matches.")
 
 
+@app.command("ingest-global-sample")
+def ingest_global_sample() -> None:
+    """Load every cataloged StatsBomb match index from the bundled attributed snapshot."""
+
+    source = Path(__file__).parent / "sample_data" / "statsbomb_global_matches.json"
+    if not source.exists():
+        raise typer.BadParameter(
+            "generated snapshot missing; run scripts/build_global_statsbomb_sample.py first"
+        )
+    payload = json.loads(source.read_text())
+    frame = pd.DataFrame(payload["matches"])
+    path = _store().write_frame("matches", frame)
+    typer.echo(
+        f"Wrote {len(frame)} unique matches across "
+        f"{frame['competition_name'].nunique()} observed competitions to {path}."
+    )
+
+
 @app.command()
 def normalize(
     competition_id: str = "37",
@@ -72,7 +93,12 @@ def ingest_player_data(
 
     store = _store()
     if sample:
-        source = Path(__file__).parent / "sample_data" / "wsl_2023_24_players.json"
+        expanded = Path(__file__).parent / "sample_data" / "statsbomb_wsl_players.json"
+        source = (
+            expanded
+            if expanded.exists()
+            else Path(__file__).parent / "sample_data" / "wsl_2023_24_players.json"
+        )
         payload = json.loads(source.read_text())
         player_frame = pd.DataFrame(payload["player_matches"])
         goal_frame = pd.DataFrame(payload["goal_events"])
@@ -145,13 +171,51 @@ def evaluate() -> None:
     typer.echo(path.read_text())
 
 
+@app.command("evaluate-global")
+def evaluate_global() -> None:
+    """Run expanding, rolling, season, league, and tournament evaluations."""
+
+    report = generate_global_evaluation(_store().read_frame("matches"))
+    typer.echo(json.dumps(report, indent=2))
+
+
+@app.command("evaluate-scorers")
+def evaluate_scorers() -> None:
+    """Evaluate scorer probabilities on a complete future-season holdout."""
+
+    store = _store()
+    report = generate_scorer_evaluation(
+        store.read_frame("matches"), store.read_frame("player_match_stats")
+    )
+    typer.echo(json.dumps(report, indent=2))
+
+
+@app.command()
+def coverage(
+    output: Annotated[Path | None, typer.Option(help="Optional JSON output path")] = None,
+) -> None:
+    """Report configured capability separately from locally observed records."""
+
+    report = coverage_report()
+    rendered = json.dumps(report, indent=2)
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(rendered)
+    typer.echo(rendered)
+
+
 @app.command("update-fixtures")
 def update_fixtures(
     competition: Annotated[str, typer.Option(help="football-data.org competition code")] = "PL",
 ) -> None:
     """Refresh upcoming fixtures through the optional authenticated provider."""
 
-    provider = FootballDataOrgProvider()
+    try:
+        provider = FootballDataOrgProvider()
+    except ValueError as error:
+        raise typer.BadParameter(
+            "live refresh is credential-required; set FOOTBALL_DATA_ORG_API_KEY"
+        ) from error
     records = provider.fetch_upcoming_fixtures(competition)
     new_frame = records_to_frame(records)
     store = _store()
@@ -162,7 +226,41 @@ def update_fixtures(
         combined = new_frame
     combined = combined.sort_values("ingested_at").drop_duplicates("match_id", keep="last")
     store.write_frame("matches", combined)
-    typer.echo(f"Updated {len(new_frame)} scheduled {competition} fixtures.")
+    active = combined[combined["status"].isin(["scheduled", "postponed"])]
+    store.write_frame("fixtures", active)
+    typer.echo(
+        f"Refreshed {len(new_frame)} {competition} records; {len(active)} active fixtures cached."
+    )
+
+
+@app.command("fixtures")
+def list_fixtures(
+    target_date: Annotated[str | None, typer.Option("--date", help="Local date YYYY-MM-DD")] = None,
+    competition: Annotated[str | None, typer.Option(help="Exact competition name")] = None,
+    timezone: Annotated[str, typer.Option(help="IANA timezone")] = "UTC",
+) -> None:
+    """List active fixtures with user-facing timezone conversion."""
+
+    try:
+        frame = SoccerService().fixtures(
+            target_date=target_date, competition=competition, timezone=timezone
+        )
+    except (FileNotFoundError, ValueError) as error:
+        raise typer.BadParameter(str(error)) from error
+    if frame.empty:
+        typer.echo(
+            "No scheduled or postponed fixtures matched; live data may be unavailable or stale."
+        )
+        return
+    columns = [
+        "match_id",
+        "competition_name",
+        "kickoff",
+        "home_team_name",
+        "away_team_name",
+        "status",
+    ]
+    typer.echo(frame[columns].to_string(index=False))
 
 
 def _prediction_for_id(fixture_id: str) -> str:
