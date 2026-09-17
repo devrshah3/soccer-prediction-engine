@@ -1,0 +1,30 @@
+competitions:
+  - key: womens_super_league
+    name: FA Women's Super League
+    country: England
+    provider_ids:
+      statsbomb: "37"
+    seasons:
+      statsbomb: ["281"]
+    enabled: true
+  - key: bundesliga
+    name: Bundesliga
+    country: Germany
+    provider_ids:
+      statsbomb: "9"
+    seasons:
+      statsbomb: ["281"]
+    enabled: false
+  - key: premier_league
+    name: English Premier League
+    country: England
+    provider_ids:
+      football_data_org: "PL"
+    enabled: false
+  - key: champions_league
+    name: UEFA Champions League
+    country: Europe
+    provider_ids:
+      statsbomb: "16"
+      football_data_org: "CL"
+    enabled: false

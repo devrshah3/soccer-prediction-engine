@@ -1,0 +1,25 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../data:/app/data
+      - ../models:/app/models
+      - ../reports:/app/reports
+    env_file:
+      - ../.env
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["streamlit", "run", "src/soccer_engine/dashboard/app.py", "--server.address", "0.0.0.0"]
+    ports:
+      - "8501:8501"
+    volumes:
+      - ../data:/app/data
+      - ../models:/app/models
+      - ../reports:/app/reports
+
