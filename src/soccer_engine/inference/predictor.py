@@ -1,12 +1,17 @@
 """Structured fixture inference."""
 
 from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from soccer_engine.evaluation.metrics import CLASS_ORDER
+from soccer_engine.features.player import build_player_features
+from soccer_engine.models.scorers import predict_goalscorers
+from soccer_engine.models.timing import predict_goal_intervals
 from soccer_engine.schemas import (
+    ExpectedLineupPlayer,
     FixturePrediction,
     OutcomeProbabilities,
     ScorelineProbability,
@@ -30,6 +35,8 @@ def predict_fixture(
     fixture: pd.Series,
     feature_row: pd.DataFrame,
     bundle: ModelBundle,
+    player_matches: pd.DataFrame | None = None,
+    goal_events: pd.DataFrame | None = None,
 ) -> FixturePrediction:
     """Generate calibrated outcome and probabilistic scoreline output."""
 
@@ -53,7 +60,49 @@ def predict_fixture(
         float(feature_row.iloc[0]["away_matches_played"]),
     )
     reliability = "medium" if history_matches >= 10 else "low"
-    warnings = ["Lineup, injury, and suspension data are unavailable in the Phase 1 source."]
+    team_ids = [str(fixture["home_team_id"]), str(fixture["away_team_id"])]
+    candidates = build_player_features(
+        player_matches if player_matches is not None else pd.DataFrame(),
+        fixture["kickoff"],
+        team_ids,
+    )
+    scorers = predict_goalscorers(candidates, {team_ids[0]: home_xg, team_ids[1]: away_xg})
+    lineup_rows: list[ExpectedLineupPlayer] = []
+    if not candidates.empty:
+        for team_id in team_ids:
+            selected_lineup = candidates[candidates["team_id"] == team_id].nlargest(
+                11, "starting_probability"
+            )
+            for raw_row in selected_lineup.itertuples(index=False):
+                row: Any = raw_row
+                lineup_rows.append(
+                    ExpectedLineupPlayer(
+                        player_id=str(row.player_id),
+                        player_name=str(row.player_name),
+                        team_id=str(row.team_id),
+                        team_name=str(row.team_name),
+                        position=None if pd.isna(row.position) else str(row.position),
+                        starting_probability=float(row.starting_probability),
+                        expected_minutes=float(row.expected_minutes),
+                        reliability=str(row.reliability),
+                    )
+                )
+    intervals, timing_reliability = predict_goal_intervals(
+        goal_events if goal_events is not None else pd.DataFrame(),
+        fixture["kickoff"],
+        home_xg,
+        away_xg,
+    )
+    warnings = [
+        "Current injury and suspension data are unavailable; lineup probabilities use prior squads."
+    ]
+    if not scorers:
+        warnings.append(
+            "No compatible earlier player history was found; "
+            "goalscorer probabilities are unavailable."
+        )
+    if timing_reliability == "low":
+        warnings.append("Goal-timing history is limited; interval estimates use a smoothed prior.")
     if reliability == "low":
         warnings.append("At least one team has fewer than 10 earlier matches in this dataset.")
     factors = [
@@ -78,6 +127,9 @@ def predict_fixture(
         expected_away_goals=away_xg,
         expected_home_margin=home_xg - away_xg,
         likely_scorelines=scorelines,
+        expected_lineups=lineup_rows,
+        likely_goalscorers=scorers[:12],
+        goal_intervals=intervals,
         important_factors=factors,
         data_freshness=pd.Timestamp(fixture.get("ingested_at", datetime.now(UTC))).to_pydatetime(),
         model_version=bundle.version,

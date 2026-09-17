@@ -36,12 +36,19 @@ page = st.sidebar.radio(
 )
 
 
-def load_assets() -> tuple[pd.DataFrame, ModelBundle]:
-    return LocalStore().read_frame("matches"), ModelBundle.load(Path("models/champion.joblib"))
+def load_assets() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, ModelBundle]:
+    store = LocalStore()
+    matches = store.read_frame("matches")
+    try:
+        players = store.read_frame("player_match_stats")
+        goals = store.read_frame("goal_events")
+    except FileNotFoundError:
+        players, goals = pd.DataFrame(), pd.DataFrame()
+    return matches, players, goals, ModelBundle.load(Path("models/champion.joblib"))
 
 
 try:
-    matches, bundle = load_assets()
+    matches, player_matches, goal_events, bundle = load_assets()
 except FileNotFoundError:
     st.error("No trained demo found. Run `soccer-engine demo`, then refresh this page.")
     st.stop()
@@ -66,7 +73,13 @@ if page == "Match predictions":
     fixture = matches[matches["match_id"] == fixture_id].iloc[0]
     feature = build_match_features(matches)
     feature = feature[feature["match_id"] == fixture_id]
-    prediction = predict_fixture(fixture, feature, bundle)
+    prediction = predict_fixture(
+        fixture,
+        feature,
+        bundle,
+        player_matches=player_matches,
+        goal_events=goal_events,
+    )
     st.subheader(f"{prediction.home_team} vs {prediction.away_team}")
     st.caption(f"{prediction.competition} · {prediction.kickoff:%Y-%m-%d %H:%M %Z}")
     left, middle, right = st.columns(3)
@@ -84,7 +97,7 @@ if page == "Match predictions":
     figure.update_layout(
         title="Most likely scorelines", yaxis_tickformat=".0%", template="plotly_dark"
     )
-    chart_left.plotly_chart(figure, use_container_width=True)
+    chart_left.plotly_chart(figure, width="stretch")
     chart_right.subheader("Forecast context")
     chart_right.write(
         f"Expected goals: **{prediction.expected_home_goals:.2f} – "
@@ -93,6 +106,74 @@ if page == "Match predictions":
     chart_right.write(f"Both teams score: **{prediction.both_teams_to_score:.1%}**")
     chart_right.write(f"Over 2.5 goals: **{prediction.over_2_5:.1%}**")
     chart_right.write(f"Reliability: **{prediction.reliability.title()}**")
+    scorer_tab, lineup_tab, timing_tab = st.tabs(
+        ["Likely goalscorers", "Expected lineups", "Goal timing"]
+    )
+    with scorer_tab:
+        scorer_frame = pd.DataFrame([item.model_dump() for item in prediction.likely_goalscorers])
+        if scorer_frame.empty:
+            st.info("Player history is unavailable for this provider/team identity.")
+        else:
+            scorer_frame = scorer_frame[
+                [
+                    "player_name",
+                    "team_name",
+                    "starting_probability",
+                    "expected_minutes",
+                    "expected_goals",
+                    "scoring_probability",
+                    "first_scorer_probability",
+                    "reliability",
+                ]
+            ]
+            st.dataframe(
+                scorer_frame,
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "starting_probability": st.column_config.ProgressColumn(format="percent"),
+                    "scoring_probability": st.column_config.ProgressColumn(format="percent"),
+                    "first_scorer_probability": st.column_config.ProgressColumn(format="percent"),
+                },
+            )
+            st.caption("No player probability is a guarantee; starting status is not confirmed.")
+    with lineup_tab:
+        lineup_frame = pd.DataFrame([item.model_dump() for item in prediction.expected_lineups])
+        if lineup_frame.empty:
+            st.info("No earlier compatible lineup data is available.")
+        else:
+            st.dataframe(
+                lineup_frame[
+                    [
+                        "team_name",
+                        "player_name",
+                        "position",
+                        "starting_probability",
+                        "expected_minutes",
+                        "reliability",
+                    ]
+                ],
+                hide_index=True,
+                width="stretch",
+            )
+    with timing_tab:
+        interval_frame = pd.DataFrame([item.model_dump() for item in prediction.goal_intervals])
+        timing_figure = go.Figure()
+        timing_figure.add_bar(
+            x=interval_frame["interval"],
+            y=interval_frame["home_goal_probability"],
+            name=prediction.home_team,
+            marker_color="#31c48d",
+        )
+        timing_figure.add_bar(
+            x=interval_frame["interval"],
+            y=interval_frame["away_goal_probability"],
+            name=prediction.away_team,
+            marker_color="#60a5fa",
+        )
+        timing_figure.update_layout(barmode="group", yaxis_tickformat=".0%", template="plotly_dark")
+        st.plotly_chart(timing_figure, width="stretch")
+        st.caption("Broad pre-match intervals are shown instead of a fake precise goal minute.")
     st.info("The model assigns probability partly from: " + "; ".join(prediction.important_factors))
     for warning in prediction.warnings:
         st.warning(warning)
@@ -108,11 +189,14 @@ elif page == "Model performance":
 elif page == "Data quality":
     st.subheader("Freshness and coverage")
     st.metric("Normalized matches", f"{len(matches):,}")
+    player_metric, goal_metric = st.columns(2)
+    player_metric.metric("Player-match rows", f"{len(player_matches):,}")
+    goal_metric.metric("Goal events", f"{len(goal_events):,}")
     st.write("Providers", matches["provider"].value_counts())
     st.write("Latest kickoff", pd.to_datetime(matches["kickoff"], utc=True).max())
     st.info(
-        "Phase 1 sample contains match results and metadata; "
-        "lineup/injury fields are not available."
+        "The Phase 2 sample contains prior lineups, minutes, shots, xG, goals, and assists. "
+        "Current injuries and suspensions are not available."
     )
 else:
     st.subheader("Award rankings")

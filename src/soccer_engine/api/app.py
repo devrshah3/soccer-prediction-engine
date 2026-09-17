@@ -15,7 +15,7 @@ from soccer_engine.training import ModelBundle
 
 app = FastAPI(
     title="Global Soccer Prediction Engine",
-    version="0.1.0",
+    version="0.2.0",
     description=(
         "Calibrated pre-match probabilities for analytics and education—not betting advice."
     ),
@@ -41,9 +41,16 @@ def _matches() -> pd.DataFrame:
         ) from error
 
 
+def _optional_table(name: str) -> pd.DataFrame:
+    try:
+        return LocalStore().read_frame(name)
+    except FileNotFoundError:
+        return pd.DataFrame()
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "soccer-engine", "version": "0.1.0"}
+    return {"status": "ok", "service": "soccer-engine", "version": "0.2.0"}
 
 
 @app.get("/fixtures")
@@ -62,4 +69,10 @@ def prediction(fixture_id: str) -> FixturePrediction:
         raise HTTPException(status_code=404, detail="fixture not found")
     features = build_match_features(matches)
     feature = features[features["match_id"] == fixture_id]
-    return predict_fixture(selected.iloc[0], feature, _bundle())
+    return predict_fixture(
+        selected.iloc[0],
+        feature,
+        _bundle(),
+        player_matches=_optional_table("player_match_stats"),
+        goal_events=_optional_table("goal_events"),
+    )

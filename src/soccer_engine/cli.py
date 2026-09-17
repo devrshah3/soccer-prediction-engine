@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import pandas as pd
 import typer
@@ -15,6 +15,7 @@ from soccer_engine.features.team import build_match_features
 from soccer_engine.inference import predict_fixture
 from soccer_engine.ingestion import FootballDataOrgProvider, StatsBombOpenDataProvider
 from soccer_engine.normalization import deduplicate_matches, records_to_frame
+from soccer_engine.normalization.players import normalize_statsbomb_players
 from soccer_engine.storage import LocalStore
 from soccer_engine.training import ModelBundle, train_and_evaluate
 from soccer_engine.utils.logging import configure_logging
@@ -63,6 +64,48 @@ def normalize(
     typer.echo(f"Wrote {len(frame)} normalized matches to {path}.")
 
 
+@app.command("ingest-player-data")
+def ingest_player_data(
+    sample: Annotated[bool, typer.Option(help="Use the compact attributed offline sample")] = False,
+) -> None:
+    """Ingest player-match statistics, lineup participation, and goal events."""
+
+    store = _store()
+    if sample:
+        source = Path(__file__).parent / "sample_data" / "wsl_2023_24_players.json"
+        payload = json.loads(source.read_text())
+        player_frame = pd.DataFrame(payload["player_matches"])
+        goal_frame = pd.DataFrame(payload["goal_events"])
+    else:
+        matches = store.read_frame("matches")
+        provider = StatsBombOpenDataProvider(get_settings().data_dir / "raw" / "statsbomb")
+        player_rows: list[dict[str, Any]] = []
+        goal_rows: list[dict[str, Any]] = []
+        for raw_match in matches.itertuples(index=False):
+            match: Any = raw_match
+            if match.provider != provider.name:
+                continue
+            provider_id = str(match.provider_match_id)
+            source_url = f"{provider.base_url}/events/{provider_id}.json"
+            players, goals = normalize_statsbomb_players(
+                match_id=str(match.match_id),
+                kickoff=pd.Timestamp(match.kickoff).to_pydatetime(),
+                lineups=provider.fetch_lineups(provider_id),
+                events=provider.fetch_events(provider_id),
+                source_url=source_url,
+            )
+            player_rows.extend(record.model_dump(mode="json") for record in players)
+            goal_rows.extend(record.model_dump(mode="json") for record in goals)
+        player_frame = pd.DataFrame(player_rows)
+        goal_frame = pd.DataFrame(goal_rows)
+    player_path = store.write_frame("player_match_stats", player_frame)
+    goal_path = store.write_frame("goal_events", goal_frame)
+    typer.echo(
+        f"Wrote {len(player_frame)} player-match rows to {player_path} "
+        f"and {len(goal_frame)} goal events to {goal_path}."
+    )
+
+
 @app.command("build-features")
 def build_features() -> None:
     """Build leakage-safe pre-match feature tables."""
@@ -78,10 +121,15 @@ def train() -> None:
     """Select, fit, and version outcome and goal models."""
 
     settings = get_settings()
+    try:
+        player_matches = _store().read_frame("player_match_stats")
+    except FileNotFoundError:
+        player_matches = pd.DataFrame()
     bundle, report = train_and_evaluate(
         _store().read_frame("matches"),
         settings.model_dir / "champion.joblib",
         Path("reports/evaluation.json"),
+        player_matches=player_matches,
     )
     typer.echo(f"Champion: {report['champion']} · model version {bundle.version}")
     typer.echo(json.dumps(report["test"], indent=2))
@@ -126,7 +174,19 @@ def _prediction_for_id(fixture_id: str) -> str:
     features = build_match_features(matches)
     feature = features[features["match_id"] == fixture_id]
     bundle = ModelBundle.load(settings.model_dir / "champion.joblib")
-    result = predict_fixture(selected.iloc[0], feature, bundle)
+    try:
+        player_matches = _store().read_frame("player_match_stats")
+        goal_events = _store().read_frame("goal_events")
+    except FileNotFoundError:
+        player_matches = pd.DataFrame()
+        goal_events = pd.DataFrame()
+    result = predict_fixture(
+        selected.iloc[0],
+        feature,
+        bundle,
+        player_matches=player_matches,
+        goal_events=goal_events,
+    )
     return result.model_dump_json(indent=2)
 
 
@@ -189,6 +249,7 @@ def demo() -> None:
 
     ingest(sample=True)
     normalize()
+    ingest_player_data(sample=True)
     build_features()
     train()
     matches = _store().read_frame("matches").sort_values("kickoff")

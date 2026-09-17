@@ -1,6 +1,8 @@
 """Shared test fixtures."""
 
+import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -39,3 +41,9 @@ def small_matches() -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+@pytest.fixture(scope="session")
+def player_sample() -> tuple[pd.DataFrame, pd.DataFrame]:
+    payload = json.loads(Path("src/soccer_engine/sample_data/wsl_2023_24_players.json").read_text())
+    return pd.DataFrame(payload["player_matches"]), pd.DataFrame(payload["goal_events"])

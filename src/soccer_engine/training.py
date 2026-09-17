@@ -22,12 +22,13 @@ from soccer_engine.evaluation.metrics import (
     bootstrap_interval,
     outcome_metrics,
 )
+from soccer_engine.evaluation.player import evaluate_goalscorers
 from soccer_engine.evaluation.splits import chronological_holdout
 from soccer_engine.features.team import build_match_features
 from soccer_engine.models.goals import PoissonGoalModel
 from soccer_engine.models.outcome import MostCommonBaseline, OutcomeModel
 
-MODEL_VERSION = "0.1.0"
+MODEL_VERSION = "0.2.0"
 
 
 @dataclass
@@ -122,6 +123,7 @@ def train_and_evaluate(
     matches: pd.DataFrame,
     model_path: Path = Path("models/champion.joblib"),
     report_path: Path = Path("reports/evaluation.json"),
+    player_matches: pd.DataFrame | None = None,
 ) -> tuple[ModelBundle, dict[str, Any]]:
     """Select on validation, refit through validation, and report untouched test metrics."""
 
@@ -201,6 +203,12 @@ def train_and_evaluate(
             "champion_log_loss_95_ci": list(log_loss_interval),
             "baselines": baseline_test,
             "goals": _goal_metrics(test, goal_model),
+            "goalscorers": evaluate_goalscorers(
+                test,
+                matches,
+                player_matches if player_matches is not None else pd.DataFrame(),
+                goal_model,
+            ),
         },
         "warning": (
             "Single-season sample results are illustrative, not evidence of global performance."

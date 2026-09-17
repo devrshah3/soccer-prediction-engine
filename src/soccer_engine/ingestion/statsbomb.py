@@ -59,6 +59,25 @@ class StatsBombOpenDataProvider(DataProvider):
             for row in self.fetch_raw_matches(competition_id, season_id)
         ]
 
+    def fetch_events(self, provider_match_id: str) -> list[dict[str, Any]]:
+        """Return cached event JSON for one open-data match."""
+
+        return self._fetch_match_asset("events", provider_match_id)
+
+    def fetch_lineups(self, provider_match_id: str) -> list[dict[str, Any]]:
+        """Return cached lineup JSON for one open-data match."""
+
+        return self._fetch_match_asset("lineups", provider_match_id)
+
+    def _fetch_match_asset(self, asset: str, provider_match_id: str) -> list[dict[str, Any]]:
+        target = self.cache_dir / asset / f"{provider_match_id}.json"
+        if not target.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            url = f"{self.base_url}/{asset}/{provider_match_id}.json"
+            target.write_bytes(self._download(url))
+        value: list[dict[str, Any]] = json.loads(target.read_text())
+        return value
+
     def _normalize(self, row: dict[str, Any], source_url: str) -> MatchRecord:
         kickoff = datetime.fromisoformat(f"{row['match_date']}T{row.get('kick_off') or '00:00:00'}")
         if kickoff.tzinfo is None:
