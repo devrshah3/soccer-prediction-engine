@@ -10,8 +10,10 @@ from typing import Annotated, Any
 import pandas as pd
 import typer
 
+from soccer_engine.awards import AwardEngine
 from soccer_engine.batch import BatchEngine, BatchJobRequest
 from soccer_engine.config import coverage_report, get_settings
+from soccer_engine.evaluation.awards import evaluate_awards as generate_award_evaluation
 from soccer_engine.evaluation.global_report import generate_global_evaluation
 from soccer_engine.evaluation.live import evaluate_live_replays
 from soccer_engine.evaluation.scorer_report import generate_scorer_evaluation
@@ -32,6 +34,14 @@ app = typer.Typer(no_args_is_help=True, help="Time-safe global soccer prediction
 def _store() -> LocalStore:
     settings = get_settings()
     return LocalStore(settings.data_dir)
+
+
+def _utc_datetime(value: str) -> Any:
+    timestamp = pd.Timestamp(value)
+    timestamp = (
+        timestamp.tz_localize("UTC") if timestamp.tzinfo is None else timestamp.tz_convert("UTC")
+    )
+    return timestamp.to_pydatetime()
 
 
 @app.command()
@@ -380,12 +390,112 @@ def evaluate_live_replay(
 
 
 @app.command("rank-awards")
-def rank_awards(award: str, as_of: str) -> None:
-    """Expose the award interface without inventing rankings before Phase 4."""
+def rank_awards(
+    award: Annotated[str, typer.Option(help="Award registry ID")],
+    as_of: Annotated[str, typer.Option(help="Cutoff timestamp or YYYY-MM-DD")],
+    edition: Annotated[str | None, typer.Option(help="Edition label when required")] = None,
+    simulations: Annotated[int, typer.Option(min=100, max=100000)] = 5000,
+    seed: int = 42,
+) -> None:
+    """Rank an award using only evidence available by the requested cutoff."""
 
-    raise typer.BadParameter(
-        f"{award} ranking as of {as_of} is unavailable until cutoff-safe candidate data is ingested"
+    try:
+        cutoff = _utc_datetime(as_of)
+        result = AwardEngine().rank(award, cutoff, edition, simulations, seed)
+    except (KeyError, ValueError) as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(result.model_dump_json(indent=2))
+
+
+@app.command("awards")
+def awards_command() -> None:
+    """List configured award definitions and honest coverage states."""
+
+    typer.echo(json.dumps(AwardEngine().list_awards(), indent=2))
+
+
+@app.command("award-coverage")
+def award_coverage() -> None:
+    """Alias for the full award registry and edition coverage report."""
+
+    typer.echo(json.dumps(AwardEngine().list_awards(), indent=2))
+
+
+@app.command("simulate-golden-boot")
+def simulate_golden_boot(
+    competition: Annotated[str, typer.Option(help="Supported competition code")],
+    season: Annotated[str, typer.Option(help="Season/edition label")],
+    as_of: Annotated[str | None, typer.Option(help="Simulation cutoff")] = None,
+    simulations: Annotated[int, typer.Option(min=100, max=100000)] = 5000,
+    seed: int = 42,
+) -> None:
+    """Run a reproducible competition-specific scoring simulation."""
+
+    if competition.casefold() not in {"wsl", "fa women's super league"}:
+        raise typer.BadParameter(
+            "Only WSL has compatible local player/schedule data; import licensed candidates "
+            "for others."
+        )
+    award = AwardEngine().registry.get("wsl_golden_boot")
+    rule = next((item for item in award.editions if item.edition == season), None)
+    if rule is None:
+        raise typer.BadParameter(f"unsupported WSL edition: {season}")
+    cutoff = _utc_datetime(as_of) if as_of else rule.eligibility_end
+    result = AwardEngine().rank(
+        "wsl_golden_boot", cutoff, season, simulations=simulations, seed=seed
     )
+    typer.echo(result.model_dump_json(indent=2))
+
+
+@app.command("import-award-results")
+def import_award_results(file: Annotated[Path, typer.Argument(exists=True)]) -> None:
+    """Import source-attributed structured historical results without scraping."""
+
+    try:
+        count = AwardEngine().import_results(file)
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(f"Imported {count} official result rows.")
+
+
+@app.command("import-award-candidates")
+def import_award_candidates(file: Annotated[Path, typer.Argument(exists=True)]) -> None:
+    """Import a complete, attributed candidate pool and component features."""
+
+    try:
+        count = AwardEngine().import_candidates(file)
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(f"Imported {count} award candidate rows.")
+
+
+@app.command("import-goal-nominations")
+def import_goal_nominations(file: Annotated[Path, typer.Argument(exists=True)]) -> None:
+    """Import official goal-nomination metadata without inferring visual quality."""
+
+    try:
+        count = AwardEngine().import_goal_nominations(file)
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(f"Imported {count} goal nomination rows.")
+
+
+@app.command("import-media-rankings")
+def import_media_rankings(file: Annotated[Path, typer.Argument(exists=True)]) -> None:
+    """Import permitted journalist rankings or sentiment observations from CSV."""
+
+    try:
+        count = AwardEngine().import_media(file)
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(f"Imported {count} media observations.")
+
+
+@app.command("evaluate-awards")
+def evaluate_awards_command() -> None:
+    """Run chronological edition-level award evaluation on compatible local data."""
+
+    typer.echo(json.dumps(generate_award_evaluation(), indent=2))
 
 
 @app.command("serve-api")

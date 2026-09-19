@@ -1,9 +1,9 @@
 # Global Soccer Prediction Engine
 
-A production-shaped, time-safe machine-learning platform for pre-match soccer probabilities. It
-turns attributed provider data into reproducible features, chooses models on chronological
-validation data, reports an untouched holdout, and serves structured predictions through a CLI,
-FastAPI, and Streamlit.
+A production-shaped, time-safe machine-learning platform for match probabilities, live-state
+replay, and evidence-based award rankings. It turns attributed provider data into reproducible
+features, uses chronological evaluation, and serves structured predictions through a CLI, FastAPI,
+and Streamlit.
 
 > **Responsible use:** probabilities are uncertain model estimates for analytics and education.
 > They are not facts, guarantees, or betting advice. Transfers, rare events, coaching changes,
@@ -36,6 +36,10 @@ flowchart LR
   M --> N[Separate live-state model]
   H --> N
   N --> J
+  O[Edition-aware award registry] --> P[Cutoff-safe award engine]
+  D --> P
+  S[Permitted structured media imports] --> P
+  P --> J
 ```
 
 The local implementation uses Parquet for columnar tables and DuckDB for analytical access. Domain
@@ -43,7 +47,17 @@ schemas and provider-neutral IDs keep a future PostgreSQL deployment straightfor
 coverage is configured in [`configs/competitions.yaml`](configs/competitions.yaml), not embedded in
 model code.
 
-## Implemented capabilities (Phases 1–3.5)
+### Award data model
+
+The normalized award layer includes `awards`, `award_editions`, `award_rules`,
+`award_candidates`, `official_nominees`, `official_results`, `official_vote_totals`,
+`player_period_statistics`, `team_achievements`, `player_achievements`,
+`journalist_rankings`, `media_mentions`, `sentiment_observations`, `goal_nominations`,
+`award_predictions`, `award_prediction_snapshots`, and `award_evaluations`. Source, publication,
+retrieval, and availability-cutoff timestamps are part of the validated ingestion contracts.
+Snapshots are immutable JSON artifacts keyed by award, edition, and `as_of` timestamp.
+
+## Implemented capabilities (Phases 1–4)
 
 - Match outcome probabilities: home win, draw, away win
 - Independent Poisson expected goals and a normalized scoreline distribution
@@ -78,9 +92,23 @@ model code.
 - A strictly sequential StatsBomb event replay simulator and clustered-bootstrap backtesting against
   static, time-decay, current-score Poisson, and event-count baselines
 - Daily slate, batch progress, replay timeline, probability movement, pace, and pressure dashboards
+- A 25-award, configuration-driven registry with 13 explicit edition rules
+- Separate narrative/vote, scoring, tournament-best-player, and goal-award strategies
+- Cutoff-filtered statistical, team-achievement, international, and optional media components
+- Reproducible Golden Boot Monte Carlo simulation with shared-lead probabilities
+- Edition-specific shared/assists/minutes tie rules and European Golden Shoe coefficients
+- Immutable as-of snapshots, time-travel history, structured imports, API, CLI, dashboard, and
+  chronological award evaluation
+- Metadata-only Puskás support that never infers visual beauty from box-score data
+- A rights-gated video-analysis protocol with no bundled implementation or implied video access
 
-Award ranking remains a Phase 4 module. Its interface is present, but the application does not
-invent outputs before cutoff-safe labels and candidate data exist.
+Global awards remain deliberately unavailable when a complete candidate pool is absent. The
+included working statistical example is the WSL Golden Boot because that is the only locally
+compatible multi-season player dataset; this is not presented as global player coverage.
+Registry coverage is 5 narrative awards, 15 scoring awards, 4 tournament-best-player awards, and
+1 goal award. At configuration level, 17 are partial, 5 unavailable, 1 credential-required,
+1 statistical-only, and 1 metadata-only; runtime responses can downgrade when required evidence is
+missing.
 
 ## Data sources and licensing
 
@@ -91,6 +119,8 @@ invent outputs before cutoff-safe labels and candidate data exist.
 | [football-data.org](https://www.football-data.org/) | Optional | API key; free plans may be available | Upcoming fixtures through the documented API. User must comply with current plan limits and terms. Responses are cached; no controls are bypassed. |
 | [OpenLigaDB](https://www.openligadb.de/) | Interface | Public API | Adapter-ready declaration; no local records are claimed. |
 | API-Football / Sportmonks | Interface | Licensed API keys | Credential-required boundaries; never enabled without applicable rights. |
+| [FIFA award publications](https://www.fifa.com/en/the-best-fifa-football-awards/2025/articles/voting-closed) and [UEFA/Ballon d'Or announcements](https://www.uefa.com/ballondor/news/029c-1e6c4428b07e-0926bc6b3468-1000--2025-ballon-d-or-awards-nominees-revealed/) | Registry references | Public official pages | Edition dates, voting structure, official nomination metadata, and rule verification only; no copyrighted article body is stored. |
+| Structured award/media CSV | Optional | User-supplied attributed records | Official results, nominees, or permitted journalist rankings. The project does not scrape pages, bypass paywalls, or reproduce article text. |
 
 The reproducible snapshot contains **3,961 unique matches, 24 observed competition names, and 80
 competition-season pairs** from 1958-06-24 through 2025-07-27. Four WSL seasons contain **457
@@ -220,6 +250,24 @@ soccer-engine evaluate-live-replay --limit 50 --interval 10
 Real live mode is intentionally disabled without a contractually legitimate feed. Set
 `LIVE_SOCCER_API_KEY` only for a reviewed adapter; the included offline replay requires no key.
 
+Award coverage, historical rankings, and the reproducible scoring simulation are available with:
+
+```bash
+soccer-engine awards
+soccer-engine award-coverage
+soccer-engine rank-awards --award wsl_golden_boot --edition 2023/2024 --as-of 2024-03-02
+soccer-engine simulate-golden-boot --competition WSL --season 2023/2024 --as-of 2024-03-02
+soccer-engine evaluate-awards
+soccer-engine import-award-candidates verified_candidates.csv
+soccer-engine import-award-results verified_results.csv
+soccer-engine import-media-rankings permitted_rankings.csv
+soccer-engine import-goal-nominations official_goal_nominees.csv
+```
+
+`ballon_dor`, `fifa_best_men`, and other global awards return `unavailable` until a complete,
+source-attributed candidate pool is imported. Missing media is reported as missing—not converted
+to neutral or positive sentiment.
+
 ## API example
 
 ```bash
@@ -230,6 +278,15 @@ The versioned API also exposes `/competitions`, `/seasons`, `/fixtures`, team/pl
 scorers, timing, freshness, providers, models, evaluation, and health. Phase 3.5 adds
 `POST /predictions/batch`, batch status, daily results/summary, live event/commentary ingestion,
 live state/prediction/timeline reads, and `POST /live/replay/{match_id}`, all beneath `/api/v1`.
+Phase 4 adds award catalog, definition, edition, candidate, ranking, prediction, leaderboard,
+history, evaluation, media-observation, and recomputation routes under `/api/v1/awards`.
+
+```bash
+curl 'http://127.0.0.1:8000/api/v1/awards/wsl_golden_boot/rankings?edition=2023%2F2024&as_of=2024-03-02T00:00:00Z'
+curl -X POST http://127.0.0.1:8000/api/v1/awards/recompute \
+  -H 'Content-Type: application/json' \
+  -d '{"award_id":"wsl_golden_boot","edition":"2023/2024","as_of":"2024-03-02T00:00:00Z","simulations":5000,"seed":42}'
+```
 
 ```json
 {
@@ -251,7 +308,7 @@ live state/prediction/timeline reads, and `POST /live/replay/{match_id}`, all be
   "goal_intervals": [
     {"interval": "0-15", "home_goal_probability": 0.19, "away_goal_probability": 0.14, "any_goal_probability": 0.30}
   ],
-  "model_version": "0.3.5",
+  "model_version": "0.4.0",
   "reliability": "medium",
   "warnings": ["Current injury and suspension data are unavailable; lineup probabilities use prior squads."]
 }
@@ -301,12 +358,38 @@ clustered 95% intervals were 0.126–0.171, 0.193–0.229, and 0.217–0.246. Ne
 was 73.28% over 1,048 eligible snapshots. These observations come from one competition and are not
 evidence of production live-feed performance.
 
+### Measured Phase 4 award results
+
+The only compatible local award evaluation is a statistics-derived WSL Golden Boot study—not an
+official vote-label dataset. It evaluates **12 chronological snapshots across four editions**
+(2018/19, 2019/20, 2020/21, and 2023/24), covering 2018-10-21 through 2024-03-24 and **2,787
+candidate rows**. The transparent simulation achieved 58.3% top-one accuracy, 66.7% top-three hit
+rate, 75.0% top-five hit rate, 0.668 mean reciprocal rank, 0.738 NDCG, 3.748 winner log loss, 0.698
+multiclass Brier, 0.304 Spearman correlation, and 0.275 Kendall correlation. Its top-one accuracy
+equals the goals-only and goal-contribution baselines; it does not demonstrate improvement.
+
+The derived end-of-snapshot leaders are Vivianne Miedema (21) in 2018/19, Vivianne Miedema (16) in
+2019/20, Vivianne Miedema and Samantha Kerr tied on 18 in 2020/21, and Khadija Shaw (21) in 2023/24.
+These labels are reconstructed from the complete local StatsBomb event snapshot, not bundled
+official award-result records.
+
+Top-one accuracy was 25% at early snapshots and 75% at both midseason and late snapshots. Only four
+editions exist, so bootstrap confidence intervals would be misleading. The very low candidate-row
+calibration error is also dominated by many non-winning players and must not be read in isolation.
+
+A 10,000-run 2023/24 WSL simulation as of 2024-03-02 ranked Khadija Shaw first: 14 observed goals,
+4.55 expected additional goals, 18.55 projected goals, and an 84.73% winner probability. Lauren
+James ranked second at 14.66%. These are historical replay estimates using incomplete availability
+evidence, not contemporary predictions or betting advice.
+
 ## Dashboard screenshots
 
 Screenshots will be added after deployment. The dashboard includes global coverage, upcoming and
 daily fixtures, batch progress, tier coverage, provider status, cross-league evaluation,
 predictions, lineups, scorers, timing, replay probability movement, event timelines, and feed
-freshness warnings.
+freshness warnings. Award Intelligence adds edition/as-of selectors, component leaderboards,
+winner-probability charts, candidate comparison, snapshot history, completeness, attribution,
+historical evaluation, and explicit metadata-only warnings.
 
 ## Development
 
@@ -337,14 +420,23 @@ Parquet, secrets, and model binaries are ignored by Git.
 - Live coefficients are currently transparent heuristics evaluated on 50 WSL matches. They require
   broader competition data, probability calibration, and prospective validation before production
   claims.
+- No complete Ballon d'Or, FIFA, UEFA, confederation, or global Golden Boot candidate corpus is
+  bundled. Those awards return unavailable, partial, or credential-required responses rather than
+  invented probabilities.
+- Historical award labels are not bundled. The WSL evaluation derives final scoring leaders from
+  the compatible StatsBomb snapshot and does not call them official vote totals.
+- Goalkeeper/defender normalization is supported for imported evidence, but reliable defensive
+  features are too sparse for current global award predictions.
+- Puskás rankings are metadata/sentiment-only until a legitimate licensed video-analysis pipeline
+  exists; visual beauty and difficulty are never fabricated.
 - Explanations describe associations the model used; they do not establish causation.
 
 ## Roadmap
 
-1. **Awards:** historical labels, separate statistical and media-sentiment components, and a constrained
-   Puskás interface that never fabricates video-quality scores.
-2. **Production:** PostgreSQL, task orchestration, drift monitoring, SHAP/permutation reports, model
-   cards, authentication, and deployed screenshots.
+1. **Phase 5 deployment:** move snapshots and jobs to PostgreSQL/object storage, add authenticated
+   background workers, signed provider webhooks, observability, drift monitoring, and model cards.
+2. **Licensed expansion:** ingest verified official award labels, complete player/trophy datasets,
+   permitted media APIs, and—only if rights allow—a separately validated video-analysis service.
 
 ## Resume-ready bullets
 
@@ -354,6 +446,8 @@ Parquet, secrets, and model binaries are ignored by Git.
   against transparent probabilistic baselines.
 - Built calibrated three-way outcome and Poisson scoreline inference with structured uncertainty,
   bootstrap evaluation, API validation, CI, and an offline real-data smoke test.
+- Designed an edition-aware award engine with cutoff-safe component rankings, reproducible scoring
+  simulations, immutable time-travel snapshots, and honest unavailable/metadata-only fallbacks.
 
 ## Attribution
 

@@ -1,0 +1,281 @@
+schema_version: "1.0"
+awards:
+  - id: ballon_dor
+    official_name: Ballon d'Or
+    organization: France Football
+    category: narrative
+    methodology: vote_based
+    coverage: unavailable
+    providers: [manual_structured_import]
+    required_data: [complete_candidate_pool, period_statistics, official_results]
+    optional_data: [vote_totals, journalist_rankings, team_achievements]
+    editions:
+      - edition: "2025"
+        eligibility_start: 2024-08-01T00:00:00Z
+        eligibility_end: 2025-07-31T23:59:59Z
+        nomination_date: 2025-08-07T00:00:00Z
+        ceremony_date: 2025-09-22T00:00:00Z
+        rules: "Season-based France Football jury vote; official edition rules govern."
+        tie_break: official_vote_rules
+  - id: fifa_best_men
+    official_name: The Best FIFA Men's Player
+    organization: FIFA
+    category: narrative
+    methodology: vote_based
+    coverage: unavailable
+    providers: [manual_structured_import]
+    required_data: [complete_candidate_pool, official_results]
+    optional_data: [official_vote_totals, period_statistics]
+    editions:
+      - edition: "2025"
+        eligibility_start: 2024-08-11T00:00:00Z
+        eligibility_end: 2025-08-02T23:59:59Z
+        nomination_date: 2025-11-06T00:00:00Z
+        voting_cutoff: 2025-11-28T22:59:59Z
+        rules: "Edition-specific FIFA eligibility and four voting groups."
+        tie_break: official_vote_rules
+  - id: uefa_mens_player
+    official_name: UEFA Men's Player of the Year / current equivalent
+    organization: UEFA
+    category: narrative
+    methodology: vote_based
+    coverage: unavailable
+    providers: [manual_structured_import]
+    required_data: [official_edition_confirmation, official_results]
+    optional_data: [period_statistics, journalist_rankings]
+    editions: []
+  - id: caf_mens_player_year
+    official_name: CAF Men's Player of the Year
+    organization: CAF
+    category: narrative
+    methodology: vote_based
+    coverage: unavailable
+    providers: [manual_structured_import]
+    required_data: [official_nominees, official_results, complete_candidate_pool]
+    optional_data: [official_vote_totals, period_statistics]
+    editions: []
+  - id: afc_player_year
+    official_name: AFC Player of the Year
+    organization: AFC
+    category: narrative
+    methodology: vote_based
+    coverage: unavailable
+    providers: [manual_structured_import]
+    required_data: [official_nominees, official_results, complete_candidate_pool]
+    optional_data: [official_vote_totals, period_statistics]
+    editions: []
+  - id: european_golden_shoe
+    official_name: European Golden Shoe
+    organization: European Sports Media
+    category: scoring
+    methodology: statistics_based
+    coverage: partial
+    providers: [manual_structured_import]
+    required_data: [league_goals, league_coefficient, complete_schedule]
+    optional_data: [expected_goals, availability]
+    editions: []
+  - id: ucl_golden_boot
+    official_name: UEFA Champions League Top Scorer
+    organization: UEFA
+    category: scoring
+    methodology: statistics_based
+    coverage: partial
+    providers: [statsbomb_open_data, manual_structured_import]
+    required_data: [competition_goals, complete_schedule]
+    optional_data: [expected_goals, availability]
+    editions: []
+  - id: premier_league_golden_boot
+    official_name: Premier League Golden Boot
+    organization: Premier League
+    category: scoring
+    methodology: statistics_based
+    coverage: partial
+    providers: [manual_structured_import]
+    required_data: [competition_goals, complete_schedule]
+    optional_data: [expected_goals, availability]
+    editions: []
+  - id: la_liga_pichichi
+    official_name: Pichichi Trophy
+    organization: Marca
+    category: scoring
+    methodology: statistics_based
+    coverage: partial
+    providers: [manual_structured_import]
+    required_data: [competition_goals, complete_schedule]
+    optional_data: [expected_goals, availability]
+    editions: []
+  - id: serie_a_capocannoniere
+    official_name: Serie A Capocannoniere
+    organization: Lega Serie A
+    category: scoring
+    methodology: statistics_based
+    coverage: partial
+    providers: [manual_structured_import]
+    required_data: [competition_goals, complete_schedule]
+    optional_data: [expected_goals, availability]
+    editions: []
+  - id: bundesliga_top_scorer
+    official_name: Bundesliga Top Scorer
+    organization: DFL
+    category: scoring
+    methodology: statistics_based
+    coverage: partial
+    providers: [manual_structured_import]
+    required_data: [competition_goals, complete_schedule]
+    optional_data: [expected_goals, availability]
+    editions: []
+  - id: ligue1_top_scorer
+    official_name: Ligue 1 Top Scorer
+    organization: LFP
+    category: scoring
+    methodology: statistics_based
+    coverage: partial
+    providers: [manual_structured_import]
+    required_data: [competition_goals, complete_schedule]
+    optional_data: [expected_goals, availability]
+    editions: []
+  - id: mls_golden_boot
+    official_name: MLS Golden Boot
+    organization: Major League Soccer
+    category: scoring
+    methodology: statistics_based
+    coverage: partial
+    providers: [manual_structured_import]
+    required_data: [competition_goals, assists, minutes, complete_schedule]
+    optional_data: [expected_goals, availability]
+    editions: []
+  - id: saudi_pro_league_top_scorer
+    official_name: Saudi Pro League Top Scorer
+    organization: Saudi Pro League
+    category: scoring
+    methodology: statistics_based
+    coverage: credential_required
+    providers: [api_football, sportmonks]
+    required_data: [competition_goals, complete_schedule]
+    optional_data: [expected_goals, availability]
+    editions: []
+  - id: wsl_golden_boot
+    official_name: Women's Super League Golden Boot
+    organization: Women's Super League
+    category: scoring
+    methodology: statistics_based
+    coverage: statistical_only
+    providers: [statsbomb_open_data]
+    required_data: [competition_goals, schedule]
+    optional_data: [expected_goals, availability]
+    editions:
+      - {edition: "2018/2019", eligibility_start: 2018-09-01T00:00:00Z, eligibility_end: 2019-06-30T23:59:59Z, rules: "Most league goals; shared lead represented as a tie.", tie_break: shared}
+      - {edition: "2019/2020", eligibility_start: 2019-09-01T00:00:00Z, eligibility_end: 2020-06-30T23:59:59Z, rules: "Most league goals; shared lead represented as a tie.", tie_break: shared}
+      - {edition: "2020/2021", eligibility_start: 2020-09-01T00:00:00Z, eligibility_end: 2021-06-30T23:59:59Z, rules: "Most league goals; shared lead represented as a tie.", tie_break: shared}
+      - {edition: "2023/2024", eligibility_start: 2023-09-01T00:00:00Z, eligibility_end: 2024-06-30T23:59:59Z, rules: "Most league goals; shared lead represented as a tie.", tie_break: shared}
+  - id: world_cup_golden_boot
+    official_name: FIFA World Cup Golden Boot
+    organization: FIFA
+    category: scoring
+    methodology: statistics_based
+    coverage: partial
+    providers: [statsbomb_open_data, manual_structured_import]
+    required_data: [tournament_goals, edition_tie_rules]
+    optional_data: [assists, minutes]
+    editions:
+      - {edition: "1994", eligibility_start: 1994-06-17T00:00:00Z, eligibility_end: 1994-07-17T23:59:59Z, rules: "Edition awarded a shared scoring lead.", tie_break: shared}
+      - {edition: "2010", eligibility_start: 2010-06-11T00:00:00Z, eligibility_end: 2010-07-11T23:59:59Z, rules: "Goals, then assists, then fewer minutes under edition rules.", tie_break: assists_then_minutes}
+      - {edition: "2022", eligibility_start: 2022-11-20T00:00:00Z, eligibility_end: 2022-12-18T23:59:59Z, rules: "Goals, then assists, then fewer minutes under edition rules.", tie_break: assists_then_minutes}
+  - id: euro_golden_boot
+    official_name: UEFA European Championship Top Scorer
+    organization: UEFA
+    category: scoring
+    methodology: statistics_based
+    coverage: partial
+    providers: [statsbomb_open_data, manual_structured_import]
+    required_data: [tournament_goals, edition_tie_rules]
+    optional_data: [assists, minutes]
+    editions:
+      - {edition: "2020", eligibility_start: 2021-06-11T00:00:00Z, eligibility_end: 2021-07-11T23:59:59Z, rules: "Goals with edition-specific assists and minutes tie-breaks.", tie_break: assists_then_minutes}
+      - {edition: "2024", eligibility_start: 2024-06-14T00:00:00Z, eligibility_end: 2024-07-14T23:59:59Z, rules: "Top-scorer award shared among tied leading scorers under the 2024 rule.", tie_break: shared}
+  - id: copa_america_golden_boot
+    official_name: Copa América Golden Boot
+    organization: CONMEBOL
+    category: scoring
+    methodology: statistics_based
+    coverage: partial
+    providers: [statsbomb_open_data, manual_structured_import]
+    required_data: [tournament_goals, edition_tie_rules]
+    optional_data: [assists, minutes]
+    editions: []
+  - id: afcon_golden_boot
+    official_name: Africa Cup of Nations Golden Boot
+    organization: CAF
+    category: scoring
+    methodology: statistics_based
+    coverage: partial
+    providers: [statsbomb_open_data, manual_structured_import]
+    required_data: [tournament_goals, edition_tie_rules]
+    optional_data: [assists, minutes]
+    editions: []
+  - id: afc_asian_cup_golden_boot
+    official_name: AFC Asian Cup Top Scorer
+    organization: AFC
+    category: scoring
+    methodology: statistics_based
+    coverage: partial
+    providers: [manual_structured_import]
+    required_data: [tournament_goals, edition_tie_rules]
+    optional_data: [assists, minutes]
+    editions: []
+  - id: world_cup_golden_ball
+    official_name: FIFA World Cup Golden Ball
+    organization: FIFA
+    category: tournament_best_player
+    methodology: vote_based
+    coverage: partial
+    providers: [statsbomb_open_data, manual_structured_import]
+    required_data: [official_nominees, official_results, tournament_statistics]
+    optional_data: [player_of_match_awards]
+    editions:
+      - {edition: "2022", eligibility_start: 2022-11-20T00:00:00Z, eligibility_end: 2022-12-18T23:59:59Z, nomination_date: 2022-12-18T00:00:00Z, rules: "Tournament-only official technical-study-group award.", tie_break: official_vote_rules}
+  - id: euro_player_of_tournament
+    official_name: UEFA EURO Player of the Tournament
+    organization: UEFA
+    category: tournament_best_player
+    methodology: vote_based
+    coverage: partial
+    providers: [statsbomb_open_data, manual_structured_import]
+    required_data: [official_nominees, official_results, tournament_statistics]
+    optional_data: [player_of_match_awards]
+    editions: []
+  - id: copa_america_best_player
+    official_name: Copa América Best Player
+    organization: CONMEBOL
+    category: tournament_best_player
+    methodology: vote_based
+    coverage: partial
+    providers: [statsbomb_open_data, manual_structured_import]
+    required_data: [official_nominees, official_results, tournament_statistics]
+    optional_data: [player_of_match_awards]
+    editions: []
+  - id: ucl_player_of_season
+    official_name: UEFA Champions League Player of the Season
+    organization: UEFA
+    category: tournament_best_player
+    methodology: vote_based
+    coverage: partial
+    providers: [statsbomb_open_data, manual_structured_import]
+    required_data: [official_nominees, official_results, tournament_statistics]
+    optional_data: [player_of_match_awards]
+    editions: []
+  - id: fifa_puskas
+    official_name: FIFA Puskás Award
+    organization: FIFA
+    category: goal
+    methodology: nomination_based
+    coverage: metadata_only
+    providers: [manual_structured_import]
+    required_data: [official_nominees, goal_metadata]
+    optional_data: [official_votes, journalist_rankings, licensed_video_features]
+    editions:
+      - edition: "2025"
+        eligibility_start: 2024-08-11T00:00:00Z
+        eligibility_end: 2025-08-02T23:59:59Z
+        rules: "Metadata and attributed sentiment only unless licensed video features exist."
+        tie_break: official_vote_rules

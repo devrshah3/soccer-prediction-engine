@@ -171,6 +171,17 @@ def test_versioned_phase3_api_routes_exist() -> None:
         "/api/v1/live/matches/{fixture_id}/prediction",
         "/api/v1/live/matches/{fixture_id}/timeline",
         "/api/v1/live/replay/{match_id}",
+        "/api/v1/awards",
+        "/api/v1/awards/{award_id}",
+        "/api/v1/awards/{award_id}/editions",
+        "/api/v1/awards/{award_id}/candidates",
+        "/api/v1/awards/{award_id}/rankings",
+        "/api/v1/awards/{award_id}/predictions",
+        "/api/v1/awards/{award_id}/leaderboard",
+        "/api/v1/awards/{award_id}/history",
+        "/api/v1/awards/{award_id}/evaluation",
+        "/api/v1/awards/{award_id}/media-observations",
+        "/api/v1/awards/recompute",
         "/api/v1/providers",
         "/api/v1/evaluation",
         "/api/v1/data-quality",
@@ -178,4 +189,4 @@ def test_versioned_phase3_api_routes_exist() -> None:
     assert required.issubset(paths)
     response = TestClient(app).get("/api/v1/health")
     assert response.status_code == 200
-    assert response.json()["version"] == "0.3.5"
+    assert response.json()["version"] == "0.4.0"

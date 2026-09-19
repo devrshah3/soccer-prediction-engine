@@ -28,7 +28,7 @@ from soccer_engine.features.team import build_match_features
 from soccer_engine.models.goals import PoissonGoalModel
 from soccer_engine.models.outcome import MostCommonBaseline, OutcomeModel
 
-MODEL_VERSION = "0.3.5"
+MODEL_VERSION = "0.4.0"
 
 
 @dataclass

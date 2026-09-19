@@ -4,7 +4,7 @@ import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Annotated, Any, cast
 
 import pandas as pd
 from fastapi import APIRouter, FastAPI, HTTPException, Query
@@ -17,6 +17,13 @@ from soccer_engine.api.models import (
     LiveIngestResponse,
     StatusResponse,
 )
+from soccer_engine.awards import (
+    AwardEngine,
+    AwardPrediction,
+    AwardRecomputeRequest,
+    MediaObservation,
+)
+from soccer_engine.awards.schemas import AwardDefinition
 from soccer_engine.batch import BatchEngine, BatchJob, BatchJobRequest, DailySummary
 from soccer_engine.config import coverage_report
 from soccer_engine.live import LiveEngine, StatsBombReplay
@@ -32,7 +39,7 @@ from soccer_engine.live.schemas import (
 from soccer_engine.schemas import FixturePrediction
 from soccer_engine.services import SoccerService
 
-VERSION = "0.3.5"
+VERSION = "0.4.0"
 app = FastAPI(
     title="Global Soccer Prediction Engine",
     version=VERSION,
@@ -266,6 +273,123 @@ def data_quality() -> StatusResponse:
         },
         warnings=["Coverage is provider- and season-specific; adapter-ready is not ingested data."],
     )
+
+
+def _award_engine() -> AwardEngine:
+    return AwardEngine()
+
+
+@router.get("/awards", response_model=StatusResponse)
+def awards() -> StatusResponse:
+    report = _award_engine().list_awards()
+    return StatusResponse(status="partial", data=report)
+
+
+@router.get("/awards/{award_id}", response_model=AwardDefinition)
+def award_definition(award_id: str) -> AwardDefinition:
+    try:
+        return _award_engine().registry.get(award_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get("/awards/{award_id}/editions", response_model=StatusResponse)
+def award_editions(award_id: str) -> StatusResponse:
+    award = award_definition(award_id)
+    values = [item.model_dump(mode="json") for item in award.editions]
+    return StatusResponse(status="available" if values else "partial", data=values)
+
+
+def _award_prediction(
+    award_id: str, as_of: datetime, edition: str | None = None
+) -> AwardPrediction:
+    try:
+        return _award_engine().rank(award_id, as_of, edition=edition)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get("/awards/{award_id}/candidates", response_model=StatusResponse)
+def award_candidates(
+    award_id: str,
+    as_of: Annotated[datetime | None, Query()] = None,
+    edition: str | None = None,
+) -> StatusResponse:
+    prediction_value = _award_prediction(award_id, as_of or datetime.now(UTC), edition)
+    return StatusResponse(
+        status=prediction_value.status,
+        data=[item.model_dump(mode="json") for item in prediction_value.candidates],
+        warnings=prediction_value.warnings,
+    )
+
+
+@router.get("/awards/{award_id}/rankings", response_model=AwardPrediction)
+def award_rankings(
+    award_id: str,
+    as_of: Annotated[datetime | None, Query()] = None,
+    edition: str | None = None,
+) -> AwardPrediction:
+    return _award_prediction(award_id, as_of or datetime.now(UTC), edition)
+
+
+@router.get("/awards/{award_id}/predictions", response_model=AwardPrediction)
+def award_predictions(
+    award_id: str,
+    as_of: Annotated[datetime | None, Query()] = None,
+    edition: str | None = None,
+) -> AwardPrediction:
+    return _award_prediction(award_id, as_of or datetime.now(UTC), edition)
+
+
+@router.get("/awards/{award_id}/leaderboard", response_model=AwardPrediction)
+def award_leaderboard(
+    award_id: str,
+    as_of: Annotated[datetime | None, Query()] = None,
+    edition: str | None = None,
+) -> AwardPrediction:
+    return _award_prediction(award_id, as_of or datetime.now(UTC), edition)
+
+
+@router.get("/awards/{award_id}/history", response_model=StatusResponse)
+def award_history(award_id: str) -> StatusResponse:
+    try:
+        values = _award_engine().history(award_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return StatusResponse(status="available" if values else "unavailable", data=values)
+
+
+@router.get("/awards/{award_id}/evaluation", response_model=StatusResponse)
+def award_evaluation(award_id: str) -> StatusResponse:
+    path = Path("reports/award_evaluation.json")
+    if not path.exists():
+        return StatusResponse(status="unavailable", data={})
+    report = _json_report(path)
+    if report.get("award_id") != award_id:
+        return StatusResponse(status="unavailable", data={})
+    return StatusResponse(status="partial", data=report, warnings=report.get("warnings", []))
+
+
+@router.post("/awards/{award_id}/media-observations", response_model=StatusResponse)
+def add_award_media(award_id: str, observations: list[MediaObservation]) -> StatusResponse:
+    if any(item.award_id != award_id for item in observations):
+        raise HTTPException(status_code=422, detail="award_id does not match route")
+    count = _award_engine().add_media_observations(observations)
+    return StatusResponse(status="available", data={"imported": count})
+
+
+@router.post("/awards/recompute", response_model=AwardPrediction)
+def recompute_award(request: AwardRecomputeRequest) -> AwardPrediction:
+    try:
+        return _award_engine().rank(
+            request.award_id,
+            request.as_of,
+            edition=request.edition,
+            simulations=request.simulations,
+            seed=request.seed,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 def _live_engine() -> LiveEngine:

@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from soccer_engine.awards import AwardEngine
 from soccer_engine.batch import BatchEngine, BatchJobRequest
 from soccer_engine.config import coverage_report
 from soccer_engine.live import LiveEngine, StatsBombReplay
@@ -46,7 +47,7 @@ page = st.sidebar.radio(
         "Cross-league evaluation",
         "Provider health",
         "Data quality",
-        "Award rankings",
+        "Award Intelligence",
     ],
 )
 
@@ -366,8 +367,107 @@ elif page == "Data quality":
         "Current injuries and suspensions are not available."
     )
 else:
-    st.subheader("Award rankings")
-    st.info(
-        "Schema and ranking contract are ready. Rankings remain disabled until Phase 4 labels "
-        "and cutoff-safe candidate data are ingested; no scores are fabricated."
+    st.subheader("Award Intelligence")
+    award_engine = AwardEngine(service.store)
+    definitions = award_engine.registry.awards
+    award_id = st.selectbox(
+        "Award",
+        list(definitions),
+        format_func=lambda value: definitions[value].official_name,
     )
+    definition = definitions[award_id]
+    editions = [item.edition for item in definition.editions]
+    edition = st.selectbox("Edition", editions) if editions else None
+    as_of_date = st.date_input("Evidence cutoff")
+    st.caption(
+        f"{definition.organization} · {definition.category} · coverage: {definition.coverage}"
+    )
+    if award_id == "fifa_puskas":
+        st.warning(
+            "Puskás output is metadata/sentiment-only without licensed video analysis. "
+            "The engine never fabricates beauty or visual-difficulty scores."
+        )
+    if st.button("Compute cutoff-safe ranking"):
+        computed_award_prediction = award_engine.rank(
+            award_id,
+            pd.Timestamp(as_of_date, tz="UTC").to_pydatetime(),
+            edition=edition,
+        )
+        st.session_state["award_prediction"] = computed_award_prediction
+    award_prediction = st.session_state.get("award_prediction")
+    if award_prediction and award_prediction.award_id == award_id:
+        st.caption(
+            f"As of {award_prediction.as_of:%Y-%m-%d} · {award_prediction.status} · "
+            f"model {award_prediction.model_version}"
+        )
+        if not award_prediction.candidates:
+            st.error("No defensible candidate probability is available for this cutoff.")
+        else:
+            candidate_frame = pd.DataFrame(
+                [item.model_dump(mode="json") for item in award_prediction.candidates]
+            )
+            probability_figure = go.Figure(
+                go.Bar(
+                    x=candidate_frame.head(15)["candidate_name"],
+                    y=candidate_frame.head(15)["winner_probability"],
+                    marker_color="#31c48d",
+                )
+            )
+            probability_figure.update_layout(
+                title="Winner probability", yaxis_tickformat=".0%", template="plotly_dark"
+            )
+            st.plotly_chart(probability_figure, width="stretch")
+            st.dataframe(candidate_frame, hide_index=True, width="stretch")
+            components = st.tabs(
+                ["Statistical", "Team success", "International", "Journalism/media"]
+            )
+            component_columns = [
+                "statistical_score",
+                "team_achievement_score",
+                "international_score",
+                "media_score",
+            ]
+            for tab, column in zip(components, component_columns, strict=True):
+                with tab:
+                    st.dataframe(
+                        candidate_frame[["candidate_name", column]].sort_values(
+                            column, ascending=False, na_position="last"
+                        ),
+                        hide_index=True,
+                        width="stretch",
+                    )
+            compared = st.multiselect(
+                "Compare candidates", candidate_frame["candidate_name"].tolist(), max_selections=4
+            )
+            if compared:
+                st.dataframe(
+                    candidate_frame[candidate_frame["candidate_name"].isin(compared)],
+                    hide_index=True,
+                    width="stretch",
+                )
+        for warning in award_prediction.warnings:
+            st.warning(warning)
+        st.caption("Sources: " + ", ".join(award_prediction.source_attribution or ["none"]))
+    history = award_engine.history(award_id)
+    if history:
+        st.subheader("Ranking movement and immutable snapshots")
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "as_of": item["as_of"],
+                        "status": item["status"],
+                        "leader": item["candidates"][0]["candidate_name"]
+                        if item["candidates"]
+                        else None,
+                    }
+                    for item in history
+                ]
+            ),
+            hide_index=True,
+            width="stretch",
+        )
+    evaluation_path = Path("reports/award_evaluation.json")
+    if evaluation_path.exists() and award_id == "wsl_golden_boot":
+        st.subheader("Historical chronological evaluation")
+        st.json(json.loads(evaluation_path.read_text()))
