@@ -1,0 +1,2 @@
+# Streamlit Community Cloud installs this project and its runtime dependencies from pyproject.toml.
+-e .

@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: soccer-prediction-engine-api
+    runtime: python
+    plan: free
+    branch: main
+    buildCommand: pip install --upgrade pip && pip install . && soccer-engine demo
+    startCommand: uvicorn soccer_engine.api.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: SOCCER_ENGINE_ENV
+        value: production

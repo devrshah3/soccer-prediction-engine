@@ -208,6 +208,66 @@ soccer-engine predict --fixture-id statsbomb:3913082
 soccer-engine serve-api
 ```
 
+## Public cloud deployment
+
+Both deployment targets use Python 3.11 and start from the repository root. Generated Parquet
+tables, DuckDB files, reports, caches, and `models/champion.joblib` remain git-ignored. The cloud
+startup workflow builds those artifacts from the attributed bundled sample instead of committing
+them.
+
+No secret is required for the credential-free historical dashboard, API health check, or offline
+predictions. `FOOTBALL_DATA_ORG_API_KEY` and `LIVE_SOCCER_API_KEY` are optional and should only be
+configured through the hosting provider's secret manager for legitimate provider access. Never
+commit `.env` or `.streamlit/secrets.toml`.
+
+### Streamlit Community Cloud
+
+1. In Streamlit Community Cloud, create an app from
+   `devrshah3/soccer-prediction-engine`, branch `main`.
+2. Set the main file path to `streamlit_app.py` and select Python 3.11 in Advanced settings.
+3. Deploy without secrets for offline mode. On the first launch, the app idempotently builds the
+   132-match demonstration from committed StatsBomb sample data; this can take several seconds.
+4. If licensed live integrations are later enabled, add optional keys in the app's Secrets panel:
+
+   ```toml
+   FOOTBALL_DATA_ORG_API_KEY = "..."
+   LIVE_SOCCER_API_KEY = "..."
+   ```
+
+The root `requirements.txt` installs the local package and all dashboard dependencies declared in
+`pyproject.toml`. `.streamlit/config.toml` supplies headless server and production theme settings.
+When optional keys are absent, the dashboard explicitly identifies offline mode and unavailable
+live-provider features.
+
+Local equivalent:
+
+```bash
+streamlit run streamlit_app.py --server.headless true
+```
+
+### Render FastAPI service
+
+Create a Render Blueprint from this repository. [`render.yaml`](render.yaml) defines a free Python
+web service with:
+
+```text
+Build command: pip install --upgrade pip && pip install . && soccer-engine demo
+Start command: uvicorn soccer_engine.api.app:app --host 0.0.0.0 --port $PORT
+Health check: /api/v1/health
+```
+
+The build command creates the offline data and model artifacts on Render's build filesystem. The
+start command honors Render's assigned `PORT`; no fixed public port is assumed. After deployment,
+verify `https://<service-name>.onrender.com/api/v1/health`. Add optional provider credentials only
+through Render environment variables.
+
+Local equivalent:
+
+```bash
+PORT=8000 uvicorn soccer_engine.api.app:app --host 0.0.0.0 --port "$PORT"
+curl http://127.0.0.1:8000/api/v1/health
+```
+
 To reproduce the larger Phase 3 evaluations, download only the public assets from the official
 StatsBomb repository. Downloads are cached and generated snapshots remain git-ignored:
 

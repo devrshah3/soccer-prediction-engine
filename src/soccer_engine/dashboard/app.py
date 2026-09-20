@@ -1,6 +1,7 @@
 """Recruiter-friendly Streamlit interface."""
 
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -9,6 +10,7 @@ import streamlit as st
 
 from soccer_engine.awards import AwardEngine
 from soccer_engine.batch import BatchEngine, BatchJobRequest
+from soccer_engine.cloud import ensure_offline_demo
 from soccer_engine.config import coverage_report
 from soccer_engine.live import LiveEngine, StatsBombReplay
 from soccer_engine.live.schemas import ReplayResult
@@ -33,6 +35,37 @@ st.title("⚽ Global Soccer Prediction Engine")
 st.caption(
     "Time-safe, calibrated soccer analytics · Predictions are uncertain, not betting guarantees"
 )
+
+for optional_secret in ("FOOTBALL_DATA_ORG_API_KEY", "LIVE_SOCCER_API_KEY"):
+    if os.getenv(optional_secret):
+        continue
+    try:
+        secret_value = st.secrets.get(optional_secret)
+    except FileNotFoundError:
+        secret_value = None
+    if secret_value:
+        os.environ[optional_secret] = str(secret_value)
+
+try:
+    with st.spinner("Preparing the credential-free offline demo…"):
+        generated_demo = ensure_offline_demo()
+except (FileNotFoundError, RuntimeError, ValueError) as error:
+    st.error(f"The offline demo could not be prepared: {error}")
+    st.stop()
+
+if generated_demo:
+    st.success("Offline demonstration data and models were prepared from the bundled sample.")
+
+missing_live_credentials = [
+    name for name in ("FOOTBALL_DATA_ORG_API_KEY", "LIVE_SOCCER_API_KEY") if not os.getenv(name)
+]
+if missing_live_credentials:
+    st.info(
+        "Offline demonstration mode is active. Historical predictions and replays work without "
+        "credentials; live fixtures or live match feeds remain unavailable until legitimate "
+        "provider keys are configured."
+    )
+    st.sidebar.warning("Live provider data unavailable · offline demo active")
 
 page = st.sidebar.radio(
     "Explore",
