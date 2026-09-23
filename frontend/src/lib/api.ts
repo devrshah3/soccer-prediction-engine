@@ -129,6 +129,17 @@ async function apiFetch<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export type Awards = {
+  golden_boot: {
+    available: boolean;
+    reason: string;
+    international_top_scorers: { player: string; team_id: string; team_name: string; goals: number }[];
+    lookback_days: number;
+  };
+  ballon_dor: { available: boolean; reason: string };
+  puskas: { available: boolean; reason: string };
+};
+
 export const api = {
   leagues: () => apiFetch<League[]>("/leagues"),
   standings: (code: string, season?: string) =>
@@ -145,6 +156,7 @@ export const api = {
         throw e;
       }
     ),
+  awards: () => apiFetch<Awards>("/awards"),
   match: (id: number) => apiFetch<Match>(`/matches/${id}`),
   prediction: (id: number) => apiFetch<Prediction | null>(`/matches/${id}/prediction`).catch((e) => {
     if (e instanceof ApiError && e.status === 503) return null;

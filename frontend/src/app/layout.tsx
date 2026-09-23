@@ -51,6 +51,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               <Link href="/assistant" className="hover:text-emerald-400">
                 Ask about soccer
               </Link>
+              <Link href="/awards" className="hover:text-emerald-400">
+                Awards
+              </Link>
             </div>
           </nav>
         </header>
