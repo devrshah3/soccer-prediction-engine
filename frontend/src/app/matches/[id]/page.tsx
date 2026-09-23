@@ -63,6 +63,35 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                   ))}
                 </div>
               </div>
+              <div className="mt-4">
+                <h3 className="mb-2 text-sm font-medium text-zinc-400">Chance of a goal, by window</h3>
+                <div className="flex gap-1">
+                  {prediction.goal_timing.map((w) => (
+                    <div key={w.window} className="flex-1 text-center">
+                      <div
+                        className="mx-auto w-full rounded-t bg-emerald-600"
+                        style={{ height: `${Math.max(4, w.prob_at_least_one_goal * 80)}px` }}
+                        title={`${w.window}': ${Math.round(w.prob_at_least_one_goal * 100)}% chance of a goal`}
+                      />
+                      <p className="mt-1 text-[10px] text-zinc-500">{w.window}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {prediction.likely_scorers.available ? (
+                <div className="mt-4">
+                  <h3 className="mb-2 text-sm font-medium text-zinc-400">Likely goalscorers</h3>
+                  <p className="mb-2 text-[11px] text-zinc-600">{prediction.likely_scorers.method}</p>
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <ScorerList label={match.home_team.name} scorers={prediction.likely_scorers.home} />
+                    <ScorerList label={match.away_team.name} scorers={prediction.likely_scorers.away} />
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-4 text-xs text-zinc-600">Likely goalscorers: not available - {prediction.likely_scorers.reason}</p>
+              )}
+
               <p className="mt-4 text-xs text-zinc-500">
                 as of {prediction.as_of} &middot; {prediction.model_version} &middot; trained on{" "}
                 {prediction.train_matches.total} matches ({prediction.train_matches.home} for{" "}
@@ -97,6 +126,32 @@ function TeamLink({ id, name }: { id: string; name: string }) {
     <Link href={`/teams/${encodeURIComponent(id)}`} className="text-xl font-semibold text-zinc-100 hover:text-emerald-400">
       {name}
     </Link>
+  );
+}
+
+function ScorerList({
+  label,
+  scorers,
+}: {
+  label: string;
+  scorers: { player: string; prob_scores: number }[];
+}) {
+  return (
+    <div>
+      <p className="mb-1 font-medium text-zinc-400">{label}</p>
+      {scorers.length === 0 ? (
+        <p className="text-zinc-600">no scoring history in the lookback window</p>
+      ) : (
+        <ul className="space-y-1">
+          {scorers.map((s) => (
+            <li key={s.player} className="flex justify-between text-zinc-300">
+              <span>{s.player}</span>
+              <span className="text-zinc-500">{Math.round(s.prob_scores * 100)}%</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

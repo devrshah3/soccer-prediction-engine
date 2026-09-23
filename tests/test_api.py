@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 
 from kickcast_api.db import get_session
 from kickcast_api.main import app
-from kickcast_api.models import Base, League, Match, Team
+from kickcast_api.models import Base, Goalscorer, League, Match, Team
 
 TEAMS = [f"Team {i}" for i in range(8)]
 
@@ -144,6 +144,73 @@ def test_prediction_has_valid_probabilities(client):
     assert body["as_of"]
 
 
+def test_prediction_includes_goal_timing_and_scorer_gating(client):
+    m = client.get("/leagues/test.1/fixtures").json()[0]
+    body = client.get(f"/matches/{m['id']}/prediction").json()
+    windows = body["goal_timing"]
+    assert [w["window"] for w in windows] == ["0-15", "15-30", "30-45", "45-60", "60-75", "75-90", "90+"]
+    assert abs(sum(w["expected_goals"] for w in windows) - sum(body["expected_goals"].values())) < 0.01
+    # synthetic league is domestic, not "international" -> no fabricated scorer data
+    assert body["likely_scorers"]["available"] is False
+    assert body["likely_scorers"]["home"] == []
+    assert body["likely_scorers"]["away"] == []
+
+
 def test_unknown_match_404(client):
     assert client.get("/matches/999999").status_code == 404
     assert client.get("/matches/999999/prediction").status_code == 404
+
+
+def test_international_prediction_includes_real_scorer_data(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'test_intl.db'}")
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine)
+    session = TestSession()
+    session.add(League(code="international", name="International", country=None, kind="international"))
+    session.add_all([Team(id="team-a", name="Team A", country=None), Team(id="team-b", name="Team B", country=None)])
+    d = date(2023, 1, 1)
+    for match_id in range(1, 13):
+        i = match_id - 1
+        session.add(
+            Match(
+                league_code="international", season="2023", date=d, kickoff=None,
+                home_team_id="team-a" if i % 2 == 0 else "team-b",
+                away_team_id="team-b" if i % 2 == 0 else "team-a",
+                home_goals=2, away_goals=1, status="finished", round="Friendly", neutral=False,
+                source="synthetic", source_id=f"synthetic:{match_id}",
+            )
+        )
+        d += timedelta(days=30)
+    session.add(
+        Match(
+            league_code="international", season="2024", date=d, kickoff=None,
+            home_team_id="team-a", away_team_id="team-b", home_goals=None, away_goals=None,
+            status="scheduled", round="Friendly", neutral=False,
+            source="synthetic", source_id="synthetic:upcoming",
+        )
+    )
+    session.add(
+        Goalscorer(
+            date=date(2023, 2, 1), team_id="team-a", scorer_name="Star Striker", minute=10,
+            own_goal=False, penalty=False, source="synthetic",
+        )
+    )
+    session.commit()
+
+    def override():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_session] = override
+    try:
+        c = TestClient(app)
+        fixtures = c.get("/leagues/international/fixtures").json()
+        body = c.get(f"/matches/{fixtures[0]['id']}/prediction").json()
+        assert body["likely_scorers"]["available"] is True
+        home_players = [s["player"] for s in body["likely_scorers"]["home"]]
+        assert "Star Striker" in home_players
+    finally:
+        app.dependency_overrides.clear()

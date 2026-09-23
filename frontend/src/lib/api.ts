@@ -75,6 +75,19 @@ export type Prediction = {
   home_team: TeamRef;
   away_team: TeamRef;
   match_status: "scheduled" | "finished";
+  goal_timing: {
+    window: string;
+    share_of_goals: number;
+    expected_goals: number;
+    prob_at_least_one_goal: number;
+  }[];
+  likely_scorers: {
+    available: boolean;
+    method?: string;
+    reason?: string;
+    home: { player: string; goals_in_window: number; prob_scores: number }[];
+    away: { player: string; goals_in_window: number; prob_scores: number }[];
+  };
 };
 
 class ApiError extends Error {
