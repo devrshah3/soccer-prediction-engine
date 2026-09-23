@@ -118,6 +118,23 @@ class AssistantCache(Base):
     created_at: Mapped[str] = mapped_column(String)
 
 
+class YoutubeSearchCache(Base):
+    """Cached YouTube search results, keyed by a hash of (query, channel restriction), so
+    a repeated highlight-link lookup never costs quota twice. search.list costs 100 of
+    the free tier's 10,000 units/day (~90 searches/day once real key usage is verified -
+    see kickcast_api/assistant/youtube.py), so caching here matters a lot more than it
+    would for a cheap endpoint. `result_json` is "null" (not absent) when a search
+    genuinely found nothing, so we don't re-search a query we already know fails."""
+
+    __tablename__ = "youtube_search_cache"
+
+    query_hash: Mapped[str] = mapped_column(String, primary_key=True)
+    query: Mapped[str] = mapped_column(String)
+    channel: Mapped[str | None] = mapped_column(String, nullable=True)
+    result_json: Mapped[str] = mapped_column(String)
+    created_at: Mapped[str] = mapped_column(String)
+
+
 class LiveMatchState(Base):
     """Polled (never on-page-load) from API-Football, key-gated - see
     kickcast_api/live/api_football.py. `last_updated_at` is what lets the frontend show

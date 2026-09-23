@@ -1,18 +1,24 @@
 """API-Football v3 client (free tier: 100 requests/day). Key-gated on API_FOOTBALL_KEY.
 
-CAVEAT (see MORNING_REPORT.md): written against API-Football v3's documented response
-shape from public documentation, NEVER exercised against a live key (none was provided).
-The response-parsing in `_parse_fixture`/`_parse_event` is best-effort and should be
-verified/adjusted against a real response the first time a real key is added - tests
-here use a hand-built mock response shaped like the documented format, which proves our
-parsing/quota/batching logic is internally consistent, not that it matches the live API
-byte-for-byte.
+VERIFIED against a real key and real calls (2026-09-23): `/status` confirmed a real
+Free-plan account (100 requests/day, matches DEFAULT_API_FOOTBALL_DAILY_QUOTA below).
+`/fixtures?live=all` confirmed `_parse_fixture`'s shape assumptions are correct
+(fixture.id/status.elapsed/status.short, teams.home/away.name, goals.home/away) against
+29 real live fixtures. Also discovered something the docs don't make obvious: each
+fixture object in the `live=all` response already embeds its OWN full events array
+(`f["events"]`) - cross-checked one live match with 8 goals at the 82nd minute against
+a separate `/fixtures/events?fixture=...` call for the same match and got byte-identical
+results (8/8 events, same minutes/types/teams). So `fetch_events()` below, which makes a
+SEPARATE per-match call, is no longer needed for the normal polling path - poller.py now
+reads events straight off the batched live=all response via `_parse_fixture`'s "events"
+key, at zero extra quota cost. `fetch_events()` is kept only as a manual/fallback tool
+(e.g. to backfill a match's final events if it dropped out of live=all before the last
+poll caught its final whistle) - it is NOT called from the automatic poll loop anymore.
 
-Ground rules honored: ONE batched call fetches ALL live fixtures at once
-(`/fixtures?live=all`), never one call per match; per-match event detail
-(`/fixtures/events`) is fetched only for matches we're actually about to show, to
-conserve the 100/day budget; nothing here is called from a request handler - only from
-kickcast_api.live.poller, itself only invoked by a scheduled job, never page load.
+Ground rules honored: ONE batched call fetches ALL live fixtures AND their events at
+once (`/fixtures?live=all`), never one call per match; nothing here is called from a
+request handler - only from kickcast_api.live.poller, itself only invoked by a
+scheduled job, never page load.
 """
 
 from __future__ import annotations
@@ -76,6 +82,8 @@ def _parse_fixture(f: dict) -> dict:
         "away_team_name": (teams.get("away") or {}).get("name"),
         "home_score": goals.get("home"),
         "away_score": goals.get("away"),
+        # embedded in live=all, verified real - see module docstring
+        "events": [_parse_event(e) for e in f.get("events") or []],
     }
 
 

@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from kickcast_api.live import api_football, poller, quota
-from kickcast_api.models import Base, League, LiveMatchState, Match, Team
+from kickcast_api.models import Base, League, LiveEvent, LiveMatchState, Match, Team
 
 
 @pytest.fixture
@@ -39,6 +39,9 @@ def test_unavailable_without_key(session, monkeypatch):
 
 
 def test_fetch_live_fixtures_parses_mocked_response(session, monkeypatch):
+    """Response shape verified against real API-Football calls on 2026-09-23: fixture
+    id/status.elapsed/status.short, teams.home/away.name, goals.home/away, and events
+    embedded per-fixture (confirmed real - see api_football.py's module docstring)."""
     monkeypatch.setenv("API_FOOTBALL_KEY", "fake-key-for-test")
 
     class FakeResponse:
@@ -52,6 +55,10 @@ def test_fetch_live_fixtures_parses_mocked_response(session, monkeypatch):
                         "fixture": {"id": 111, "status": {"elapsed": 37, "short": "1H"}},
                         "teams": {"home": {"name": "Alpha FC"}, "away": {"name": "Beta United"}},
                         "goals": {"home": 1, "away": 0},
+                        "events": [
+                            {"time": {"elapsed": 12}, "type": "Goal", "detail": "Normal Goal",
+                             "team": {"name": "Alpha FC"}, "player": {"name": "A. Striker"}},
+                        ],
                     }
                 ]
             }
@@ -67,6 +74,10 @@ def test_fetch_live_fixtures_parses_mocked_response(session, monkeypatch):
             "fixture_id": 111, "minute": 37, "match_status": "1H",
             "home_team_name": "Alpha FC", "away_team_name": "Beta United",
             "home_score": 1, "away_score": 0,
+            "events": [
+                {"minute": 12, "event_type": "goal", "team_name": "Alpha FC",
+                 "player": "A. Striker", "detail": "Normal Goal"},
+            ],
         }
     ]
 
@@ -102,7 +113,7 @@ def test_poller_matches_by_team_name_and_writes_state(session, monkeypatch):
         poller.api_football, "fetch_live_fixtures",
         lambda s: [{"fixture_id": 1, "minute": 60, "match_status": "2H",
                     "home_team_name": "Alpha FC", "away_team_name": "Beta United",
-                    "home_score": 2, "away_score": 1}],
+                    "home_score": 2, "away_score": 1, "events": []}],
     )
     updated = poller.poll_live_matches(session)
     assert updated == 1
@@ -116,10 +127,58 @@ def test_poller_ignores_fixtures_it_cant_match(session, monkeypatch):
         poller.api_football, "fetch_live_fixtures",
         lambda s: [{"fixture_id": 2, "minute": 10, "match_status": "1H",
                     "home_team_name": "Totally Unrelated FC", "away_team_name": "Nobody FC",
-                    "home_score": 0, "away_score": 0}],
+                    "home_score": 0, "away_score": 0, "events": []}],
     )
     assert poller.poll_live_matches(session) == 0
     assert session.query(LiveMatchState).count() == 0
+
+
+def test_poller_writes_events_from_embedded_events(session, monkeypatch):
+    """Events come embedded in the same batched live=all response - no second per-match
+    call. Confirmed for real against API-Football on 2026-09-23 (see api_football.py)."""
+    monkeypatch.setenv("API_FOOTBALL_KEY", "fake-key")
+    monkeypatch.setattr(
+        poller.api_football, "fetch_live_fixtures",
+        lambda s: [{"fixture_id": 1, "minute": 60, "match_status": "2H",
+                    "home_team_name": "Alpha FC", "away_team_name": "Beta United",
+                    "home_score": 2, "away_score": 1,
+                    "events": [
+                        {"minute": 23, "event_type": "goal", "team_name": "Alpha FC",
+                         "player": "A. Striker", "detail": "Normal Goal"},
+                        {"minute": 58, "event_type": "card", "team_name": "Beta United",
+                         "player": "B. Defender", "detail": "Yellow Card"},
+                    ]}],
+    )
+    poller.poll_live_matches(session)
+    events = session.query(LiveEvent).order_by(LiveEvent.minute).all()
+    assert len(events) == 2
+    assert events[0].minute == 23 and events[0].event_type == "goal" and events[0].team_id == "team-a"
+    assert events[1].minute == 58 and events[1].event_type == "card" and events[1].team_id == "team-b"
+
+
+def test_poller_replaces_events_on_next_poll_not_appends(session, monkeypatch):
+    """API-Football's embedded events list is authoritative-as-of-now, not a delta (a VAR
+    reversal or corrected minute must be reflected) - each poll should replace, not add."""
+    monkeypatch.setenv("API_FOOTBALL_KEY", "fake-key")
+    first = [{"fixture_id": 1, "minute": 20, "match_status": "1H",
+              "home_team_name": "Alpha FC", "away_team_name": "Beta United",
+              "home_score": 1, "away_score": 0,
+              "events": [{"minute": 15, "event_type": "goal", "team_name": "Alpha FC",
+                          "player": "A. Striker", "detail": "Normal Goal"}]}]
+    second = [{"fixture_id": 1, "minute": 40, "match_status": "1H",
+               "home_team_name": "Alpha FC", "away_team_name": "Beta United",
+               "home_score": 2, "away_score": 0,
+               "events": [
+                   {"minute": 15, "event_type": "goal", "team_name": "Alpha FC",
+                    "player": "A. Striker", "detail": "Normal Goal"},
+                   {"minute": 38, "event_type": "goal", "team_name": "Alpha FC",
+                    "player": "A. Striker", "detail": "Normal Goal"},
+               ]}]
+    monkeypatch.setattr(poller.api_football, "fetch_live_fixtures", lambda s: first)
+    poller.poll_live_matches(session)
+    monkeypatch.setattr(poller.api_football, "fetch_live_fixtures", lambda s: second)
+    poller.poll_live_matches(session)
+    assert session.query(LiveEvent).count() == 2  # not 3 - replaced, not appended
 
 
 # ------------------------------------------------------------- quota.py

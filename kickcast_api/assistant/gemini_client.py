@@ -1,13 +1,28 @@
 """Gemini integration: DB-first tool-calling, then Google Search grounding only for
 what our tools couldn't answer. Key-gated on GEMINI_API_KEY (free tier).
 
-IMPORTANT CAVEAT (see MORNING_REPORT.md): this has been written against the installed
-google-genai SDK's real type signatures (verified by introspecting the installed
-package, not guessed), but has NEVER been run against a live API key, because none was
-provided. The tool-execution LOOP (service.py's orchestration, which never lets Gemini
-state a fact without a tool result backing it) is unit-tested with a mocked Gemini
-client. The actual wire-level correctness of these specific google-genai calls is
-UNVERIFIED - test this for real the first time a real GEMINI_API_KEY is added.
+VERIFIED against a real key and real calls (2026-09-23, key format "AQ." - Google's
+newer auth-key format, bound to a service account; the google-genai SDK (2.25.0) takes
+it identically via `genai.Client(api_key=...)`, no special handling needed):
+  - `gemini-2.5-flash` (the old default here) is 404 NOT_FOUND for new users - Google's
+    own error told us to migrate to `models/gemini-3.6-flash`. Switched MODEL to that;
+    confirmed with a real call (real "OK" reply, real usage_metadata back).
+  - Real function-calling round trip confirmed: response.function_calls is a list of
+    objects with .name (str) and .args (dict), exactly what ask_gemini() below assumes;
+    response.candidates[0].content round-trips back into `contents` correctly.
+  - Google Search grounding (ask_gemini_with_search, below) returned a REAL
+    429 RESOURCE_EXHAUSTED on the very first attempt, not a rate limit from repeated
+    calls. Confirmed against Google's own pricing docs: grounding is genuinely "Not
+    available" on the free tier for Gemini 3.x Flash models without a billing account
+    attached (2.5 models get 1,500 free grounded requests/day, but 2.5-flash itself is
+    the model that's 404ing for new users, so that path is closed too). This is not a
+    bug in this code - it's a real product/billing limitation on this key. Per the
+    project's no-spending-money rule, we do NOT enable billing to unlock it.
+    ask_gemini_with_search already fails closed (broad except -> None -> DB/Wikipedia
+    fallback) so nothing breaks, it just never succeeds on this tier. See
+    kickcast_api/assistant/wikipedia.py for the free, keyless substitute this project
+    uses instead for outside-DB facts (match write-ups etc.) - added specifically
+    because Search grounding turned out to be unavailable.
 
 System instruction is deliberately strict: never state a score/scorer/table
 position/prediction that didn't come from a tool call; say so and stop rather than
@@ -37,7 +52,7 @@ SYSTEM_INSTRUCTION = (
     "dates for anything time-sensitive."
 )
 
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-3.6-flash"
 MAX_TOOL_ITERATIONS = 5
 
 
