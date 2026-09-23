@@ -12,7 +12,7 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from kickcast_api.models import Base, Match
+from kickcast_api.models import Base, Match, Team
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("ingest", REPO_ROOT / "scripts" / "ingest.py")
@@ -53,3 +53,35 @@ def test_international_ingest_is_idempotent(tmp_path):
     session.commit()
     count2 = session.query(Match).filter(Match.league_code == "international").count()
     assert count2 == count1
+
+
+def test_real_madrid_survives_international_ingest_without_id_collision(tmp_path):
+    """Real bug found while wiring the assistant: results.csv has a genuine 2013 friendly
+    between Spanish REGIONAL sides, "Madrid" vs "Andalusia" (2013-06-07) - slug("Madrid")
+    collides with canonical("Real Madrid") == "madrid" (canonical() strips the "Real "
+    prefix). Ingesting international results AFTER domestic leagues used to silently
+    overwrite the club's Team row with the regional side's name - breaking every
+    Real Madrid lookup (predictions, the assistant's resolve_team tool, etc). Domestic
+    ingestion must run first so ingest_international can see and avoid the collision."""
+    session = _session(tmp_path)
+    ingest.ingest_domestic(session, "es.1", "SP1", "La Liga", "Spain")
+    session.commit()
+    real_madrid = session.get(Team, "madrid")
+    assert real_madrid is not None and real_madrid.name == "Real Madrid"
+
+    ingest.ingest_international(session)
+    session.commit()
+
+    real_madrid_after = session.get(Team, "madrid")
+    assert real_madrid_after.name == "Real Madrid", (
+        "Real Madrid's club Team row was overwritten by the international ingest - "
+        "the id-collision disambiguation in _domestic_team_ids/_intl_team_id regressed"
+    )
+    regional_side = session.get(Team, "madrid-intl")
+    assert regional_side is not None and regional_side.name == "Madrid"
+    regional_match = (
+        session.query(Match)
+        .filter(Match.league_code == "international", Match.home_team_id == "madrid-intl")
+        .first()
+    )
+    assert regional_match is not None and regional_match.away_team_id == "andalusia"

@@ -148,15 +148,38 @@ def ingest_domestic(session, kc_code: str, fd_code: str, name: str, country: str
     return n
 
 
+def _domestic_team_ids(session) -> set[str]:
+    """Club team IDs already claimed by a domestic league. results.csv includes real
+    sub-national representative sides (e.g. a 2013 friendly, Madrid 1-2 Andalusia -
+    Spanish regions occasionally play these) whose slugged name can coincide with a
+    club's canonical id (slug("Madrid") == canonical("Real Madrid") == "madrid", since
+    canonical() strips the "Real " prefix) - without this check, ingesting that
+    friendly AFTER the domestic leagues silently overwrites Real Madrid's Team row
+    with the regional side's name. Call after ingest_domestic has run for the season,
+    before ingest_international, so this reflects real current claims."""
+    rows = session.query(Match.home_team_id, Match.away_team_id).filter(Match.league_code != "international").all()
+    ids: set[str] = set()
+    for h, a in rows:
+        ids.add(h)
+        ids.add(a)
+    return ids
+
+
+def _intl_team_id(raw_id: str, domestic_ids: set[str]) -> str:
+    return f"{raw_id}-intl" if raw_id in domestic_ids else raw_id
+
+
 def ingest_international(session) -> int:
     upsert_league(session, "international", "International", None, "international")
     existing = load_existing_matches(session, "international")
     team_cache: dict = {}
+    domestic_ids = _domestic_team_ids(session)
     n = 0
 
     tourn = international.tournaments(RESULTS_CSV)
     for m in international.load_results(RESULTS_CSV, INTERNATIONAL_SINCE, friendly_weight=0.5):
-        home_id, away_id = slug(international.canonical(m.home)), slug(international.canonical(m.away))
+        home_id = _intl_team_id(slug(international.canonical(m.home)), domestic_ids)
+        away_id = _intl_team_id(slug(international.canonical(m.away)), domestic_ids)
         upsert_team(session, home_id, international.canonical(m.home), None, team_cache)
         upsert_team(session, away_id, international.canonical(m.away), None, team_cache)
         key = ("international", m.date, home_id, away_id)
@@ -176,7 +199,8 @@ def ingest_international(session) -> int:
         payload = json.loads(NATIONS_LEAGUE_JSON.read_text())
         for fx in payload["fixtures"]:
             d = date.fromisoformat(fx["date"])
-            home_id, away_id = slug(international.canonical(fx["home"])), slug(international.canonical(fx["away"]))
+            home_id = _intl_team_id(slug(international.canonical(fx["home"])), domestic_ids)
+            away_id = _intl_team_id(slug(international.canonical(fx["away"])), domestic_ids)
             upsert_team(session, home_id, international.canonical(fx["home"]), None, team_cache)
             upsert_team(session, away_id, international.canonical(fx["away"]), None, team_cache)
             key = ("international", d, home_id, away_id)
@@ -204,6 +228,14 @@ def ingest_goalscorers(session) -> int:
         (m.date, m.home_team_id, m.away_team_id): m.id
         for m in session.query(Match).filter(Match.league_code == "international")
     }
+    # Domestic club ids as they stand AFTER ingest_international has run (which already
+    # disambiguated any collision) - recomputed here (not passed in) so this function
+    # stays correct even if called standalone; see _domestic_team_ids's docstring for why
+    # this disambiguation exists (a real martj42 regional-side/club name collision).
+    domestic_ids = {
+        tid for row in session.query(Match.home_team_id, Match.away_team_id)
+        .filter(Match.league_code != "international") for tid in row
+    }
     n = 0
     with open(GOALSCORERS_CSV, newline="", encoding="utf-8") as fh:
         import csv
@@ -212,9 +244,9 @@ def ingest_goalscorers(session) -> int:
             d = date.fromisoformat(r["date"])
             if d < INTERNATIONAL_SINCE:
                 continue
-            home_id = slug(international.canonical(r["home_team"]))
-            away_id = slug(international.canonical(r["away_team"]))
-            team_id = slug(international.canonical(r["team"]))
+            home_id = _intl_team_id(slug(international.canonical(r["home_team"])), domestic_ids)
+            away_id = _intl_team_id(slug(international.canonical(r["away_team"])), domestic_ids)
+            team_id = _intl_team_id(slug(international.canonical(r["team"])), domestic_ids)
             match_id = match_index.get((d, home_id, away_id))
             session.add(
                 Goalscorer(
