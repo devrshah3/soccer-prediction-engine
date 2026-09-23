@@ -1,4 +1,4 @@
-# Soccer Prediction Engine
+# KickCast
 
 Pre-match prediction engine for soccer: win/draw/loss probabilities, likely scorelines,
 expected goals, totals and BTTS. It's built to power a free public soccer website.
@@ -47,9 +47,9 @@ Full per-league tables and calibration are in `reports/backtest_2015_16.json`.
 ## Layout
 
 ```
-soccer_engine/models/dixon_coles.py   pre-match model (analytic gradient, xG blend, leakage guard)
-soccer_engine/evaluation.py           walk-forward backtest, RPS / log loss / Brier / calibration
-soccer_engine/data/statsbomb.py       StatsBomb open-data loader with cache
+kickcast_engine/models/dixon_coles.py   pre-match model (analytic gradient, xG blend, leakage guard)
+kickcast_engine/evaluation.py           walk-forward backtest, RPS / log loss / Brier / calibration
+kickcast_engine/data/statsbomb.py       StatsBomb open-data loader with cache
 scripts/extract_statsbomb_events.py   streams event files -> per-match xG, goal timeline, reds, corners
 scripts/backtest_compare.py           head-to-head backtest (baseline vs penaltyblog vs ours)
 tests/                                unit tests incl. leakage checks
@@ -65,7 +65,7 @@ for p in "2 27" "11 27" "12 27" "7 27"; do set -- $p
     https://raw.githubusercontent.com/statsbomb/open-data/master/data/matches/$1/$2.json; done
 python scripts/extract_statsbomb_events.py data/sb_summaries.jsonl data/sb/matches_*_27.json
 python scripts/backtest_compare.py data/sb_summaries.jsonl data/sb reports/backtest_2015_16.json
-pytest && ruff check . && mypy soccer_engine --ignore-missing-imports
+pytest && ruff check . && mypy kickcast_engine --ignore-missing-imports
 ```
 
 ## Data credit

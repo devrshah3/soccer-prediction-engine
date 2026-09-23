@@ -11,12 +11,10 @@ from collections import Counter
 from datetime import date
 from pathlib import Path
 
-import numpy as np
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from soccer_engine.data.openfootball import load_all_seasons, to_training_matches  # noqa: E402
-from soccer_engine.evaluation import outcome, walk_forward_window  # noqa: E402
-from soccer_engine.models.dixon_coles import DixonColes  # noqa: E402
+from kickcast_engine.data.openfootball import load_all_seasons, to_training_matches
+from kickcast_engine.evaluation import outcome, walk_forward_window
+from kickcast_engine.models.dixon_coles import DixonColes
 
 warnings.filterwarnings("ignore")
 REPO = Path(sys.argv[1])

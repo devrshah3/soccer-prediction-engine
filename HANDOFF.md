@@ -1,20 +1,20 @@
-# Soccer Prediction Website — Handoff Brief for Claude Code
+# KickCast — Handoff Brief for Claude Code
 
 ## What exists already (in this repo, tested, do not throw away)
 
-- `soccer_engine/models/dixon_coles.py` — pre-match model: Dixon-Coles with analytic
+- `kickcast_engine/models/dixon_coles.py` — pre-match model: Dixon-Coles with analytic
   gradient, time-decay weights, xG-blended training targets, L2 shrinkage, match-weight
   (friendly vs competitive), leakage guard (`fit()` raises if any training match is on/after
   the cutoff date).
-- `soccer_engine/evaluation.py` — walk-forward backtest (refit weekly on past-only data),
+- `kickcast_engine/evaluation.py` — walk-forward backtest (refit weekly on past-only data),
   RPS / log loss / Brier / calibration (ECE), plus `walk_forward_window` for bounded date ranges.
-- `soccer_engine/data/openfootball.py` — loader for `data/openfootball_raw/` (CC0, free,
+- `kickcast_engine/data/openfootball.py` — loader for `data/openfootball_raw/` (CC0, free,
   13-17 seasons per big-5 league incl. live 2026-27 season): standings table builder,
   per-team fixture list, training-set extractor.
-- `soccer_engine/data/statsbomb.py` + `scripts/extract_statsbomb_events.py` — StatsBomb
+- `kickcast_engine/data/statsbomb.py` + `scripts/extract_statsbomb_events.py` — StatsBomb
   Open Data loader + event summarizer (xG, goal timeline, reds, corners). Used for the
   original model validation; re-run only if you need fresh event-level detail.
-- `soccer_engine/data/international.py` — loader for `data/results.csv` /
+- `kickcast_engine/data/international.py` — loader for `data/results.csv` /
   `data/goalscorers.csv` (martj42/international_results, CC0) for national-team matches.
 - `data/nations_league_2026_27_md1_4.json` — real UEFA-published fixtures for the
   2026-27 Nations League, Matchdays 1-4 (Sept 24 - Oct 6 2026), hand-transcribed from

@@ -11,9 +11,9 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from soccer_engine.data.international import load_results, tournaments
-from soccer_engine.evaluation import outcome, walk_forward_window
-from soccer_engine.models.dixon_coles import DixonColes
+from kickcast_engine.data.international import load_results, tournaments
+from kickcast_engine.evaluation import outcome, walk_forward_window
+from kickcast_engine.models.dixon_coles import DixonColes
 
 warnings.filterwarnings("ignore")
 RESULTS = Path(sys.argv[1])

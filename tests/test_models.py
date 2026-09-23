@@ -3,8 +3,8 @@ from datetime import date, timedelta
 import numpy as np
 import pytest
 
-from soccer_engine.evaluation import rps, walk_forward
-from soccer_engine.models.dixon_coles import DixonColes, LeakageError, MatchResult
+from kickcast_engine.evaluation import rps, walk_forward
+from kickcast_engine.models.dixon_coles import DixonColes, LeakageError, MatchResult
 
 
 def synthetic(n_rounds: int = 12, seed: int = 0) -> list[MatchResult]:
@@ -78,7 +78,7 @@ def test_walk_forward_never_trains_on_future():
 
 
 def test_standings_matches_manual_table():
-    from soccer_engine.data.openfootball import standings
+    from kickcast_engine.data.openfootball import standings
 
     rows = [
         {"season": "24-25", "status": "finished", "home": "A", "away": "B", "home_goals": 2, "away_goals": 1},
@@ -96,7 +96,7 @@ def test_standings_matches_manual_table():
 def test_openfootball_no_future_leakage_in_training_set():
     from datetime import date
 
-    from soccer_engine.data.openfootball import to_training_matches
+    from kickcast_engine.data.openfootball import to_training_matches
 
     rows = [
         {"date": "2026-09-20", "home": "A", "away": "B", "home_goals": 2, "away_goals": 0, "status": "finished"},

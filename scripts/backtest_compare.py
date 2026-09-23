@@ -17,8 +17,8 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from soccer_engine.evaluation import outcome, walk_forward
-from soccer_engine.models.dixon_coles import DixonColes, MatchResult
+from kickcast_engine.evaluation import outcome, walk_forward
+from kickcast_engine.models.dixon_coles import DixonColes, MatchResult
 
 warnings.filterwarnings("ignore")
 LEAGUES = {"Premier League": "England", "La Liga": "Spain", "Serie A": "Italy", "Ligue 1": "France"}
