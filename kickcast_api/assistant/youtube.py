@@ -33,23 +33,46 @@ def _cache_key(query: str, channel: str | None) -> str:
     return hashlib.sha256(normalized.encode()).hexdigest()
 
 
+# name -> YouTube channel ID (the UC... string, NOT the @handle). These are public,
+# stable identifiers, not credentials, so - unlike the 4 API keys - they're safe to check
+# into source. VERIFIED for real (2026-09-23) via `channels.list?forHandle=...` (1 quota
+# unit each, not the 100-unit search.list), confirming each response's returned title
+# actually matches the intended official channel before trusting it:
+#   UEFA          -> "UEFA" ("Welcome to the official UEFA YouTube channel...")
+#   Premier League-> "Premier League" ("...official Premier League YouTube channel...")
+#   LaLiga        -> "LALIGA EA SPORTS" (LaLiga's real channel, sponsor-rebranded title -
+#                    not literally "official" in its description, but this IS the
+#                    channel linked from laliga.com, not a fan channel)
+#   Serie A       -> "Serie A" ("Welcome to the Official Serie A channel...")
+#   Bundesliga    -> "Bundesliga" ("...official YouTube page of the Bundesliga...")
+#   Ligue 1       -> "Ligue 1 McDonald's" (sponsor-branded official channel, description
+#                    literally says "chaîne officielle de la Ligue1 McDonald's")
+DEFAULT_OFFICIAL_CHANNELS: dict[str, str] = {
+    "UEFA": "UCyGa1YEx9ST66rYrJTGIKOw",
+    "Premier League": "UCG5qGWdu8nIRZqJ_GgDwQ-w",
+    "LaLiga": "UCTv-XvfzLX3i4IGWAm4sbmA",
+    "Serie A": "UCBJeMCIeLQos7wacox4hmLQ",
+    "Bundesliga": "UC6UL29enLNe4mqwTfAyeNuw",
+    "Ligue 1": "UCQsH5XtIc9hONE1BQjucM0g",
+}
+
+
 def official_channel_ids() -> dict[str, str]:
-    """name -> YouTube channel ID (the UC... string, NOT the @handle), restricting
-    find_official_highlight() to real official channels rather than an arbitrary search
-    result. NOT pre-populated here: we don't have a verified list of real channel IDs
-    (guessing/hardcoding one would risk silently pointing at the wrong channel, which is
-    worse than finding no link at all). Set YOUTUBE_OFFICIAL_CHANNELS in .env to a JSON
-    object, e.g. {"UEFA": "UCxxxxxxxxxxxxxxxxxxxxxx", "Premier League": "UCxxxx..."},
-    with IDs confirmed from each channel's real "About" page. Empty by default -
-    find_official_highlight() then falls back to un-channel-restricted search."""
+    """name -> YouTube channel ID, restricting find_official_highlight() to real official
+    channels rather than an arbitrary search result. Starts from the verified defaults
+    above; YOUTUBE_OFFICIAL_CHANNELS in .env (a JSON object) can add to or override them
+    without a code change, e.g. to add a national-team or competition channel."""
+    channels = dict(DEFAULT_OFFICIAL_CHANNELS)
     raw = os.environ.get("YOUTUBE_OFFICIAL_CHANNELS")
     if not raw:
-        return {}
+        return channels
     try:
         parsed = json.loads(raw)
-        return {str(k): str(v) for k, v in parsed.items()} if isinstance(parsed, dict) else {}
+        if isinstance(parsed, dict):
+            channels.update({str(k): str(v) for k, v in parsed.items()})
     except (json.JSONDecodeError, TypeError):
-        return {}
+        pass
+    return channels
 
 
 def find_official_highlight(session: Session, query: str, channel: str | None = None) -> dict | None:

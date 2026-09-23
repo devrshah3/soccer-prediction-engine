@@ -135,6 +135,23 @@ class YoutubeSearchCache(Base):
     created_at: Mapped[str] = mapped_column(String)
 
 
+class WikipediaCache(Base):
+    """Cached Wikipedia lookups (search + extract), keyed by a hash of the normalized
+    query, so a repeated question never re-hits the MediaWiki API. Free/keyless, but
+    Wikimedia's User-Agent policy asks courteous clients not to hammer it needlessly -
+    see kickcast_api/assistant/wikipedia.py. `extract` is empty string (not absent) when
+    a search genuinely found nothing, so we don't re-search a known-empty query."""
+
+    __tablename__ = "wikipedia_cache"
+
+    query_hash: Mapped[str] = mapped_column(String, primary_key=True)
+    query: Mapped[str] = mapped_column(String)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    url: Mapped[str | None] = mapped_column(String, nullable=True)
+    extract: Mapped[str] = mapped_column(String)
+    created_at: Mapped[str] = mapped_column(String)
+
+
 class LiveMatchState(Base):
     """Polled (never on-page-load) from API-Football, key-gated - see
     kickcast_api/live/api_football.py. `last_updated_at` is what lets the frontend show

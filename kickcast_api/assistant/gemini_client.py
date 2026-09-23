@@ -117,6 +117,40 @@ def ask_gemini(session: Session, question: str) -> dict | None:
         return None
 
 
+def ask_gemini_with_context(session: Session, question: str, context: str, context_label: str) -> dict | None:
+    """Answer using ONLY the given text (e.g. a Wikipedia extract) as grounding - the
+    real substitute for Search grounding on this key (see module docstring). The system
+    instruction is explicit: answer only from the provided context, say so and stop if
+    the context doesn't contain the answer, never fall back to unaided parametric
+    knowledge presented as fact."""
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return None
+    if quota.gemini_quota_remaining(session) <= 0:
+        return None
+
+    client = genai.Client(api_key=api_key)
+    prompt = (
+        f"Using ONLY the {context_label} text below, answer the question. Be specific "
+        "(exact minutes, names, scores) where the text supports it. If the text does not "
+        "contain the answer, say plainly that you don't know from this source - do not "
+        f"use outside knowledge.\n\n--- {context_label} ---\n{context}\n--- end ---\n\n"
+        f"Question: {question}"
+    )
+    try:
+        response = client.models.generate_content(
+            model=MODEL, contents=prompt,
+            config=types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION),
+        )
+        quota.record_gemini_call(session)
+        text = getattr(response, "text", None) or ""
+        if not text.strip():
+            return None
+        return {"text": text, "used_search": False}
+    except Exception:  # noqa: BLE001 - fail closed, deliberate (see other methods in this file)
+        return None
+
+
 def ask_gemini_with_search(session: Session, question: str) -> dict | None:
     """Separate call using ONLY Google Search grounding (no function-calling tool mixed
     in - some Gemini API versions reject combining built-in tools like google_search

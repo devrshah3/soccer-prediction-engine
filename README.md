@@ -90,3 +90,10 @@ No formal license/terms-of-use text restricting research or personal use was fou
 widely used in football-analytics research, with no robots.txt restriction either. Downloaded
 once into `data/footballdata_uk/` via `scripts/fetch_footballdata_uk.py` (not scraped live per
 request), with a manifest recording what was fetched and when.
+
+Match write-ups and other facts not in our own database (the "Ask about soccer" assistant's
+outside-DB source): [Wikipedia](https://en.wikipedia.org/), content licensed
+[CC BY-SA](https://creativecommons.org/licenses/by-sa/4.0/), fetched live per question via the
+free MediaWiki Action API with a descriptive User-Agent (see `kickcast_api/assistant/wikipedia.py`)
+and cached so a repeated question never re-fetches. Every assistant answer sourced from Wikipedia
+cites the specific article and URL used.

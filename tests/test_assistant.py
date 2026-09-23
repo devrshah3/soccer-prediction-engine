@@ -166,6 +166,7 @@ def test_service_never_fabricates_when_gemini_and_search_both_miss(session, monk
     monkeypatch.setattr(service.gemini_client, "available", lambda: True)
     monkeypatch.setattr(service.gemini_client, "ask_gemini", fake_ask_gemini)
     monkeypatch.setattr(service.gemini_client, "ask_gemini_with_search", fake_ask_gemini_with_search)
+    monkeypatch.setattr(service.wikipedia, "lookup", lambda s, q: None)  # simulates: Wikipedia also has nothing
 
     result = service.ask(session, "What happened in a match that doesn't exist?")
     assert result["mode"] == "gemini"
@@ -193,6 +194,69 @@ def test_service_augments_with_search_when_db_tools_miss(session, monkeypatch):
     assert result["sources"][0]["url"] == "https://example.com"
 
 
+def test_service_uses_wikipedia_when_search_grounding_unavailable(session, monkeypatch):
+    """Search grounding is genuinely 429'd on the free tier this project uses (see
+    gemini_client.py) - this is the real substitute path. Verify it only ever states
+    what the (mocked) Wikipedia-grounded call actually said, and cites Wikipedia."""
+
+    def fake_ask_gemini(sess, question):
+        return {"text": "not in our db", "sources": [{"type": "kickcast_tool", "tool": "resolve_team", "args": {}, "result": {"found": False}}], "used_search": False}
+
+    def fake_lookup(sess, query):
+        return {"found": True, "title": "2016 UEFA Champions League final", "url": "https://en.wikipedia.org/wiki/2016_UEFA_Champions_League_final", "extract": "Real Madrid won 5-3 on penalties.", "source": "Wikipedia (CC BY-SA)"}
+
+    def fake_context(sess, question, context, label):
+        assert "Real Madrid won 5-3 on penalties." in context
+        return {"text": "Real Madrid won on penalties, per the Wikipedia article.", "used_search": False}
+
+    monkeypatch.setattr(service.gemini_client, "available", lambda: True)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini", fake_ask_gemini)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini_with_search", lambda s, q: None)
+    monkeypatch.setattr(service.wikipedia, "lookup", fake_lookup)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini_with_context", fake_context)
+
+    result = service.ask(session, "Who won the 2016 Champions League final?")
+    assert result["text"] == "Real Madrid won on penalties, per the Wikipedia article."
+    wiki_sources = [s for s in result["sources"] if s["type"] == "wikipedia"]
+    assert len(wiki_sources) == 1
+    assert wiki_sources[0]["license"] == "Wikipedia (CC BY-SA)"
+
+
+def test_service_attaches_video_link_only_when_asked(session, monkeypatch):
+    calls = []
+
+    def fake_ask_gemini(sess, question):
+        return {"text": "not in our db", "sources": [], "used_search": False}
+
+    def fake_lookup(sess, query):
+        return {"found": True, "title": "2016 UEFA Champions League final", "url": "https://en.wikipedia.org/wiki/x", "extract": "...", "source": "Wikipedia (CC BY-SA)"}
+
+    def fake_context(sess, question, context, label):
+        return {"text": "answer text", "used_search": False}
+
+    def fake_highlight(sess, query, channel=None):
+        calls.append((query, channel))
+        return {"title": "2016 UCL Final Highlights", "url": "https://youtube.com/watch?v=abc", "channel": "UEFA"}
+
+    monkeypatch.setattr(service.gemini_client, "available", lambda: True)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini", fake_ask_gemini)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini_with_search", lambda s, q: None)
+    monkeypatch.setattr(service.wikipedia, "lookup", fake_lookup)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini_with_context", fake_context)
+    monkeypatch.setattr(service.youtube, "find_official_highlight", fake_highlight)
+
+    result = service.ask(session, "Who scored in the 2016 Champions League final? Give me a link to watch it.")
+    youtube_sources = [s for s in result["sources"] if s["type"] == "youtube"]
+    assert len(youtube_sources) == 1
+    assert youtube_sources[0]["url"] == "https://youtube.com/watch?v=abc"
+    assert calls[0][1] == "UEFA"  # channel guessed from "Champions League" in the wikipedia title
+
+    calls.clear()
+    result2 = service.ask(session, "Who scored in the 2016 Champions League final?")  # no "watch"/"link"
+    assert not any(s["type"] == "youtube" for s in result2["sources"])
+    assert calls == []
+
+
 def test_service_caches_gemini_answers_but_not_db_fallback(session, monkeypatch):
     call_count = {"n": 0}
 
@@ -203,6 +267,7 @@ def test_service_caches_gemini_answers_but_not_db_fallback(session, monkeypatch)
     monkeypatch.setattr(service.gemini_client, "available", lambda: True)
     monkeypatch.setattr(service.gemini_client, "ask_gemini", fake_ask_gemini)
     monkeypatch.setattr(service.gemini_client, "ask_gemini_with_search", lambda s, q: None)
+    monkeypatch.setattr(service.wikipedia, "lookup", lambda s, q: None)
 
     r1 = service.ask(session, "unique question for caching test")
     r2 = service.ask(session, "unique question for caching test")
