@@ -1,0 +1,51 @@
+{
+ "source": "StatsBomb Open Data (CC0), 4 full 2015/16 league seasons (Premier League, La Liga, Serie A, Ligue 1)",
+ "reproduce": "scripts/extract_statsbomb_events.py -> scripts/analyze_corners_and_timing.py",
+ "n_matches": 1517,
+ "n_matches_with_timeline_mismatch": 14,
+ "goal_timing": {
+  "total_goals": 3979,
+  "windows": [
+   {
+    "window": "0-15",
+    "goals": 517,
+    "share": 0.1299
+   },
+   {
+    "window": "15-30",
+    "goals": 575,
+    "share": 0.1445
+   },
+   {
+    "window": "30-45",
+    "goals": 598,
+    "share": 0.1503
+   },
+   {
+    "window": "45-60",
+    "goals": 656,
+    "share": 0.1649
+   },
+   {
+    "window": "60-75",
+    "goals": 650,
+    "share": 0.1634
+   },
+   {
+    "window": "75-90",
+    "goals": 717,
+    "share": 0.1802
+   },
+   {
+    "window": "90+",
+    "goals": 266,
+    "share": 0.0669
+   }
+  ]
+ },
+ "corner_goal_rate": {
+  "total_corners": 15387,
+  "corners_leading_to_goal": 515,
+  "rate": 0.0335
+ }
+}
