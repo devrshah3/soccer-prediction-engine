@@ -104,3 +104,26 @@ class Meta(Base):
 
     key: Mapped[str] = mapped_column(String, primary_key=True)
     value: Mapped[str] = mapped_column(String)
+
+
+class AssistantCache(Base):
+    """Cached assistant answers, keyed by a hash of the normalized question, so repeat
+    questions don't cost Gemini/YouTube quota twice."""
+
+    __tablename__ = "assistant_cache"
+
+    question_hash: Mapped[str] = mapped_column(String, primary_key=True)
+    question: Mapped[str] = mapped_column(String)
+    answer_json: Mapped[str] = mapped_column(String)
+    created_at: Mapped[str] = mapped_column(String)
+
+
+class AssistantQuota(Base):
+    """One row per UTC calendar day: how many Gemini calls the assistant has made, so we
+    can stop before hitting the free-tier daily limit and fall back to the DB-only path."""
+
+    __tablename__ = "assistant_quota"
+
+    day: Mapped[str] = mapped_column(String, primary_key=True)  # "YYYY-MM-DD"
+    gemini_calls: Mapped[int] = mapped_column(Integer, default=0)
+    youtube_calls: Mapped[int] = mapped_column(Integer, default=0)

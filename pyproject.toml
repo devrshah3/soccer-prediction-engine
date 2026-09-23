@@ -6,6 +6,7 @@ requires-python = ">=3.10"
 dependencies = [
     "numpy", "scipy", "requests",
     "fastapi", "uvicorn", "sqlalchemy", "apscheduler", "python-dotenv",
+    "google-genai",
 ]
 
 [project.optional-dependencies]
@@ -18,7 +19,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = [
     "kickcast_engine", "kickcast_engine.models", "kickcast_engine.data",
-    "kickcast_api", "kickcast_api.routes",
+    "kickcast_api", "kickcast_api.routes", "kickcast_api.assistant",
 ]
 
 [tool.ruff]
