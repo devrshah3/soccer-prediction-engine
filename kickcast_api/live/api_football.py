@@ -78,6 +78,8 @@ def _parse_fixture(f: dict) -> dict:
         "fixture_id": fixture.get("id"),
         "minute": (fixture.get("status") or {}).get("elapsed"),
         "match_status": (fixture.get("status") or {}).get("short"),
+        "home_team_id": (teams.get("home") or {}).get("id"),
+        "away_team_id": (teams.get("away") or {}).get("id"),
         "home_team_name": (teams.get("home") or {}).get("name"),
         "away_team_name": (teams.get("away") or {}).get("name"),
         "home_score": goals.get("home"),

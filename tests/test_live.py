@@ -40,7 +40,7 @@ def test_unavailable_without_key(session, monkeypatch):
 
 def test_fetch_live_fixtures_parses_mocked_response(session, monkeypatch):
     """Response shape verified against real API-Football calls on 2026-09-23: fixture
-    id/status.elapsed/status.short, teams.home/away.name, goals.home/away, and events
+    id/status.elapsed/status.short, teams.home/away.id/name, goals.home/away, and events
     embedded per-fixture (confirmed real - see api_football.py's module docstring)."""
     monkeypatch.setenv("API_FOOTBALL_KEY", "fake-key-for-test")
 
@@ -53,7 +53,7 @@ def test_fetch_live_fixtures_parses_mocked_response(session, monkeypatch):
                 "response": [
                     {
                         "fixture": {"id": 111, "status": {"elapsed": 37, "short": "1H"}},
-                        "teams": {"home": {"name": "Alpha FC"}, "away": {"name": "Beta United"}},
+                        "teams": {"home": {"id": 33, "name": "Alpha FC"}, "away": {"id": 34, "name": "Beta United"}},
                         "goals": {"home": 1, "away": 0},
                         "events": [
                             {"time": {"elapsed": 12}, "type": "Goal", "detail": "Normal Goal",
@@ -72,6 +72,7 @@ def test_fetch_live_fixtures_parses_mocked_response(session, monkeypatch):
     assert fixtures == [
         {
             "fixture_id": 111, "minute": 37, "match_status": "1H",
+            "home_team_id": 33, "away_team_id": 34,
             "home_team_name": "Alpha FC", "away_team_name": "Beta United",
             "home_score": 1, "away_score": 0,
             "events": [
@@ -119,6 +120,46 @@ def test_poller_matches_by_team_name_and_writes_state(session, monkeypatch):
     assert updated == 1
     state = session.query(LiveMatchState).one()
     assert state.minute == 60 and state.home_score == 2 and state.away_score == 1
+
+
+def test_poller_prefers_real_crosswalk_over_name_matching(session, monkeypatch):
+    """kickcast_engine.data.api_football_crosswalk (built from real /teams responses,
+    see its module docstring) should be tried FIRST and take priority over fuzzy name
+    matching, since it's unambiguous. Team names here are deliberately misleading
+    (wouldn't fuzzy-match "Alpha FC"/"Beta United" at all) to prove the id path, not the
+    name fallback, is what matched."""
+    monkeypatch.setenv("API_FOOTBALL_KEY", "fake-key")
+    monkeypatch.setattr(poller, "_crosswalk", {9001: "team-a", 9002: "team-b"})
+    monkeypatch.setattr(
+        poller.api_football, "fetch_live_fixtures",
+        lambda s: [{"fixture_id": 1, "minute": 10, "match_status": "1H",
+                    "home_team_id": 9001, "away_team_id": 9002,
+                    "home_team_name": "Some Completely Different Name FC",
+                    "away_team_name": "Another Unrelated Name United",
+                    "home_score": 0, "away_score": 0, "events": []}],
+    )
+    updated = poller.poll_live_matches(session)
+    assert updated == 1
+    state = session.query(LiveMatchState).one()
+    assert state.match_id == session.query(Match).one().id
+
+
+def test_poller_does_not_fall_back_to_fuzzy_matching_when_crosswalk_ids_are_known_but_unmatched(session, monkeypatch):
+    """If the crosswalk resolves both API-Football team ids to real kickcast teams but
+    there's no fixture for that exact pairing today, that's a real "no fixture today"
+    case - must NOT then guess via name substring matching (risk of matching the wrong
+    game entirely)."""
+    monkeypatch.setenv("API_FOOTBALL_KEY", "fake-key")
+    monkeypatch.setattr(poller, "_crosswalk", {9001: "team-a", 9003: "team-c-not-playing-today"})
+    monkeypatch.setattr(
+        poller.api_football, "fetch_live_fixtures",
+        lambda s: [{"fixture_id": 1, "minute": 10, "match_status": "1H",
+                    "home_team_id": 9001, "away_team_id": 9003,
+                    "home_team_name": "Alpha FC", "away_team_name": "Beta United",  # would fuzzy-match team-a/team-b if tried
+                    "home_score": 0, "away_score": 0, "events": []}],
+    )
+    assert poller.poll_live_matches(session) == 0
+    assert session.query(LiveMatchState).count() == 0
 
 
 def test_poller_ignores_fixtures_it_cant_match(session, monkeypatch):
