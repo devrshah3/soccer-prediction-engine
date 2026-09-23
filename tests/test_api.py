@@ -290,3 +290,63 @@ def test_international_prediction_includes_real_scorer_data(tmp_path):
         assert "Star Striker" in home_players
     finally:
         app.dependency_overrides.clear()
+
+
+def test_domestic_prediction_includes_real_api_football_scorer_data(tmp_path):
+    """Uses real La Liga team id "madrid" (Real Madrid) against the real cached
+    API-Football topscorer data (data/api_football_cache/) - proves the domestic
+    likely-scorers path returns real players, not just that the code runs."""
+    from kickcast_api import domestic_scorers
+
+    if not domestic_scorers.available("es.1"):
+        return  # no cache in this environment - nothing to check here
+    engine = create_engine(f"sqlite:///{tmp_path / 'test_domestic_scorers.db'}")
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine)
+    session = TestSession()
+    session.add(League(code="es.1", name="La Liga", country="Spain", kind="domestic_league"))
+    session.add_all([
+        Team(id="madrid", name="Real Madrid", country="Spain"),
+        Team(id="opponent", name="Some Opponent", country="Spain"),
+    ])
+    d = date(2023, 1, 1)
+    for match_id in range(1, 13):
+        i = match_id - 1
+        session.add(
+            Match(
+                league_code="es.1", season="2022-23", date=d,
+                home_team_id="madrid" if i % 2 == 0 else "opponent",
+                away_team_id="opponent" if i % 2 == 0 else "madrid",
+                home_goals=2, away_goals=1, status="finished", round=None, neutral=False,
+                source="synthetic", source_id=f"synthetic:{match_id}",
+            )
+        )
+        d += timedelta(days=7)
+    session.add(
+        Match(
+            league_code="es.1", season="2023-24", date=d, kickoff=None,
+            home_team_id="madrid", away_team_id="opponent", home_goals=None, away_goals=None,
+            status="scheduled", round="Matchday 1", neutral=False,
+            source="synthetic", source_id="synthetic:upcoming",
+        )
+    )
+    session.commit()
+
+    def override():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_session] = override
+    try:
+        c = TestClient(app)
+        fixtures = c.get("/leagues/es.1/fixtures").json()
+        body = c.get(f"/matches/{fixtures[0]['id']}/prediction").json()
+        assert body["likely_scorers"]["available"] is True
+        assert body["likely_scorers"]["source"] == domestic_scorers.SOURCE
+        home_players = [s["player"] for s in body["likely_scorers"]["home"]]
+        assert "Kylian Mbappé" in home_players  # real 2024-25 La Liga top scorer for Real Madrid
+    finally:
+        app.dependency_overrides.clear()

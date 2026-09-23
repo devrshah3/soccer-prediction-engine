@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from kickcast_engine.models.goal_timing import goal_timing_windows
 
+from .. import domestic_scorers
 from ..cards import get_card_model
 from ..db import get_session
 from ..models import Match
@@ -52,11 +53,20 @@ def match_prediction(match_id: int, session: Session = Depends(get_session)) -> 
             "home": team_likely_scorers(session, m.home_team_id, m.date, pred["expected_goals"]["home"]),
             "away": team_likely_scorers(session, m.away_team_id, m.date, pred["expected_goals"]["away"]),
         }
+    elif domestic_scorers.available(m.league_code):
+        pred["likely_scorers"] = {
+            "available": True,
+            "method": f"share of the {domestic_scorers.SEASON_LABEL} season's real goal total "
+                      "(API-Football free tier - NOT the current season, that needs a paid plan; "
+                      "NOT squad-sheet or fitness/rotation-aware) times this match's expected goals",
+            "source": domestic_scorers.SOURCE,
+            "home": domestic_scorers.team_likely_scorers(m.league_code, m.home_team_id, pred["expected_goals"]["home"]),
+            "away": domestic_scorers.team_likely_scorers(m.league_code, m.away_team_id, pred["expected_goals"]["away"]),
+        }
     else:
         pred["likely_scorers"] = {
             "available": False,
-            "reason": "no free, keyless, per-player data source found for domestic leagues "
-                      "(see MORNING_REPORT.md) - needs API-Football or a similar paid/keyed source",
+            "reason": "no per-player data source available for this competition",
             "home": [], "away": [],
         }
 

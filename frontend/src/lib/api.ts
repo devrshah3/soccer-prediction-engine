@@ -101,6 +101,7 @@ export type Prediction = {
   likely_scorers: {
     available: boolean;
     method?: string;
+    source?: string;
     reason?: string;
     home: { player: string; goals_in_window: number; prob_scores: number }[];
     away: { player: string; goals_in_window: number; prob_scores: number }[];
@@ -129,12 +130,25 @@ async function apiFetch<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export type DomesticGoldenBootLeague =
+  | { available: false; reason: string }
+  | {
+      available: true;
+      season: string;
+      source: string;
+      note: string;
+      top_scorers: { player: string; team_id: string; team_name: string; goals: number; appearances: number }[];
+    };
+
 export type Awards = {
   golden_boot: {
     available: boolean;
-    reason: string;
-    international_top_scorers: { player: string; team_id: string; team_name: string; goals: number }[];
-    lookback_days: number;
+    by_league: Record<string, DomesticGoldenBootLeague>;
+    international_top_scorers_also_available: {
+      reason: string;
+      international_top_scorers: { player: string; team_id: string; team_name: string; goals: number }[];
+      lookback_days: number;
+    };
   };
   ballon_dor: { available: boolean; reason: string };
   puskas: { available: boolean; reason: string };

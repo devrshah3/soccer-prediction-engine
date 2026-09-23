@@ -43,13 +43,42 @@ def test_international_top_scorers_excludes_own_goals_and_old_data(tmp_path):
     assert top["goals"] == 2
 
 
-def test_get_awards_reports_domestic_gaps_honestly(tmp_path):
+def test_get_awards_reports_international_scorers_and_honest_gaps(tmp_path):
     s = seeded_session(tmp_path)
     out = get_awards(s)
-    assert out["golden_boot"]["available"] is False
-    assert "international_top_scorers" in out["golden_boot"]
+    # golden_boot's availability now depends on whether data/api_football_cache/ exists in
+    # THIS environment (real cached data if scripts/fetch_api_football.py has run, absent
+    # on e.g. a bare clone) - both are legitimate, so don't assert a fixed value; just
+    # assert the shape is honest either way.
+    assert "by_league" in out["golden_boot"]
+    for code in ("en.1", "es.1", "it.1", "de.1", "fr.1"):
+        entry = out["golden_boot"]["by_league"][code]
+        assert entry["available"] in (True, False)
+        if not entry["available"]:
+            assert entry["reason"]
+    intl = out["golden_boot"]["international_top_scorers_also_available"]
+    names = {r["player"] for r in intl["international_top_scorers"]}
+    assert "Striker One" in names and "Defender X" not in names
     assert out["ballon_dor"]["available"] is False
     assert out["puskas"]["available"] is False
-    # every "not available" entry states why, never silently empty
-    for key in ("golden_boot", "ballon_dor", "puskas"):
+    for key in ("ballon_dor", "puskas"):
         assert out[key]["reason"]
+
+
+def test_domestic_golden_boot_uses_real_cached_data_when_present(tmp_path):
+    """When data/api_football_cache/ is populated (as it is in this dev environment - see
+    scripts/fetch_api_football.py), the domestic Golden Boot must show real players with
+    a plausible single-season goal/appearance shape, not placeholder or fabricated data."""
+    from kickcast_api import domestic_scorers
+
+    if not domestic_scorers.available("es.1"):
+        return  # no cache in this environment (e.g. CI without it) - nothing to check here
+    s = seeded_session(tmp_path)
+    out = get_awards(s)
+    la_liga = out["golden_boot"]["by_league"]["es.1"]
+    assert la_liga["available"] is True
+    assert la_liga["season"] == domestic_scorers.SEASON_LABEL
+    assert la_liga["top_scorers"], "expected at least one real scorer"
+    top = la_liga["top_scorers"][0]
+    assert top["goals"] > 0
+    assert top["appearances"] <= 38  # data-quality filter: a real single season, not cumulative
