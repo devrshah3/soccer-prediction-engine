@@ -15,7 +15,16 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   });
   if (!match) notFound();
 
-  const prediction = match.status === "scheduled" ? await api.prediction(matchId) : null;
+  const prediction =
+    match.status === "scheduled"
+      ? await api.prediction(matchId).catch((e) => {
+          // 503 = no validated model for this competition yet (e.g. Champions League -
+          // see kickcast_api/predictions.py's explicit guard) - real, expected, not a
+          // page error.
+          if (e instanceof ApiError && e.status === 503) return null;
+          throw e;
+        })
+      : null;
 
   return (
     <div className="space-y-6">

@@ -20,7 +20,16 @@ export default async function LeaguePage({
   });
   if (!standings) notFound();
 
-  const trophyOdds = standings.season === standings.available_seasons[0] ? await api.trophyOdds(code, standings.season) : null;
+  const trophyOdds =
+    standings.season === standings.available_seasons[0]
+      ? await api.trophyOdds(code, standings.season).catch((e) => {
+          // 503 = not enough validated model history for this competition (e.g. Champions
+          // League - see kickcast_api/predictions.py's explicit guard, a cross-league
+          // rating is unvalidated future work) - a real, expected state, not a page error.
+          if (e instanceof ApiError && e.status === 503) return null;
+          throw e;
+        })
+      : null;
 
   return (
     <div className="space-y-6">
@@ -108,8 +117,9 @@ export default async function LeaguePage({
         </div>
       )}
       <p className="text-xs text-zinc-600">
-        Stat leaders (goals/assists) aren&apos;t shown yet - we don&apos;t have a verified free source of
-        per-player domestic stats. See MORNING_REPORT.md.
+        Top scorers for this league (2024-25 season, most recent available on our free data
+        tier) are on the <Link href="/awards" className="text-emerald-500 hover:underline">Awards</Link> page.
+        A full assists/stat-leaders table isn&apos;t built yet.
       </p>
     </div>
   );

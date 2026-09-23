@@ -52,7 +52,18 @@ def _training_matches(session: Session, league_code: str) -> list[MatchResult]:
 
 def get_model(session: Session, league_code: str) -> DixonColes | None:
     """Returns a fitted, cached DixonColes model for the competition, or None if there
-    isn't enough finished-match history yet (DixonColes.fit needs >= 10 matches)."""
+    isn't enough finished-match history yet (DixonColes.fit needs >= 10 matches).
+
+    "CL" (Champions League) is deliberately excluded even once it has >= 10 finished
+    matches: fitting Dixon-Coles on CL results alone would mix teams from many different
+    domestic leagues with no shared strength scale (a team's CL results say little about
+    its true strength without a cross-league rating), and DOMESTIC_HYPERPARAMS were
+    tuned/validated on single-league goals, not a cross-league cup - per the project's
+    backtesting rule, an unvalidated model must not be presented as a real prediction.
+    A real cross-league rating is future work, not something to ship quickly here.
+    """
+    if league_code == "CL":
+        return None
     version = data_version(session)
     key = cache_key(session, "goals", league_code)
     cached = _cache.get(key)

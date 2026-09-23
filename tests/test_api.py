@@ -350,3 +350,32 @@ def test_domestic_prediction_includes_real_api_football_scorer_data(tmp_path):
         assert "Kylian Mbappé" in home_players  # real 2024-25 La Liga top scorer for Real Madrid
     finally:
         app.dependency_overrides.clear()
+
+
+def test_champions_league_never_gets_an_unvalidated_prediction_model(tmp_path):
+    """get_model() must explicitly refuse "CL" even with >= 10 finished matches -
+    DOMESTIC_HYPERPARAMS were validated on single-league goals, not a cross-league cup
+    mixing teams with no shared strength scale (see predictions.py's docstring)."""
+    from kickcast_api.predictions import get_model
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'test_cl_guard.db'}")
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine)
+    session = TestSession()
+    session.add(League(code="CL", name="UEFA Champions League", country="Europe", kind="continental_cup"))
+    session.add_all([Team(id="team-a", name="Team A", country=None), Team(id="team-b", name="Team B", country=None)])
+    d = date(2026, 9, 1)
+    for match_id in range(1, 15):  # well above the >= 10 threshold that would otherwise fit a model
+        i = match_id - 1
+        session.add(
+            Match(
+                league_code="CL", season="2026-27", date=d, kickoff=None,
+                home_team_id="team-a" if i % 2 == 0 else "team-b",
+                away_team_id="team-b" if i % 2 == 0 else "team-a",
+                home_goals=2, away_goals=1, status="finished", round="LEAGUE_STAGE MD1", neutral=False,
+                source="synthetic", source_id=f"synthetic:{match_id}",
+            )
+        )
+        d += timedelta(days=7)
+    session.commit()
+    assert get_model(session, "CL") is None

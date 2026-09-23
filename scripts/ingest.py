@@ -23,6 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from kickcast_api import football_data_org
 from kickcast_api.db import SessionLocal, engine, init_db
 from kickcast_api.models import Goalscorer, League, Match, MatchStats, Meta, Team
 from kickcast_engine.data import footballdata_uk, international, openfootball
@@ -222,6 +223,75 @@ def ingest_international(session) -> int:
     return n
 
 
+def ingest_champions_league(session) -> int:
+    """UEFA Champions League fixtures/results from football-data.org (free tier, 10
+    req/min - see kickcast_api/football_data_org.py's real header-driven throttle).
+    Key-gated: a no-op (returns 0) when FOOTBALL_DATA_ORG_API_KEY isn't set, exactly
+    like the rest of this project's optional data sources.
+
+    Fetched LIVE on every ingest run, not cached to a static file like
+    footballdata_uk/api_football - CL results change match to match (TIMED -> FINISHED)
+    and football-data.org's 10/min budget easily covers one call per ingest run.
+    utcDate is already real UTC (unlike openfootball's local-time convention) - no
+    timezone conversion needed here.
+
+    Team ids use the SAME team_aliases.canonical() as the domestic leagues (best-effort,
+    not a separately verified crosswalk like API-Football's - in scope here is "ship
+    real fixtures/results", not a second verified crosswalk); many CL clubs already
+    exist as real Team rows from their domestic league ingestion and will match
+    automatically, non-big-5 clubs (e.g. Club Brugge) get a new Team row.
+
+    No prediction model is fit for "CL" (see kickcast_api/predictions.py's explicit
+    guard) - a cross-league team-strength rating is a separate, unvalidated research
+    task, not something to ship quickly and unvalidated per the project's backtesting
+    rule. Real fixtures/results/standings only, honestly, no fake odds.
+    """
+    if not football_data_org.available():
+        return 0
+    payload = football_data_org.get("/competitions/CL/matches")
+    if payload is None:
+        return 0
+
+    upsert_league(session, "CL", "UEFA Champions League", "Europe", "continental_cup")
+    existing = load_existing_matches(session, "CL")
+    team_cache: dict = {}
+    n = 0
+    season_start_year = int(payload["matches"][0]["season"]["startDate"][:4]) if payload["matches"] else None
+    season_label = f"{season_start_year}-{str(season_start_year + 1)[2:]}" if season_start_year else "unknown"
+
+    for fx in payload["matches"]:
+        home_id = canonical(fx["homeTeam"]["name"])
+        away_id = canonical(fx["awayTeam"]["name"])
+        # Only CREATE a team row if one doesn't already exist - most big-5 clubs already
+        # have a correct name/country from domestic ingestion, and football-data.org's
+        # match payload has no usable per-team country field (only the competition's
+        # "area", which is "Europe" for every CL match) - upsert_team would otherwise
+        # blindly overwrite a real country with None (the exact class of bug fixed
+        # earlier for the "Real Madrid" vs regional-side id collision).
+        if session.get(Team, home_id) is None:
+            upsert_team(session, home_id, fx["homeTeam"]["name"], None, team_cache)
+        if session.get(Team, away_id) is None:
+            upsert_team(session, away_id, fx["awayTeam"]["name"], None, team_cache)
+        match_date = datetime.fromisoformat(fx["utcDate"].replace("Z", "+00:00")).date()
+        kickoff_utc = datetime.fromisoformat(fx["utcDate"].replace("Z", "+00:00")).strftime("%H:%M")
+        key = ("CL", match_date, home_id, away_id)
+        finished = fx["status"] == "FINISHED"
+        full_time = fx.get("score", {}).get("fullTime", {}) if finished else {}
+        round_label = f"{fx['stage']} MD{fx['matchday']}" if fx.get("matchday") else fx["stage"]
+        upsert_match(
+            session, existing, key,
+            {
+                "season": season_label, "kickoff": kickoff_utc,
+                "home_goals": full_time.get("home"), "away_goals": full_time.get("away"),
+                "status": "finished" if finished else "scheduled",
+                "round": round_label, "neutral": False,
+                "source": "football-data.org", "source_id": f"CL:{fx['id']}",
+            },
+        )
+        n += 1
+    return n
+
+
 def ingest_goalscorers(session) -> int:
     session.query(Goalscorer).delete()  # small table, cheap to fully rebuild each run (keeps it simple+idempotent)
     match_index = {
@@ -278,6 +348,10 @@ def main() -> None:
             counts[kc_code] = ingest_domestic(session, kc_code, fd_code, name, country)
             session.commit()
             print(f"{kc_code:8} {name:16} {counts[kc_code]:6} match rows upserted")
+        counts["CL"] = ingest_champions_league(session)  # no-op (0) without FOOTBALL_DATA_ORG_API_KEY
+        session.commit()
+        if counts["CL"]:
+            print(f"{'CL':8} {'Champions League':16} {counts['CL']:6} match rows upserted")
         counts["international"] = ingest_international(session)
         session.commit()
         print(f"{'intl':8} {'International':16} {counts['international']:6} match rows upserted")

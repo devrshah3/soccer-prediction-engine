@@ -20,12 +20,17 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  let leagues: { code: string; name: string }[] = [];
+  let leagues: { code: string; name: string; kind: string }[] = [];
   try {
-    leagues = (await api.leagues()).filter((l) => l.kind === "domestic_league");
+    leagues = await api.leagues();
   } catch {
     // backend not reachable (e.g. during a frontend-only lint/build check) - nav degrades gracefully
   }
+  const domesticLeagues = leagues.filter((l) => l.kind === "domestic_league");
+  // Champions League only shown once real data exists (FOOTBALL_DATA_ORG_API_KEY set and
+  // scripts/ingest.py run) - never link to an empty/404ing page, per "don't build UI for
+  // data we don't have".
+  const hasChampionsLeague = leagues.some((l) => l.code === "CL");
 
   return (
     <html
@@ -40,11 +45,16 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               KickCast
             </Link>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-400">
-              {leagues.map((l) => (
+              {domesticLeagues.map((l) => (
                 <Link key={l.code} href={`/leagues/${l.code}`} className="hover:text-emerald-400">
                   {l.name}
                 </Link>
               ))}
+              {hasChampionsLeague && (
+                <Link href="/leagues/CL" className="hover:text-emerald-400">
+                  Champions League
+                </Link>
+              )}
               <Link href="/leagues/international" className="hover:text-emerald-400">
                 International
               </Link>
@@ -62,7 +72,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </header>
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
         <footer className="border-t border-zinc-800 px-4 py-6 text-center text-xs text-zinc-600">
-          Data: openfootball (CC0), football-data.co.uk, StatsBomb Open Data, martj42/international_results (CC0).
+          Data: openfootball (CC0), football-data.co.uk, StatsBomb Open Data, martj42/international_results (CC0),
+          football-data.org (Champions League), API-Football (domestic scorer data), Wikipedia (CC BY-SA).
           Predictions are our own model, backtested out-of-sample - not a promise of accuracy.
         </footer>
       </body>

@@ -12,7 +12,8 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from kickcast_api.models import Base, Match, Team
+from kickcast_api import football_data_org
+from kickcast_api.models import Base, League, Match, Team
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("ingest", REPO_ROOT / "scripts" / "ingest.py")
@@ -85,3 +86,87 @@ def test_real_madrid_survives_international_ingest_without_id_collision(tmp_path
         .first()
     )
     assert regional_match is not None and regional_match.away_team_id == "andalusia"
+
+
+FAKE_CL_PAYLOAD = {
+    "matches": [
+        {
+            "id": 900001,
+            "season": {"startDate": "2026-09-08", "endDate": "2027-01-27"},
+            "utcDate": "2026-09-08T16:45:00Z",
+            "status": "FINISHED",
+            "matchday": 1,
+            "stage": "LEAGUE_STAGE",
+            "homeTeam": {"name": "Real Madrid CF"},
+            "awayTeam": {"name": "Club Brugge KV"},
+            "score": {"fullTime": {"home": 3, "away": 1}},
+        },
+        {
+            "id": 900002,
+            "season": {"startDate": "2026-09-08", "endDate": "2027-01-27"},
+            "utcDate": "2026-10-01T19:00:00Z",
+            "status": "TIMED",
+            "matchday": 2,
+            "stage": "LEAGUE_STAGE",
+            "homeTeam": {"name": "Club Brugge KV"},
+            "awayTeam": {"name": "Real Madrid CF"},
+            "score": {"fullTime": {"home": None, "away": None}},
+        },
+    ]
+}
+
+
+def test_champions_league_ingest_is_a_noop_without_key(tmp_path, monkeypatch):
+    monkeypatch.delenv("FOOTBALL_DATA_ORG_API_KEY", raising=False)
+    session = _session(tmp_path)
+    assert ingest.ingest_champions_league(session) == 0
+    assert session.query(Match).filter(Match.league_code == "CL").count() == 0
+
+
+def test_champions_league_ingest_real_shape_and_idempotency(tmp_path, monkeypatch):
+    monkeypatch.setenv("FOOTBALL_DATA_ORG_API_KEY", "fake-key")
+    monkeypatch.setattr(football_data_org, "get", lambda path, params=None: FAKE_CL_PAYLOAD)
+
+    session = _session(tmp_path)
+    n1 = ingest.ingest_champions_league(session)
+    session.commit()
+    assert n1 == 2
+    league = session.get(League, "CL")
+    assert league is not None and league.kind == "continental_cup"
+
+    finished = session.query(Match).filter(Match.league_code == "CL", Match.status == "finished").one()
+    assert finished.home_goals == 3 and finished.away_goals == 1
+    assert finished.season == "2026-27"
+    assert finished.kickoff == "16:45"  # utcDate is already real UTC - no conversion needed
+    assert finished.round == "LEAGUE_STAGE MD1"
+
+    scheduled = session.query(Match).filter(Match.league_code == "CL", Match.status == "scheduled").one()
+    assert scheduled.home_goals is None and scheduled.away_goals is None
+
+    n2 = ingest.ingest_champions_league(session)
+    session.commit()
+    assert n2 == 2  # same rows re-processed
+    assert session.query(Match).filter(Match.league_code == "CL").count() == 2  # no duplicates
+
+
+def test_champions_league_ingest_never_overwrites_an_existing_teams_name_or_country(tmp_path, monkeypatch):
+    """Real bug avoided (same class as the Real Madrid/regional-side collision):
+    football-data.org's match payload has no usable per-team country field, so CL
+    ingestion must never blindly overwrite a team that already exists from domestic
+    ingestion (e.g. Real Madrid, correctly "Real Madrid"/"Spain" from La Liga)."""
+    monkeypatch.setenv("FOOTBALL_DATA_ORG_API_KEY", "fake-key")
+    monkeypatch.setattr(ingest.football_data_org, "get", lambda path, params=None: FAKE_CL_PAYLOAD)
+
+    session = _session(tmp_path)
+    ingest.ingest_domestic(session, "es.1", "SP1", "La Liga", "Spain")
+    session.commit()
+    real_madrid_before = session.get(Team, "madrid")
+    assert real_madrid_before.name == "Real Madrid" and real_madrid_before.country == "Spain"
+
+    ingest.ingest_champions_league(session)
+    session.commit()
+
+    real_madrid_after = session.get(Team, "madrid")
+    assert real_madrid_after.name == "Real Madrid" and real_madrid_after.country == "Spain"
+    brugge = session.get(Team, "brugge kv")  # canonical_id() strips the "club " prefix
+    assert brugge is not None  # a genuinely new CL-only club still gets created

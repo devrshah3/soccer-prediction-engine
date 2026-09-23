@@ -25,7 +25,7 @@ class League(Base):
     code: Mapped[str] = mapped_column(String, primary_key=True)  # "en.1", "international", ...
     name: Mapped[str] = mapped_column(String)
     country: Mapped[str | None] = mapped_column(String, nullable=True)
-    kind: Mapped[str] = mapped_column(String)  # "domestic_league" | "international"
+    kind: Mapped[str] = mapped_column(String)  # "domestic_league" | "international" | "continental_cup"
 
 
 class Team(Base):
