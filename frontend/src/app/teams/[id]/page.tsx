@@ -17,11 +17,13 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   });
   if (!team) notFound();
 
-  const [upcoming, recent, nextPrediction] = await Promise.all([
+  const [upcoming, recent, nextPrediction, trophyOdds] = await Promise.all([
     api.teamFixtures(id, "scheduled", 20),
     api.teamFixtures(id, "finished", 10),
     team.next_match ? api.prediction(team.next_match.id) : Promise.resolve(null),
+    team.league_code ? api.trophyOdds(team.league_code, team.season ?? undefined) : Promise.resolve(null),
   ]);
+  const teamOdds = trophyOdds?.teams.find((t) => t.team_id === id);
 
   return (
     <div className="space-y-8">
@@ -43,6 +45,19 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         <div className="mt-2">
           <FormDots form={team.form} />
         </div>
+        {teamOdds && (
+          <div className="mt-3 flex gap-4 text-xs text-zinc-400">
+            <span>
+              Title <span className="font-semibold text-zinc-200">{(teamOdds.title_pct * 100).toFixed(1)}%</span>
+            </span>
+            <span>
+              Top 4 <span className="font-semibold text-zinc-200">{(teamOdds.top4_pct * 100).toFixed(1)}%</span>
+            </span>
+            <span>
+              Relegation <span className="font-semibold text-zinc-200">{(teamOdds.relegation_pct * 100).toFixed(1)}%</span>
+            </span>
+          </div>
+        )}
       </div>
 
       {team.next_match && (

@@ -163,6 +163,25 @@ def test_unknown_match_404(client):
     assert client.get("/matches/999999/prediction").status_code == 404
 
 
+def test_trophy_odds_shape_and_sums(client):
+    r = client.get("/leagues/test.1/trophy-odds")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["league_code"] == "test.1"
+    assert body["n_sims"] > 0
+    teams = body["teams"]
+    assert len(teams) == 8
+    assert abs(sum(t["title_pct"] for t in teams) - 1.0) < 1e-6
+    assert abs(sum(t["top4_pct"] for t in teams) - 4.0) < 1e-6
+    for t in teams:
+        assert 0 <= t["title_pct"] <= 1
+        assert 0 <= t["relegation_pct"] <= 1
+
+
+def test_trophy_odds_unknown_league_404(client):
+    assert client.get("/leagues/nope/trophy-odds").status_code == 404
+
+
 def test_prediction_includes_card_data_when_available(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'test_cards.db'}")
     Base.metadata.create_all(engine)

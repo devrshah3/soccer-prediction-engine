@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from ..db import get_session
 from ..models import League, Match
 from ..serialize import latest_season, match_dict, seasons, standings
+from ..trophy_odds import get_trophy_odds
 
 router = APIRouter(prefix="/leagues", tags=["leagues"])
 
@@ -50,3 +51,15 @@ def league_fixtures(
     order = Match.date.asc() if status != "finished" else Match.date.desc()
     matches = q.order_by(order).limit(limit).all()
     return [match_dict(session, m) for m in matches]
+
+
+@router.get("/{code}/trophy-odds")
+def league_trophy_odds(code: str, season: str | None = None, session: Session = Depends(get_session)) -> dict:
+    _get_league(session, code)
+    odds = get_trophy_odds(session, code, season)
+    if odds is None:
+        raise HTTPException(
+            503, f"not enough data yet to simulate {code!r}"
+            + (f" season {season!r}" if season else "")
+        )
+    return odds

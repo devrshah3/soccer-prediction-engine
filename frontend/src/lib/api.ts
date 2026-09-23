@@ -47,6 +47,23 @@ export type Standings = {
   table: StandingsRow[];
 };
 
+export type TrophyOdds = {
+  league_code: string;
+  season: string;
+  n_sims: number;
+  remaining_fixtures: number;
+  model_as_of: string | null;
+  teams: {
+    team_id: string;
+    team_name: string;
+    title_pct: number;
+    top4_pct: number;
+    relegation_pct: number;
+    expected_position: number;
+    expected_points: number;
+  }[];
+};
+
 export type TeamDetail = {
   id: string;
   name: string;
@@ -121,6 +138,13 @@ export const api = {
   team: (id: string) => apiFetch<TeamDetail>(`/teams/${encodeURIComponent(id)}`),
   teamFixtures: (id: string, status: "scheduled" | "finished" | "all" = "all", limit = 100) =>
     apiFetch<Match[]>(`/teams/${encodeURIComponent(id)}/fixtures?status=${status}&limit=${limit}`),
+  trophyOdds: (code: string, season?: string) =>
+    apiFetch<TrophyOdds | null>(`/leagues/${encodeURIComponent(code)}/trophy-odds${season ? `?season=${season}` : ""}`).catch(
+      (e) => {
+        if (e instanceof ApiError && e.status === 503) return null;
+        throw e;
+      }
+    ),
   match: (id: number) => apiFetch<Match>(`/matches/${id}`),
   prediction: (id: number) => apiFetch<Prediction | null>(`/matches/${id}/prediction`).catch((e) => {
     if (e instanceof ApiError && e.status === 503) return null;

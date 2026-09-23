@@ -20,6 +20,8 @@ export default async function LeaguePage({
   });
   if (!standings) notFound();
 
+  const trophyOdds = standings.season === standings.available_seasons[0] ? await api.trophyOdds(code, standings.season) : null;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -69,6 +71,42 @@ export default async function LeaguePage({
           </tbody>
         </table>
       </div>
+      {trophyOdds && (
+        <div>
+          <h2 className="mb-1 text-lg font-semibold text-zinc-200">Trophy odds</h2>
+          <p className="mb-3 text-xs text-zinc-500">
+            Monte Carlo simulation of the rest of the season ({trophyOdds.n_sims.toLocaleString()} runs over{" "}
+            {trophyOdds.remaining_fixtures} remaining fixtures), model as of {trophyOdds.model_as_of}. Not a
+            promise of accuracy.
+          </p>
+          <div className="overflow-x-auto rounded-lg border border-zinc-800">
+            <table className="w-full min-w-[480px] text-sm">
+              <thead className="bg-zinc-900 text-left text-xs uppercase tracking-wide text-zinc-500">
+                <tr>
+                  <th className="px-3 py-2">Team</th>
+                  <th className="px-2 py-2 text-center">Title</th>
+                  <th className="px-2 py-2 text-center">Top 4</th>
+                  <th className="px-2 py-2 text-center">Relegation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trophyOdds.teams.map((t) => (
+                  <tr key={t.team_id} className="border-t border-zinc-800">
+                    <td className="px-3 py-2">
+                      <Link href={`/teams/${encodeURIComponent(t.team_id)}`} className="hover:text-emerald-400">
+                        {t.team_name}
+                      </Link>
+                    </td>
+                    <td className="px-2 py-2 text-center text-zinc-300">{(t.title_pct * 100).toFixed(1)}%</td>
+                    <td className="px-2 py-2 text-center text-zinc-300">{(t.top4_pct * 100).toFixed(1)}%</td>
+                    <td className="px-2 py-2 text-center text-zinc-300">{(t.relegation_pct * 100).toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       <p className="text-xs text-zinc-600">
         Stat leaders (goals/assists) aren&apos;t shown yet - we don&apos;t have a verified free source of
         per-player domestic stats. See MORNING_REPORT.md.
