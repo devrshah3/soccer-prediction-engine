@@ -7,9 +7,17 @@ it identically via `genai.Client(api_key=...)`, no special handling needed):
   - `gemini-2.5-flash` (the old default here) is 404 NOT_FOUND for new users - Google's
     own error told us to migrate to `models/gemini-3.6-flash`. Switched MODEL to that;
     confirmed with a real call (real "OK" reply, real usage_metadata back).
-  - Real function-calling round trip confirmed: response.function_calls is a list of
-    objects with .name (str) and .args (dict), exactly what ask_gemini() below assumes;
-    response.candidates[0].content round-trips back into `contents` correctly.
+  - response.function_calls is a list of objects with .name (str) and .args (dict),
+    exactly what ask_gemini() below assumes; response.candidates[0].content round-trips
+    back into `contents` correctly for a SINGLE tool call. A REAL multi-turn round trip
+    (needed whenever the model wants a second tool call after seeing the first result,
+    which is common) was NOT actually verified in the original pass - it silently threw
+    on the second turn: `types.Content(role="tool", ...)` is rejected by the live API
+    ("Role 'tool' is not supported... valid role: SYSTEM, SYSTEM_1, USER, ASSISTANT,
+    DEVELOPER, CONTEXT, USER_CONTEXT, MODEL, USER"), caught by the broad except below and
+    silently downgraded to the DB-only fallback with mode="db_fallback" - every question
+    needing 2+ tool calls (i.e. resolve_team then anything) was silently degraded before
+    this was found and fixed to role="user" (confirmed working end-to-end for real).
   - Google Search grounding (ask_gemini_with_search, below) returned a REAL
     429 RESOURCE_EXHAUSTED on the very first attempt, not a rate limit from repeated
     calls. Confirmed against Google's own pricing docs: grounding is genuinely "Not
@@ -108,7 +116,13 @@ def ask_gemini(session: Session, question: str) -> dict | None:
                 result = tool_obj.run(session, **(call.args or {})) if tool_obj else {"found": False, "error": "unknown tool"}
                 sources.append({"type": "kickcast_tool", "tool": call.name, "args": call.args, "result": result})
                 response_parts.append(types.Part(function_response=types.FunctionResponse(name=call.name, response=result)))
-            contents.append(types.Content(role="tool", parts=response_parts))
+            # NOT role="tool" - VERIFIED against a real call (2026-09-23): the live API
+            # rejects it with "Role 'tool' is not supported. Please use a valid role:
+            # SYSTEM, SYSTEM_1, USER, ASSISTANT, DEVELOPER, CONTEXT, USER_CONTEXT, MODEL,
+            # USER" - this silently broke every multi-tool-call conversation (anything
+            # needing more than one round of tool calls) until caught here; "user" is
+            # confirmed to work end-to-end against a real multi-turn call.
+            contents.append(types.Content(role="user", parts=response_parts))
 
         return None  # exhausted iterations without a final answer - don't guess, fall back
     except Exception:  # noqa: BLE001 - fail closed to DB fallback on any SDK/network error, deliberate

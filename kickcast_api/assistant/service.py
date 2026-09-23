@@ -28,6 +28,24 @@ def _all_tools_missed(sources: list[dict]) -> bool:
     return all(isinstance(s.get("result"), dict) and s["result"].get("found") is False for s in tool_results)
 
 
+# Phrases the SYSTEM_INSTRUCTION explicitly primes Gemini to use ("say plainly that you
+# don't know rather than guessing") when its tool calls found data, but not the RIGHT
+# data - e.g. resolve_team + team_recent_results both succeed (found=True) for a team,
+# but the specific match asked about (an old European final, say) isn't in our DB at
+# all. _all_tools_missed alone can't catch this (every individual tool call DID find
+# something), so also check the model's own final answer for a decline.
+_DECLINE_PHRASES = (
+    "don't know", "do not know", "don't have", "do not have", "cannot answer",
+    "can't answer", "no access", "not available in", "couldn't find", "could not find",
+    "not in our database", "not in my database", "outside our database", "no data",
+)
+
+
+def _looks_like_decline(text: str) -> bool:
+    t = text.lower()
+    return any(p in t for p in _DECLINE_PHRASES)
+
+
 def _try_wikipedia(session: Session, question: str) -> dict | None:
     """Real substitute for Search grounding: look the question up on Wikipedia, then
     have Gemini answer strictly from that extract (never from its own unaided
@@ -80,7 +98,7 @@ def ask(session: Session, question: str) -> dict:
     if gemini_client.available():
         result = gemini_client.ask_gemini(session, question)
         if result is not None:
-            if _all_tools_missed(result["sources"]):
+            if _all_tools_missed(result["sources"]) or _looks_like_decline(result["text"]):
                 outside_db = gemini_client.ask_gemini_with_search(session, question)
                 if outside_db is None:
                     outside_db = _try_wikipedia(session, question)
