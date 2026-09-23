@@ -59,20 +59,29 @@ tests/                                unit tests incl. leakage checks
 
 ```bash
 pip install -e ".[dev]"
+
+# Free/keyless data. Both steps are idempotent (skip what's already present, safe to
+# re-run) - a genuinely fresh clone needs both before `python scripts/ingest.py` works:
+scripts/fetch_open_data.sh          # openfootball + martj42/international_results
+python scripts/fetch_footballdata_uk.py   # football-data.co.uk (stats/cards/odds, 2001-02+)
+
 mkdir -p data/sb
 for p in "2 27" "11 27" "12 27" "7 27"; do set -- $p
   curl -s -o data/sb/matches_$1_$2.json \
     https://raw.githubusercontent.com/statsbomb/open-data/master/data/matches/$1/$2.json; done
 python scripts/extract_statsbomb_events.py data/sb_summaries.jsonl data/sb/matches_*_27.json
 python scripts/backtest_compare.py data/sb_summaries.jsonl data/sb reports/backtest_2015_16.json
+python scripts/analyze_corners_and_timing.py data/sb_summaries.jsonl reports/corner_and_timing_stats.json
 pytest && ruff check . && mypy kickcast_engine --ignore-missing-imports
 ```
 
 ## Data credit
 
 Historical data: [StatsBomb Open Data](https://github.com/statsbomb/open-data),
-[openfootball](https://github.com/openfootball) (CC0),
-[martj42/international_results](https://github.com/martj42/international_results) (CC0).
+[openfootball/football.json](https://github.com/openfootball/football.json) (CC0 - fetched via
+`scripts/fetch_open_data.sh`, which pulls a tarball of the repo into `data/openfootball_raw/`),
+[martj42/international_results](https://github.com/martj42/international_results) (CC0 - same
+script, `results.csv`/`goalscorers.csv` into `data/`).
 Comparison model: [penaltyblog](https://github.com/martineastwood/penaltyblog) (MIT).
 
 Match stats, cards and historical closing odds: [football-data.co.uk](https://www.football-data.co.uk/).
