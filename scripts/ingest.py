@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from kickcast_api.db import SessionLocal, engine, init_db
 from kickcast_api.models import Goalscorer, League, Match, MatchStats, Meta, Team
 from kickcast_engine.data import footballdata_uk, international, openfootball
+from kickcast_engine.data.kickoff import LEAGUE_TIMEZONES, to_utc_hhmm
 from kickcast_engine.data.team_aliases import canonical
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -128,11 +129,16 @@ def ingest_domestic(session, kc_code: str, fd_code: str, name: str, country: str
         home_id, away_id = canonical(of_row["home"]), canonical(of_row["away"])
         upsert_team(session, home_id, of_row["home"], country, team_cache)
         upsert_team(session, away_id, of_row["away"], country, team_cache)
-        key = (kc_code, date.fromisoformat(of_row["date"]), home_id, away_id)
+        match_date = date.fromisoformat(of_row["date"])
+        key = (kc_code, match_date, home_id, away_id)
+        local_kickoff = of_row.get("kickoff")
+        kickoff_utc = (
+            to_utc_hhmm(match_date, local_kickoff, LEAGUE_TIMEZONES[kc_code]) if local_kickoff else None
+        )
         upsert_match(
             session, existing, key,
             {
-                "season": of_row["season"], "kickoff": of_row.get("kickoff"),
+                "season": of_row["season"], "kickoff": kickoff_utc,
                 "home_goals": of_row["home_goals"], "away_goals": of_row["away_goals"],
                 "status": of_row["status"], "round": of_row.get("round"), "neutral": False,
                 "source": openfootball.SOURCE, "source_id": f"{kc_code}:{of_row['date']}",
@@ -174,10 +180,14 @@ def ingest_international(session) -> int:
             upsert_team(session, home_id, international.canonical(fx["home"]), None, team_cache)
             upsert_team(session, away_id, international.canonical(fx["away"]), None, team_cache)
             key = ("international", d, home_id, away_id)
+            local_kickoff = fx.get("kickoff_cet")
+            kickoff_utc = (
+                to_utc_hhmm(d, local_kickoff, LEAGUE_TIMEZONES["international"]) if local_kickoff else None
+            )
             upsert_match(
                 session, existing, key,
                 {
-                    "season": "2026-27", "kickoff": fx.get("kickoff_cet"),
+                    "season": "2026-27", "kickoff": kickoff_utc,
                     "home_goals": None, "away_goals": None,
                     "status": fx["status"], "round": f"{fx['competition']} MD{fx['matchday']} Group {fx['group']}",
                     "neutral": False,

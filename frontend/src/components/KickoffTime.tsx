@@ -1,9 +1,10 @@
 "use client";
 
-// Renders kickoff in the viewer's local time zone. ASSUMPTION (unverified against the
-// source docs - flagged in MORNING_REPORT.md): stored `kickoff` strings are treated as UTC.
-// If that assumption is wrong the displayed time will be off by a fixed offset; the raw
-// source value is always shown alongside it so nothing is hidden.
+// Renders kickoff in the viewer's local time zone. `kickoff` is stored as real UTC
+// (converted DST-aware from each league's local kickoff time at ingestion - see
+// kickcast_engine/data/kickoff.py, verified against a real fixture: Arsenal vs Coventry
+// City, 2026-08-21, 20:00 in London (BST, UTC+1) -> stored/served as "19:00" UTC). The
+// raw source value is still shown alongside it so nothing is hidden if this ever drifts.
 export function KickoffTime({ date, kickoff }: { date: string; kickoff: string | null }) {
   if (!kickoff) {
     return <span>{date}</span>;
