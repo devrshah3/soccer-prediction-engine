@@ -103,6 +103,30 @@ def test_fallback_declines_unmatched_question_honestly():
     assert "only answer from our own database" in r["text"].lower()
 
 
+def test_fallback_declines_specific_past_year_instead_of_guessing_most_recent_match(session):
+    """Regression for a real bug: 'scored' matched _RESULT_WORDS's 'score' substring, so
+    "Who scored the winning goal for Ridgeway United in the 2016 Champions League final?"
+    silently returned Ridgeway United's most recent (unrelated, 2024) synthetic result as
+    if it answered the question about 2016 - a confident-looking wrong answer, exactly
+    what the "never invent a fact" rule exists to prevent. The fallback tools only ever
+    look up next/most-recent/current, never a specific year, so any other year must decline."""
+    r = fallback.answer(
+        session,
+        "Who scored the winning goal for Ridgeway United in the 2016 Champions League final?",
+    )
+    assert r["found"] is False
+    assert "2016" in r["text"]
+    assert r["sources"] == []
+
+
+def test_fallback_current_season_year_still_answers_normally(session):
+    from datetime import UTC, datetime
+
+    current_year = datetime.now(UTC).year
+    r = fallback.answer(session, f"When does Ridgeway United play next in {current_year}?")
+    assert r["found"] is True
+
+
 def test_fallback_never_fabricates_result_for_team_with_no_finished_matches(session):
     session.add(Team(id="team-new", name="Brand New FC", country="Testland"))
     session.commit()

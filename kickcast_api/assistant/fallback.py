@@ -9,6 +9,9 @@ nothing matches, it says so rather than guessing, per the "never invent a fact" 
 
 from __future__ import annotations
 
+import re
+from datetime import UTC, datetime
+
 from sqlalchemy.orm import Session
 
 from ..models import Team
@@ -18,6 +21,27 @@ _NEXT_WORDS = ("next", "when", "upcoming", "fixture", "play next", "playing next
 _RESULT_WORDS = ("score", "result", "beat", "lost", "won", "lose", "win against", "draw")
 _TABLE_WORDS = ("table", "standings", "position", "top of", "leading", "first place", "where are")
 _PREDICT_WORDS = ("predict", "odds", "chance", "probability", "who will win", "favourite", "favorite")
+_YEAR_RE = re.compile(r"\b(19\d{2}|20\d{2})\b")
+
+_DECLINE_SPECIFIC_YEAR = (
+    "I can only answer from our own database right now (no AI assistant configured/available), "
+    "and our database lookups here only cover the CURRENT/most recent match, standings and "
+    "predictions - not a specific match from {year}. Ask again once the assistant's AI mode is "
+    "available, or check the team's fixtures/results page for older matches we do have on file."
+)
+
+
+def _references_other_season(question: str) -> str | None:
+    """These fallback tools only ever answer 'next'/'most recent'/'current' - never a specific
+    past match - so a question naming a year outside the current season is out of scope for all
+    of them. Returns that year if so, else None. (Current season years pass through normally.)"""
+    now = datetime.now(UTC)
+    current_season_years = {now.year, now.year + 1, now.year - 1}
+    for m in _YEAR_RE.finditer(question):
+        year = int(m.group(1))
+        if year not in current_season_years:
+            return m.group(1)
+    return None
 
 
 def _mentioned_teams(session: Session, question: str) -> list[dict]:
@@ -40,6 +64,10 @@ def _mentioned_teams(session: Session, question: str) -> list[dict]:
 def answer(session: Session, question: str) -> dict:
     q = question.lower()
     teams = _mentioned_teams(session, question)
+
+    other_year = _references_other_season(question)
+    if other_year is not None:
+        return {"text": _DECLINE_SPECIFIC_YEAR.format(year=other_year), "sources": [], "found": False}
 
     if any(w in q for w in _PREDICT_WORDS) and len(teams) == 2:
         r = tools.match_prediction_lookup(session, teams[0]["id"], teams[1]["id"])
