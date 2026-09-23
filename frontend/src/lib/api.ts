@@ -88,6 +88,12 @@ export type Prediction = {
     home: { player: string; goals_in_window: number; prob_scores: number }[];
     away: { player: string; goals_in_window: number; prob_scores: number }[];
   };
+  cards: {
+    available: boolean;
+    reason?: string;
+    home?: { expected_yellow: number; expected_red: number; evidence: "A" | "B" | "C" };
+    away?: { expected_yellow: number; expected_red: number; evidence: "A" | "B" | "C" };
+  };
 };
 
 class ApiError extends Error {

@@ -1,0 +1,178 @@
+{
+ "tuning": [
+  {
+   "xi": 0.0005,
+   "l2": 2.0,
+   "n": 25358,
+   "pooled_poisson_nll_yellow": 1.6531
+  },
+  {
+   "xi": 0.0005,
+   "l2": 6.0,
+   "n": 25358,
+   "pooled_poisson_nll_yellow": 1.652
+  },
+  {
+   "xi": 0.0005,
+   "l2": 15.0,
+   "n": 25358,
+   "pooled_poisson_nll_yellow": 1.6512
+  },
+  {
+   "xi": 0.001,
+   "l2": 2.0,
+   "n": 25358,
+   "pooled_poisson_nll_yellow": 1.6525
+  },
+  {
+   "xi": 0.001,
+   "l2": 6.0,
+   "n": 25358,
+   "pooled_poisson_nll_yellow": 1.651
+  },
+  {
+   "xi": 0.001,
+   "l2": 15.0,
+   "n": 25358,
+   "pooled_poisson_nll_yellow": 1.6501
+  },
+  {
+   "xi": 0.002,
+   "l2": 2.0,
+   "n": 25358,
+   "pooled_poisson_nll_yellow": 1.6534
+  },
+  {
+   "xi": 0.002,
+   "l2": 6.0,
+   "n": 25358,
+   "pooled_poisson_nll_yellow": 1.6508
+  },
+  {
+   "xi": 0.002,
+   "l2": 15.0,
+   "n": 25358,
+   "pooled_poisson_nll_yellow": 1.6495
+  },
+  {
+   "xi": 0.004,
+   "l2": 2.0,
+   "n": 25358,
+   "pooled_poisson_nll_yellow": 1.6562
+  },
+  {
+   "xi": 0.004,
+   "l2": 6.0,
+   "n": 25358,
+   "pooled_poisson_nll_yellow": 1.6515
+  },
+  {
+   "xi": 0.004,
+   "l2": 15.0,
+   "n": 25358,
+   "pooled_poisson_nll_yellow": 1.6499
+  }
+ ],
+ "best": {
+  "xi": 0.002,
+  "l2": 15.0
+ },
+ "test": {
+  "en.1": {
+   "baseline": {
+    "n": 3800,
+    "mae_yellow": 1.0896,
+    "mae_red": 0.1214,
+    "poisson_nll_yellow": 1.6764,
+    "poisson_nll_red": 0.2256
+   },
+   "ours": {
+    "n": 3800,
+    "mae_yellow": 1.0638,
+    "mae_red": 0.1093,
+    "poisson_nll_yellow": 1.6517,
+    "poisson_nll_red": 0.2287
+   }
+  },
+  "es.1": {
+   "baseline": {
+    "n": 3786,
+    "mae_yellow": 1.2689,
+    "mae_red": 0.2441,
+    "poisson_nll_yellow": 1.8145,
+    "poisson_nll_red": 0.4034
+   },
+   "ours": {
+    "n": 3786,
+    "mae_yellow": 1.2306,
+    "mae_red": 0.2237,
+    "poisson_nll_yellow": 1.7985,
+    "poisson_nll_red": 0.4038
+   }
+  },
+  "it.1": {
+   "baseline": {
+    "n": 3782,
+    "mae_yellow": 1.0795,
+    "mae_red": 0.2096,
+    "poisson_nll_yellow": 1.6822,
+    "poisson_nll_red": 0.334
+   },
+   "ours": {
+    "n": 3782,
+    "mae_yellow": 1.0537,
+    "mae_red": 0.1775,
+    "poisson_nll_yellow": 1.6657,
+    "poisson_nll_red": 0.3286
+   }
+  },
+  "de.1": {
+   "baseline": {
+    "n": 3058,
+    "mae_yellow": 1.077,
+    "mae_red": 0.1458,
+    "poisson_nll_yellow": 1.676,
+    "poisson_nll_red": 0.2721
+   },
+   "ours": {
+    "n": 3058,
+    "mae_yellow": 1.0764,
+    "mae_red": 0.136,
+    "poisson_nll_yellow": 1.6653,
+    "poisson_nll_red": 0.2769
+   }
+  },
+  "fr.1": {
+   "baseline": {
+    "n": 3354,
+    "mae_yellow": 1.0094,
+    "mae_red": 0.2161,
+    "poisson_nll_yellow": 1.6234,
+    "poisson_nll_red": 0.3902
+   },
+   "ours": {
+    "n": 3354,
+    "mae_yellow": 1.0078,
+    "mae_red": 0.221,
+    "poisson_nll_yellow": 1.6185,
+    "poisson_nll_red": 0.3916
+   }
+  }
+ },
+ "pooled_test": {
+  "baseline": {
+   "n": 17780,
+   "mae_yellow": 1.1083,
+   "mae_red": 0.1883,
+   "poisson_nll_yellow": 1.697,
+   "poisson_nll_red": 0.3256
+  },
+  "ours": {
+   "n": 17780,
+   "mae_yellow": 1.0888,
+   "mae_red": 0.1738,
+   "poisson_nll_yellow": 1.682,
+   "poisson_nll_red": 0.3263
+  }
+ }
+}

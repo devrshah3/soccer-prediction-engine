@@ -19,26 +19,14 @@ from sqlalchemy.orm import Session
 
 from kickcast_engine.models.dixon_coles import DixonColes, MatchResult
 
-from .models import Match, Meta
+from .model_cache import cache_key, data_version
+from .models import Match
 
 DOMESTIC_HYPERPARAMS = {"xi": 0.0022, "l2": 2.0}
 INTERNATIONAL_HYPERPARAMS = {"xi": 0.001, "l2": 0.1}
 INTERNATIONAL_FRIENDLY_WEIGHT = 0.5
 
-_cache: dict[tuple[str, str], tuple[str, DixonColes]] = {}
-
-
-def _cache_key(session: Session, league_code: str) -> tuple[str, str]:
-    # include the DB URL so two different databases (e.g. production vs. a test's throwaway
-    # engine) never share a cached model just because they happen to reuse a league code.
-    # `.engine` is defined on both Engine and Connection (Engine.engine returns itself),
-    # so this works regardless of which one get_bind() hands back.
-    return (str(session.get_bind().engine.url), league_code)
-
-
-def _data_version(session: Session) -> str:
-    row = session.get(Meta, "data_version")
-    return row.value if row else "0"
+_cache: dict[tuple[str, str, str], tuple[str, DixonColes]] = {}
 
 
 def _training_matches(session: Session, league_code: str) -> list[MatchResult]:
@@ -65,8 +53,8 @@ def _training_matches(session: Session, league_code: str) -> list[MatchResult]:
 def get_model(session: Session, league_code: str) -> DixonColes | None:
     """Returns a fitted, cached DixonColes model for the competition, or None if there
     isn't enough finished-match history yet (DixonColes.fit needs >= 10 matches)."""
-    version = _data_version(session)
-    key = _cache_key(session, league_code)
+    version = data_version(session)
+    key = cache_key(session, "goals", league_code)
     cached = _cache.get(key)
     if cached is not None and cached[0] == version:
         return cached[1]

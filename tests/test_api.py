@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 
 from kickcast_api.db import get_session
 from kickcast_api.main import app
-from kickcast_api.models import Base, Goalscorer, League, Match, Team
+from kickcast_api.models import Base, Goalscorer, League, Match, MatchStats, Team
 
 TEAMS = [f"Team {i}" for i in range(8)]
 
@@ -154,11 +154,68 @@ def test_prediction_includes_goal_timing_and_scorer_gating(client):
     assert body["likely_scorers"]["available"] is False
     assert body["likely_scorers"]["home"] == []
     assert body["likely_scorers"]["away"] == []
+    # synthetic fixture DB has no match_stats rows seeded -> not enough card history yet
+    assert body["cards"]["available"] is False
 
 
 def test_unknown_match_404(client):
     assert client.get("/matches/999999").status_code == 404
     assert client.get("/matches/999999/prediction").status_code == 404
+
+
+def test_prediction_includes_card_data_when_available(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'test_cards.db'}")
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine)
+    session = TestSession()
+    session.add(League(code="cards.1", name="Cards League", country="Testland", kind="domestic_league"))
+    for i in range(8):
+        session.add(Team(id=f"c-{i}", name=f"Club {i}", country="Testland"))
+    session.commit()
+
+    d = date(2024, 8, 1)
+    for match_id in range(1, 13):
+        i = match_id - 1
+        h, a = i % 8, (i + 1) % 8
+        m = Match(
+            league_code="cards.1", season="2024-25", date=d, kickoff=None,
+            home_team_id=f"c-{h}", away_team_id=f"c-{a}", home_goals=1, away_goals=1,
+            status="finished", round=f"Matchday {match_id}", neutral=False,
+            source="synthetic", source_id=f"synthetic:{match_id}",
+        )
+        session.add(m)
+        session.flush()
+        session.add(
+            MatchStats(match_id=m.id, home_yellow=2, away_yellow=3, home_red=0, away_red=0, source="synthetic")
+        )
+        d += timedelta(days=7)
+    session.add(
+        Match(
+            league_code="cards.1", season="2024-25", date=d, kickoff=None,
+            home_team_id="c-0", away_team_id="c-1", home_goals=None, away_goals=None,
+            status="scheduled", round="Matchday 13", neutral=False,
+            source="synthetic", source_id="synthetic:upcoming",
+        )
+    )
+    session.commit()
+
+    def override():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_session] = override
+    try:
+        c = TestClient(app)
+        fixtures = c.get("/leagues/cards.1/fixtures").json()
+        body = c.get(f"/matches/{fixtures[0]['id']}/prediction").json()
+        assert body["cards"]["available"] is True
+        assert body["cards"]["home"]["expected_yellow"] > 0
+        assert body["cards"]["away"]["expected_yellow"] > 0
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_international_prediction_includes_real_scorer_data(tmp_path):

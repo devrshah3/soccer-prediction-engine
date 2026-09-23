@@ -92,6 +92,24 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                 <p className="mt-4 text-xs text-zinc-600">Likely goalscorers: not available - {prediction.likely_scorers.reason}</p>
               )}
 
+              {prediction.cards.available && prediction.cards.home && prediction.cards.away ? (
+                <div className="mt-4">
+                  <h3 className="mb-2 text-sm font-medium text-zinc-400">Expected cards</h3>
+                  <div className="grid grid-cols-2 gap-4 text-xs text-zinc-300">
+                    <p>
+                      {match.home_team.name}: {prediction.cards.home.expected_yellow.toFixed(2)} yellow,{" "}
+                      {prediction.cards.home.expected_red.toFixed(3)} red
+                    </p>
+                    <p>
+                      {match.away_team.name}: {prediction.cards.away.expected_yellow.toFixed(2)} yellow,{" "}
+                      {prediction.cards.away.expected_red.toFixed(3)} red
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-4 text-xs text-zinc-600">Expected cards: not available - {prediction.cards.reason}</p>
+              )}
+
               <p className="mt-4 text-xs text-zinc-500">
                 as of {prediction.as_of} &middot; {prediction.model_version} &middot; trained on{" "}
                 {prediction.train_matches.total} matches ({prediction.train_matches.home} for{" "}

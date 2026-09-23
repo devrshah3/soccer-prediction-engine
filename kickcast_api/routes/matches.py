@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from kickcast_engine.models.goal_timing import goal_timing_windows
 
+from ..cards import get_card_model
 from ..db import get_session
 from ..models import Match
 from ..predictions import get_model
@@ -57,5 +58,19 @@ def match_prediction(match_id: int, session: Session = Depends(get_session)) -> 
             "reason": "no free, keyless, per-player data source found for domestic leagues "
                       "(see MORNING_REPORT.md) - needs API-Football or a similar paid/keyed source",
             "home": [], "away": [],
+        }
+
+    card_model = get_card_model(session, m.league_code)
+    if card_model is not None:
+        pred["cards"] = {
+            "available": True,
+            "home": card_model.predict(m.home_team_id, True),
+            "away": card_model.predict(m.away_team_id, False),
+        }
+    else:
+        pred["cards"] = {
+            "available": False,
+            "reason": "no card data source for this competition yet" if m.league_code == "international"
+                      else "not enough card history to fit a model yet",
         }
     return pred
