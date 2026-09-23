@@ -1,0 +1,12 @@
+[project]
+name = "soccer-engine"
+version = "0.1.0"
+description = "Soccer match prediction engine: xG-informed Dixon-Coles with walk-forward evaluation"
+requires-python = ">=3.10"
+dependencies = ["numpy", "scipy", "requests"]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "mypy", "penaltyblog"]
+
+[tool.ruff]
+line-length = 110

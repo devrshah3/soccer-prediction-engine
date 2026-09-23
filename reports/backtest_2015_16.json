@@ -1,0 +1,1134 @@
+{
+ "tuning": [
+  {
+   "xg_weight": 0.0,
+   "l2": 0.1,
+   "n": 280,
+   "accuracy": 0.4786,
+   "rps": 0.212,
+   "log_loss": 1.0537,
+   "brier": 0.6313,
+   "ece": 0.0493
+  },
+  {
+   "xg_weight": 0.0,
+   "l2": 0.5,
+   "n": 280,
+   "accuracy": 0.4786,
+   "rps": 0.2111,
+   "log_loss": 1.0497,
+   "brier": 0.6291,
+   "ece": 0.0413
+  },
+  {
+   "xg_weight": 0.0,
+   "l2": 1.0,
+   "n": 280,
+   "accuracy": 0.4786,
+   "rps": 0.2102,
+   "log_loss": 1.0456,
+   "brier": 0.6268,
+   "ece": 0.038
+  },
+  {
+   "xg_weight": 0.0,
+   "l2": 2.0,
+   "n": 280,
+   "accuracy": 0.475,
+   "rps": 0.2089,
+   "log_loss": 1.04,
+   "brier": 0.6235,
+   "ece": 0.0309
+  },
+  {
+   "xg_weight": 0.25,
+   "l2": 0.1,
+   "n": 280,
+   "accuracy": 0.4786,
+   "rps": 0.2094,
+   "log_loss": 1.0431,
+   "brier": 0.6248,
+   "ece": 0.0472
+  },
+  {
+   "xg_weight": 0.25,
+   "l2": 0.5,
+   "n": 280,
+   "accuracy": 0.4821,
+   "rps": 0.2087,
+   "log_loss": 1.0401,
+   "brier": 0.6231,
+   "ece": 0.0419
+  },
+  {
+   "xg_weight": 0.25,
+   "l2": 1.0,
+   "n": 280,
+   "accuracy": 0.4857,
+   "rps": 0.208,
+   "log_loss": 1.0372,
+   "brier": 0.6214,
+   "ece": 0.0354
+  },
+  {
+   "xg_weight": 0.25,
+   "l2": 2.0,
+   "n": 280,
+   "accuracy": 0.4821,
+   "rps": 0.2071,
+   "log_loss": 1.0333,
+   "brier": 0.619,
+   "ece": 0.035
+  },
+  {
+   "xg_weight": 0.5,
+   "l2": 0.1,
+   "n": 280,
+   "accuracy": 0.4857,
+   "rps": 0.2077,
+   "log_loss": 1.0359,
+   "brier": 0.6203,
+   "ece": 0.0459
+  },
+  {
+   "xg_weight": 0.5,
+   "l2": 0.5,
+   "n": 280,
+   "accuracy": 0.4786,
+   "rps": 0.2072,
+   "log_loss": 1.0337,
+   "brier": 0.619,
+   "ece": 0.0485
+  },
+  {
+   "xg_weight": 0.5,
+   "l2": 1.0,
+   "n": 280,
+   "accuracy": 0.475,
+   "rps": 0.2067,
+   "log_loss": 1.0316,
+   "brier": 0.6178,
+   "ece": 0.0415
+  },
+  {
+   "xg_weight": 0.5,
+   "l2": 2.0,
+   "n": 280,
+   "accuracy": 0.4786,
+   "rps": 0.2061,
+   "log_loss": 1.029,
+   "brier": 0.6162,
+   "ece": 0.0288
+  },
+  {
+   "xg_weight": 0.75,
+   "l2": 0.1,
+   "n": 280,
+   "accuracy": 0.4857,
+   "rps": 0.2071,
+   "log_loss": 1.0323,
+   "brier": 0.6183,
+   "ece": 0.048
+  },
+  {
+   "xg_weight": 0.75,
+   "l2": 0.5,
+   "n": 280,
+   "accuracy": 0.4821,
+   "rps": 0.2067,
+   "log_loss": 1.0306,
+   "brier": 0.6173,
+   "ece": 0.0369
+  },
+  {
+   "xg_weight": 0.75,
+   "l2": 1.0,
+   "n": 280,
+   "accuracy": 0.4821,
+   "rps": 0.2063,
+   "log_loss": 1.0291,
+   "brier": 0.6164,
+   "ece": 0.0293
+  },
+  {
+   "xg_weight": 0.75,
+   "l2": 2.0,
+   "n": 280,
+   "accuracy": 0.4786,
+   "rps": 0.2059,
+   "log_loss": 1.0274,
+   "brier": 0.6153,
+   "ece": 0.0313
+  },
+  {
+   "xg_weight": 1.0,
+   "l2": 0.1,
+   "n": 280,
+   "accuracy": 0.4929,
+   "rps": 0.2076,
+   "log_loss": 1.0323,
+   "brier": 0.6188,
+   "ece": 0.0404
+  },
+  {
+   "xg_weight": 1.0,
+   "l2": 0.5,
+   "n": 280,
+   "accuracy": 0.4964,
+   "rps": 0.2072,
+   "log_loss": 1.0309,
+   "brier": 0.618,
+   "ece": 0.0376
+  },
+  {
+   "xg_weight": 1.0,
+   "l2": 1.0,
+   "n": 280,
+   "accuracy": 0.4964,
+   "rps": 0.2069,
+   "log_loss": 1.0297,
+   "brier": 0.6173,
+   "ece": 0.0365
+  },
+  {
+   "xg_weight": 1.0,
+   "l2": 2.0,
+   "n": 280,
+   "accuracy": 0.4893,
+   "rps": 0.2066,
+   "log_loss": 1.0284,
+   "brier": 0.6165,
+   "ece": 0.0265
+  }
+ ],
+ "leagues": {
+  "Premier League": {
+   "Baseline (league H/D/A rates)": {
+    "n": 280,
+    "accuracy": 0.4286,
+    "rps": 0.2272,
+    "log_loss": 1.0853,
+    "brier": 0.6574,
+    "ece": 0.002,
+    "calibration": [
+     {
+      "bin": "0.2-0.3",
+      "n": 280,
+      "predicted": 0.279,
+      "observed": 0.282
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 494,
+      "predicted": 0.355,
+      "observed": 0.354
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 66,
+      "predicted": 0.403,
+      "observed": 0.394
+     }
+    ]
+   },
+   "penaltyblog Dixon-Coles (goals)": {
+    "n": 280,
+    "accuracy": 0.4786,
+    "rps": 0.2121,
+    "log_loss": 1.0545,
+    "brier": 0.6317,
+    "ece": 0.0477,
+    "calibration": [
+     {
+      "bin": "0.0-0.1",
+      "n": 30,
+      "predicted": 0.072,
+      "observed": 0.167
+     },
+     {
+      "bin": "0.1-0.2",
+      "n": 123,
+      "predicted": 0.156,
+      "observed": 0.203
+     },
+     {
+      "bin": "0.2-0.3",
+      "n": 307,
+      "predicted": 0.25,
+      "observed": 0.287
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 138,
+      "predicted": 0.34,
+      "observed": 0.312
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 92,
+      "predicted": 0.45,
+      "observed": 0.413
+     },
+     {
+      "bin": "0.5-0.6",
+      "n": 72,
+      "predicted": 0.545,
+      "observed": 0.458
+     },
+     {
+      "bin": "0.6-0.7",
+      "n": 47,
+      "predicted": 0.648,
+      "observed": 0.574
+     },
+     {
+      "bin": "0.7-0.8",
+      "n": 26,
+      "predicted": 0.755,
+      "observed": 0.692
+     },
+     {
+      "bin": "0.8-0.9",
+      "n": 4,
+      "predicted": 0.832,
+      "observed": 0.5
+     },
+     {
+      "bin": "0.9-1.0",
+      "n": 1,
+      "predicted": 0.928,
+      "observed": 1.0
+     }
+    ]
+   },
+   "Ours: goals only (l2=2.0)": {
+    "n": 280,
+    "accuracy": 0.475,
+    "rps": 0.2089,
+    "log_loss": 1.04,
+    "brier": 0.6235,
+    "ece": 0.0309,
+    "calibration": [
+     {
+      "bin": "0.0-0.1",
+      "n": 19,
+      "predicted": 0.083,
+      "observed": 0.053
+     },
+     {
+      "bin": "0.1-0.2",
+      "n": 106,
+      "predicted": 0.161,
+      "observed": 0.208
+     },
+     {
+      "bin": "0.2-0.3",
+      "n": 328,
+      "predicted": 0.254,
+      "observed": 0.277
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 149,
+      "predicted": 0.339,
+      "observed": 0.309
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 101,
+      "predicted": 0.446,
+      "observed": 0.416
+     },
+     {
+      "bin": "0.5-0.6",
+      "n": 72,
+      "predicted": 0.538,
+      "observed": 0.528
+     },
+     {
+      "bin": "0.6-0.7",
+      "n": 44,
+      "predicted": 0.639,
+      "observed": 0.568
+     },
+     {
+      "bin": "0.7-0.8",
+      "n": 19,
+      "predicted": 0.738,
+      "observed": 0.684
+     },
+     {
+      "bin": "0.8-0.9",
+      "n": 2,
+      "predicted": 0.835,
+      "observed": 1.0
+     }
+    ]
+   },
+   "Ours: xG-blend (w=0.75, l2=2.0)": {
+    "n": 280,
+    "accuracy": 0.4786,
+    "rps": 0.2059,
+    "log_loss": 1.0274,
+    "brier": 0.6153,
+    "ece": 0.0313,
+    "calibration": [
+     {
+      "bin": "0.0-0.1",
+      "n": 7,
+      "predicted": 0.086,
+      "observed": 0.0
+     },
+     {
+      "bin": "0.1-0.2",
+      "n": 76,
+      "predicted": 0.165,
+      "observed": 0.158
+     },
+     {
+      "bin": "0.2-0.3",
+      "n": 351,
+      "predicted": 0.258,
+      "observed": 0.279
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 192,
+      "predicted": 0.342,
+      "observed": 0.292
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 108,
+      "predicted": 0.45,
+      "observed": 0.444
+     },
+     {
+      "bin": "0.5-0.6",
+      "n": 66,
+      "predicted": 0.542,
+      "observed": 0.591
+     },
+     {
+      "bin": "0.6-0.7",
+      "n": 31,
+      "predicted": 0.634,
+      "observed": 0.581
+     },
+     {
+      "bin": "0.7-0.8",
+      "n": 9,
+      "predicted": 0.741,
+      "observed": 1.0
+     }
+    ]
+   }
+  },
+  "La Liga": {
+   "Baseline (league H/D/A rates)": {
+    "n": 280,
+    "accuracy": 0.5,
+    "rps": 0.2241,
+    "log_loss": 1.046,
+    "brier": 0.6294,
+    "ece": 0.0202,
+    "calibration": [
+     {
+      "bin": "0.2-0.3",
+      "n": 540,
+      "predicted": 0.264,
+      "observed": 0.254
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 20,
+      "predicted": 0.309,
+      "observed": 0.15
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 280,
+      "predicted": 0.47,
+      "observed": 0.5
+     }
+    ]
+   },
+   "penaltyblog Dixon-Coles (goals)": {
+    "n": 280,
+    "accuracy": 0.5,
+    "rps": 0.1991,
+    "log_loss": 0.9724,
+    "brier": 0.5757,
+    "ece": 0.0428,
+    "calibration": [
+     {
+      "bin": "0.0-0.1",
+      "n": 87,
+      "predicted": 0.064,
+      "observed": 0.057
+     },
+     {
+      "bin": "0.1-0.2",
+      "n": 117,
+      "predicted": 0.152,
+      "observed": 0.231
+     },
+     {
+      "bin": "0.2-0.3",
+      "n": 225,
+      "predicted": 0.254,
+      "observed": 0.28
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 185,
+      "predicted": 0.344,
+      "observed": 0.341
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 72,
+      "predicted": 0.446,
+      "observed": 0.333
+     },
+     {
+      "bin": "0.5-0.6",
+      "n": 48,
+      "predicted": 0.547,
+      "observed": 0.5
+     },
+     {
+      "bin": "0.6-0.7",
+      "n": 44,
+      "predicted": 0.646,
+      "observed": 0.5
+     },
+     {
+      "bin": "0.7-0.8",
+      "n": 38,
+      "predicted": 0.743,
+      "observed": 0.763
+     },
+     {
+      "bin": "0.8-0.9",
+      "n": 17,
+      "predicted": 0.843,
+      "observed": 0.941
+     },
+     {
+      "bin": "0.9-1.0",
+      "n": 7,
+      "predicted": 0.926,
+      "observed": 1.0
+     }
+    ]
+   },
+   "Ours: goals only (l2=2.0)": {
+    "n": 280,
+    "accuracy": 0.5107,
+    "rps": 0.1966,
+    "log_loss": 0.963,
+    "brier": 0.5708,
+    "ece": 0.0384,
+    "calibration": [
+     {
+      "bin": "0.0-0.1",
+      "n": 58,
+      "predicted": 0.07,
+      "observed": 0.034
+     },
+     {
+      "bin": "0.1-0.2",
+      "n": 123,
+      "predicted": 0.15,
+      "observed": 0.187
+     },
+     {
+      "bin": "0.2-0.3",
+      "n": 236,
+      "predicted": 0.254,
+      "observed": 0.28
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 204,
+      "predicted": 0.342,
+      "observed": 0.319
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 80,
+      "predicted": 0.451,
+      "observed": 0.4
+     },
+     {
+      "bin": "0.5-0.6",
+      "n": 47,
+      "predicted": 0.555,
+      "observed": 0.468
+     },
+     {
+      "bin": "0.6-0.7",
+      "n": 48,
+      "predicted": 0.648,
+      "observed": 0.625
+     },
+     {
+      "bin": "0.7-0.8",
+      "n": 29,
+      "predicted": 0.737,
+      "observed": 0.897
+     },
+     {
+      "bin": "0.8-0.9",
+      "n": 12,
+      "predicted": 0.85,
+      "observed": 0.917
+     },
+     {
+      "bin": "0.9-1.0",
+      "n": 3,
+      "predicted": 0.93,
+      "observed": 1.0
+     }
+    ]
+   },
+   "Ours: xG-blend (w=0.75, l2=2.0)": {
+    "n": 280,
+    "accuracy": 0.5536,
+    "rps": 0.1936,
+    "log_loss": 0.9549,
+    "brier": 0.5645,
+    "ece": 0.0278,
+    "calibration": [
+     {
+      "bin": "0.0-0.1",
+      "n": 21,
+      "predicted": 0.074,
+      "observed": 0.048
+     },
+     {
+      "bin": "0.1-0.2",
+      "n": 118,
+      "predicted": 0.158,
+      "observed": 0.119
+     },
+     {
+      "bin": "0.2-0.3",
+      "n": 275,
+      "predicted": 0.26,
+      "observed": 0.255
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 209,
+      "predicted": 0.34,
+      "observed": 0.316
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 92,
+      "predicted": 0.444,
+      "observed": 0.446
+     },
+     {
+      "bin": "0.5-0.6",
+      "n": 68,
+      "predicted": 0.549,
+      "observed": 0.588
+     },
+     {
+      "bin": "0.6-0.7",
+      "n": 41,
+      "predicted": 0.65,
+      "observed": 0.805
+     },
+     {
+      "bin": "0.7-0.8",
+      "n": 10,
+      "predicted": 0.747,
+      "observed": 1.0
+     },
+     {
+      "bin": "0.8-0.9",
+      "n": 6,
+      "predicted": 0.834,
+      "observed": 0.833
+     }
+    ]
+   }
+  },
+  "Serie A": {
+   "Baseline (league H/D/A rates)": {
+    "n": 280,
+    "accuracy": 0.4321,
+    "rps": 0.2315,
+    "log_loss": 1.0877,
+    "brier": 0.6592,
+    "ece": 0.0264,
+    "calibration": [
+     {
+      "bin": "0.2-0.3",
+      "n": 509,
+      "predicted": 0.261,
+      "observed": 0.283
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 51,
+      "predicted": 0.313,
+      "observed": 0.294
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 221,
+      "predicted": 0.456,
+      "observed": 0.434
+     },
+     {
+      "bin": "0.5-0.6",
+      "n": 59,
+      "predicted": 0.516,
+      "observed": 0.424
+     }
+    ]
+   },
+   "penaltyblog Dixon-Coles (goals)": {
+    "n": 280,
+    "accuracy": 0.5107,
+    "rps": 0.2027,
+    "log_loss": 1.0099,
+    "brier": 0.6044,
+    "ece": 0.032,
+    "calibration": [
+     {
+      "bin": "0.0-0.1",
+      "n": 50,
+      "predicted": 0.07,
+      "observed": 0.1
+     },
+     {
+      "bin": "0.1-0.2",
+      "n": 144,
+      "predicted": 0.161,
+      "observed": 0.201
+     },
+     {
+      "bin": "0.2-0.3",
+      "n": 263,
+      "predicted": 0.255,
+      "observed": 0.278
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 147,
+      "predicted": 0.34,
+      "observed": 0.327
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 85,
+      "predicted": 0.45,
+      "observed": 0.435
+     },
+     {
+      "bin": "0.5-0.6",
+      "n": 58,
+      "predicted": 0.549,
+      "observed": 0.483
+     },
+     {
+      "bin": "0.6-0.7",
+      "n": 44,
+      "predicted": 0.64,
+      "observed": 0.614
+     },
+     {
+      "bin": "0.7-0.8",
+      "n": 32,
+      "predicted": 0.745,
+      "observed": 0.625
+     },
+     {
+      "bin": "0.8-0.9",
+      "n": 16,
+      "predicted": 0.837,
+      "observed": 0.75
+     },
+     {
+      "bin": "0.9-1.0",
+      "n": 1,
+      "predicted": 0.909,
+      "observed": 1.0
+     }
+    ]
+   },
+   "Ours: goals only (l2=2.0)": {
+    "n": 280,
+    "accuracy": 0.5071,
+    "rps": 0.2026,
+    "log_loss": 1.0074,
+    "brier": 0.6032,
+    "ece": 0.0262,
+    "calibration": [
+     {
+      "bin": "0.0-0.1",
+      "n": 28,
+      "predicted": 0.075,
+      "observed": 0.071
+     },
+     {
+      "bin": "0.1-0.2",
+      "n": 136,
+      "predicted": 0.162,
+      "observed": 0.162
+     },
+     {
+      "bin": "0.2-0.3",
+      "n": 287,
+      "predicted": 0.253,
+      "observed": 0.286
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 151,
+      "predicted": 0.34,
+      "observed": 0.331
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 97,
+      "predicted": 0.445,
+      "observed": 0.402
+     },
+     {
+      "bin": "0.5-0.6",
+      "n": 65,
+      "predicted": 0.549,
+      "observed": 0.554
+     },
+     {
+      "bin": "0.6-0.7",
+      "n": 38,
+      "predicted": 0.638,
+      "observed": 0.579
+     },
+     {
+      "bin": "0.7-0.8",
+      "n": 30,
+      "predicted": 0.735,
+      "observed": 0.633
+     },
+     {
+      "bin": "0.8-0.9",
+      "n": 8,
+      "predicted": 0.832,
+      "observed": 1.0
+     }
+    ]
+   },
+   "Ours: xG-blend (w=0.75, l2=2.0)": {
+    "n": 280,
+    "accuracy": 0.5107,
+    "rps": 0.1969,
+    "log_loss": 0.9894,
+    "brier": 0.5904,
+    "ece": 0.0156,
+    "calibration": [
+     {
+      "bin": "0.0-0.1",
+      "n": 11,
+      "predicted": 0.077,
+      "observed": 0.0
+     },
+     {
+      "bin": "0.1-0.2",
+      "n": 91,
+      "predicted": 0.165,
+      "observed": 0.154
+     },
+     {
+      "bin": "0.2-0.3",
+      "n": 343,
+      "predicted": 0.253,
+      "observed": 0.254
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 165,
+      "predicted": 0.343,
+      "observed": 0.315
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 116,
+      "predicted": 0.449,
+      "observed": 0.457
+     },
+     {
+      "bin": "0.5-0.6",
+      "n": 65,
+      "predicted": 0.547,
+      "observed": 0.6
+     },
+     {
+      "bin": "0.6-0.7",
+      "n": 37,
+      "predicted": 0.649,
+      "observed": 0.649
+     },
+     {
+      "bin": "0.7-0.8",
+      "n": 11,
+      "predicted": 0.74,
+      "observed": 0.909
+     },
+     {
+      "bin": "0.8-0.9",
+      "n": 1,
+      "predicted": 0.845,
+      "observed": 1.0
+     }
+    ]
+   }
+  },
+  "Ligue 1": {
+   "Baseline (league H/D/A rates)": {
+    "n": 278,
+    "accuracy": 0.4317,
+    "rps": 0.2255,
+    "log_loss": 1.0832,
+    "brier": 0.6558,
+    "ece": 0.01,
+    "calibration": [
+     {
+      "bin": "0.2-0.3",
+      "n": 387,
+      "predicted": 0.289,
+      "observed": 0.3
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 238,
+      "predicted": 0.334,
+      "observed": 0.319
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 209,
+      "predicted": 0.415,
+      "observed": 0.411
+     }
+    ]
+   },
+   "penaltyblog Dixon-Coles (goals)": {
+    "n": 278,
+    "accuracy": 0.4388,
+    "rps": 0.2146,
+    "log_loss": 1.051,
+    "brier": 0.6326,
+    "ece": 0.0554,
+    "calibration": [
+     {
+      "bin": "0.0-0.1",
+      "n": 44,
+      "predicted": 0.053,
+      "observed": 0.068
+     },
+     {
+      "bin": "0.1-0.2",
+      "n": 100,
+      "predicted": 0.156,
+      "observed": 0.21
+     },
+     {
+      "bin": "0.2-0.3",
+      "n": 256,
+      "predicted": 0.26,
+      "observed": 0.32
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 227,
+      "predicted": 0.345,
+      "observed": 0.335
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 95,
+      "predicted": 0.443,
+      "observed": 0.347
+     },
+     {
+      "bin": "0.5-0.6",
+      "n": 50,
+      "predicted": 0.546,
+      "observed": 0.4
+     },
+     {
+      "bin": "0.6-0.7",
+      "n": 26,
+      "predicted": 0.644,
+      "observed": 0.538
+     },
+     {
+      "bin": "0.7-0.8",
+      "n": 18,
+      "predicted": 0.75,
+      "observed": 0.833
+     },
+     {
+      "bin": "0.8-0.9",
+      "n": 15,
+      "predicted": 0.854,
+      "observed": 0.733
+     },
+     {
+      "bin": "0.9-1.0",
+      "n": 3,
+      "predicted": 0.943,
+      "observed": 1.0
+     }
+    ]
+   },
+   "Ours: goals only (l2=2.0)": {
+    "n": 278,
+    "accuracy": 0.4496,
+    "rps": 0.2107,
+    "log_loss": 1.0369,
+    "brier": 0.6243,
+    "ece": 0.0391,
+    "calibration": [
+     {
+      "bin": "0.0-0.1",
+      "n": 32,
+      "predicted": 0.063,
+      "observed": 0.062
+     },
+     {
+      "bin": "0.1-0.2",
+      "n": 87,
+      "predicted": 0.162,
+      "observed": 0.161
+     },
+     {
+      "bin": "0.2-0.3",
+      "n": 250,
+      "predicted": 0.259,
+      "observed": 0.304
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 273,
+      "predicted": 0.342,
+      "observed": 0.355
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 95,
+      "predicted": 0.445,
+      "observed": 0.326
+     },
+     {
+      "bin": "0.5-0.6",
+      "n": 49,
+      "predicted": 0.549,
+      "observed": 0.49
+     },
+     {
+      "bin": "0.6-0.7",
+      "n": 21,
+      "predicted": 0.646,
+      "observed": 0.619
+     },
+     {
+      "bin": "0.7-0.8",
+      "n": 18,
+      "predicted": 0.751,
+      "observed": 0.667
+     },
+     {
+      "bin": "0.8-0.9",
+      "n": 8,
+      "predicted": 0.853,
+      "observed": 1.0
+     },
+     {
+      "bin": "0.9-1.0",
+      "n": 1,
+      "predicted": 0.935,
+      "observed": 1.0
+     }
+    ]
+   },
+   "Ours: xG-blend (w=0.75, l2=2.0)": {
+    "n": 278,
+    "accuracy": 0.4568,
+    "rps": 0.2087,
+    "log_loss": 1.0315,
+    "brier": 0.619,
+    "ece": 0.0405,
+    "calibration": [
+     {
+      "bin": "0.0-0.1",
+      "n": 19,
+      "predicted": 0.07,
+      "observed": 0.053
+     },
+     {
+      "bin": "0.1-0.2",
+      "n": 63,
+      "predicted": 0.166,
+      "observed": 0.143
+     },
+     {
+      "bin": "0.2-0.3",
+      "n": 275,
+      "predicted": 0.26,
+      "observed": 0.298
+     },
+     {
+      "bin": "0.3-0.4",
+      "n": 284,
+      "predicted": 0.339,
+      "observed": 0.313
+     },
+     {
+      "bin": "0.4-0.5",
+      "n": 116,
+      "predicted": 0.446,
+      "observed": 0.379
+     },
+     {
+      "bin": "0.5-0.6",
+      "n": 45,
+      "predicted": 0.535,
+      "observed": 0.6
+     },
+     {
+      "bin": "0.6-0.7",
+      "n": 17,
+      "predicted": 0.653,
+      "observed": 0.765
+     },
+     {
+      "bin": "0.7-0.8",
+      "n": 13,
+      "predicted": 0.752,
+      "observed": 0.846
+     },
+     {
+      "bin": "0.8-0.9",
+      "n": 2,
+      "predicted": 0.849,
+      "observed": 1.0
+     }
+    ]
+   }
+  }
+ },
+ "best": {
+  "xg_weight": 0.75,
+  "l2": 2.0
+ }
+}
