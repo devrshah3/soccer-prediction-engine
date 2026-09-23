@@ -1,0 +1,580 @@
+{
+ "tuning": {
+  "grid": [
+   {
+    "xi": 0.0008,
+    "l2": 0.5,
+    "n": 12681,
+    "rps": 0.20093
+   },
+   {
+    "xi": 0.0008,
+    "l2": 1.0,
+    "n": 12681,
+    "rps": 0.20081
+   },
+   {
+    "xi": 0.0008,
+    "l2": 2.0,
+    "n": 12681,
+    "rps": 0.20072
+   },
+   {
+    "xi": 0.0008,
+    "l2": 4.0,
+    "n": 12681,
+    "rps": 0.20075
+   },
+   {
+    "xi": 0.0015,
+    "l2": 0.5,
+    "n": 12681,
+    "rps": 0.20027
+   },
+   {
+    "xi": 0.0015,
+    "l2": 1.0,
+    "n": 12681,
+    "rps": 0.20011
+   },
+   {
+    "xi": 0.0015,
+    "l2": 2.0,
+    "n": 12681,
+    "rps": 0.2
+   },
+   {
+    "xi": 0.0015,
+    "l2": 4.0,
+    "n": 12681,
+    "rps": 0.20008
+   },
+   {
+    "xi": 0.0022,
+    "l2": 0.5,
+    "n": 12681,
+    "rps": 0.20022
+   },
+   {
+    "xi": 0.0022,
+    "l2": 1.0,
+    "n": 12681,
+    "rps": 0.20002
+   },
+   {
+    "xi": 0.0022,
+    "l2": 2.0,
+    "n": 12681,
+    "rps": 0.1999
+   },
+   {
+    "xi": 0.0022,
+    "l2": 4.0,
+    "n": 12681,
+    "rps": 0.20006
+   }
+  ],
+  "best": {
+   "xi": 0.0022,
+   "l2": 2.0,
+   "n": 12681,
+   "rps": 0.1999
+  }
+ },
+ "xi": 0.0022,
+ "l2": 2.0,
+ "per_league": {
+  "en.1": {
+   "full": {
+    "Baseline (H/D/A rates)": {
+     "n": 1900,
+     "accuracy": 0.4416,
+     "rps": 0.2322,
+     "log_loss": 1.0684,
+     "brier": 0.6464,
+     "ece": 0.0077
+    },
+    "penaltyblog Dixon-Coles": {
+     "n": 1900,
+     "accuracy": 0.5321,
+     "rps": 0.2021,
+     "log_loss": 0.984,
+     "brier": 0.5844,
+     "ece": 0.0079
+    },
+    "Ours: 1-season warm start": {
+     "n": 1900,
+     "accuracy": 0.5189,
+     "rps": 0.2088,
+     "log_loss": 1.0057,
+     "brier": 0.601,
+     "ece": 0.0264
+    },
+    "Ours: full-history warm start": {
+     "n": 1900,
+     "accuracy": 0.5311,
+     "rps": 0.2012,
+     "log_loss": 0.9786,
+     "brier": 0.5823,
+     "ece": 0.0122
+    }
+   },
+   "early_season": {
+    "Baseline (H/D/A rates)": {
+     "n": 300,
+     "accuracy": 0.42,
+     "rps": 0.2301,
+     "log_loss": 1.0854,
+     "brier": 0.6573,
+     "ece": 0.0268
+    },
+    "penaltyblog Dixon-Coles": {
+     "n": 300,
+     "accuracy": 0.55,
+     "rps": 0.1919,
+     "log_loss": 0.9854,
+     "brier": 0.5769,
+     "ece": 0.0179
+    },
+    "Ours: 1-season warm start": {
+     "n": 300,
+     "accuracy": 0.49,
+     "rps": 0.2193,
+     "log_loss": 1.0582,
+     "brier": 0.6372,
+     "ece": 0.0466
+    },
+    "Ours: full-history warm start": {
+     "n": 300,
+     "accuracy": 0.53,
+     "rps": 0.1883,
+     "log_loss": 0.9605,
+     "brier": 0.5689,
+     "ece": 0.0211
+    }
+   }
+  },
+  "es.1": {
+   "full": {
+    "Baseline (H/D/A rates)": {
+     "n": 1890,
+     "accuracy": 0.4577,
+     "rps": 0.2253,
+     "log_loss": 1.0658,
+     "brier": 0.6438,
+     "ece": 0.007
+    },
+    "penaltyblog Dixon-Coles": {
+     "n": 1890,
+     "accuracy": 0.5265,
+     "rps": 0.1983,
+     "log_loss": 0.9866,
+     "brier": 0.5867,
+     "ece": 0.011
+    },
+    "Ours: 1-season warm start": {
+     "n": 1890,
+     "accuracy": 0.4905,
+     "rps": 0.2073,
+     "log_loss": 1.0174,
+     "brier": 0.6088,
+     "ece": 0.0186
+    },
+    "Ours: full-history warm start": {
+     "n": 1890,
+     "accuracy": 0.5265,
+     "rps": 0.1978,
+     "log_loss": 0.9839,
+     "brier": 0.5856,
+     "ece": 0.0148
+    }
+   },
+   "early_season": {
+    "Baseline (H/D/A rates)": {
+     "n": 300,
+     "accuracy": 0.43,
+     "rps": 0.2303,
+     "log_loss": 1.0796,
+     "brier": 0.6536,
+     "ece": 0.0111
+    },
+    "penaltyblog Dixon-Coles": {
+     "n": 300,
+     "accuracy": 0.5433,
+     "rps": 0.1873,
+     "log_loss": 0.96,
+     "brier": 0.5671,
+     "ece": 0.0519
+    },
+    "Ours: 1-season warm start": {
+     "n": 300,
+     "accuracy": 0.4267,
+     "rps": 0.2184,
+     "log_loss": 1.06,
+     "brier": 0.6389,
+     "ece": 0.0632
+    },
+    "Ours: full-history warm start": {
+     "n": 300,
+     "accuracy": 0.55,
+     "rps": 0.1872,
+     "log_loss": 0.9539,
+     "brier": 0.5662,
+     "ece": 0.0433
+    }
+   }
+  },
+  "it.1": {
+   "full": {
+    "Baseline (H/D/A rates)": {
+     "n": 1890,
+     "accuracy": 0.4048,
+     "rps": 0.2298,
+     "log_loss": 1.0869,
+     "brier": 0.6587,
+     "ece": 0.0112
+    },
+    "penaltyblog Dixon-Coles": {
+     "n": 1890,
+     "accuracy": 0.5286,
+     "rps": 0.1965,
+     "log_loss": 0.9888,
+     "brier": 0.5896,
+     "ece": 0.0126
+    },
+    "Ours: 1-season warm start": {
+     "n": 1890,
+     "accuracy": 0.4995,
+     "rps": 0.2038,
+     "log_loss": 1.0125,
+     "brier": 0.6063,
+     "ece": 0.0155
+    },
+    "Ours: full-history warm start": {
+     "n": 1890,
+     "accuracy": 0.5254,
+     "rps": 0.196,
+     "log_loss": 0.9862,
+     "brier": 0.5886,
+     "ece": 0.0165
+    }
+   },
+   "early_season": {
+    "Baseline (H/D/A rates)": {
+     "n": 300,
+     "accuracy": 0.4,
+     "rps": 0.2258,
+     "log_loss": 1.0945,
+     "brier": 0.6634,
+     "ece": 0.0307
+    },
+    "penaltyblog Dixon-Coles": {
+     "n": 300,
+     "accuracy": 0.5267,
+     "rps": 0.1928,
+     "log_loss": 1.0005,
+     "brier": 0.5936,
+     "ece": 0.0414
+    },
+    "Ours: 1-season warm start": {
+     "n": 300,
+     "accuracy": 0.3867,
+     "rps": 0.2201,
+     "log_loss": 1.0817,
+     "brier": 0.6544,
+     "ece": 0.0364
+    },
+    "Ours: full-history warm start": {
+     "n": 300,
+     "accuracy": 0.5333,
+     "rps": 0.19,
+     "log_loss": 0.985,
+     "brier": 0.5872,
+     "ece": 0.0349
+    }
+   }
+  },
+  "de.1": {
+   "full": {
+    "Baseline (H/D/A rates)": {
+     "n": 1530,
+     "accuracy": 0.4405,
+     "rps": 0.2301,
+     "log_loss": 1.0702,
+     "brier": 0.6473,
+     "ece": 0.0021
+    },
+    "penaltyblog Dixon-Coles": {
+     "n": 1530,
+     "accuracy": 0.5137,
+     "rps": 0.2047,
+     "log_loss": 1.002,
+     "brier": 0.5962,
+     "ece": 0.0206
+    },
+    "Ours: 1-season warm start": {
+     "n": 1530,
+     "accuracy": 0.5013,
+     "rps": 0.2121,
+     "log_loss": 1.0284,
+     "brier": 0.6131,
+     "ece": 0.0349
+    },
+    "Ours: full-history warm start": {
+     "n": 1530,
+     "accuracy": 0.519,
+     "rps": 0.2037,
+     "log_loss": 0.9953,
+     "brier": 0.5937,
+     "ece": 0.0188
+    }
+   },
+   "early_season": {
+    "Baseline (H/D/A rates)": {
+     "n": 270,
+     "accuracy": 0.4111,
+     "rps": 0.2356,
+     "log_loss": 1.0786,
+     "brier": 0.654,
+     "ece": 0.0255
+    },
+    "penaltyblog Dixon-Coles": {
+     "n": 270,
+     "accuracy": 0.5111,
+     "rps": 0.2075,
+     "log_loss": 1.0204,
+     "brier": 0.602,
+     "ece": 0.0303
+    },
+    "Ours: 1-season warm start": {
+     "n": 270,
+     "accuracy": 0.4704,
+     "rps": 0.2273,
+     "log_loss": 1.0659,
+     "brier": 0.6417,
+     "ece": 0.0398
+    },
+    "Ours: full-history warm start": {
+     "n": 270,
+     "accuracy": 0.5148,
+     "rps": 0.2042,
+     "log_loss": 0.9929,
+     "brier": 0.594,
+     "ece": 0.0179
+    }
+   }
+  },
+  "fr.1": {
+   "full": {
+    "Baseline (H/D/A rates)": {
+     "n": 1677,
+     "accuracy": 0.4347,
+     "rps": 0.232,
+     "log_loss": 1.0723,
+     "brier": 0.649,
+     "ece": 0.0072
+    },
+    "penaltyblog Dixon-Coles": {
+     "n": 1677,
+     "accuracy": 0.5158,
+     "rps": 0.2081,
+     "log_loss": 1.0044,
+     "brier": 0.6004,
+     "ece": 0.0087
+    },
+    "Ours: 1-season warm start": {
+     "n": 1677,
+     "accuracy": 0.4979,
+     "rps": 0.2137,
+     "log_loss": 1.0262,
+     "brier": 0.6141,
+     "ece": 0.0253
+    },
+    "Ours: full-history warm start": {
+     "n": 1677,
+     "accuracy": 0.517,
+     "rps": 0.2072,
+     "log_loss": 1.0015,
+     "brier": 0.5983,
+     "ece": 0.004
+    }
+   },
+   "early_season": {
+    "Baseline (H/D/A rates)": {
+     "n": 282,
+     "accuracy": 0.4255,
+     "rps": 0.2257,
+     "log_loss": 1.0836,
+     "brier": 0.6563,
+     "ece": 0.0174
+    },
+    "penaltyblog Dixon-Coles": {
+     "n": 282,
+     "accuracy": 0.4752,
+     "rps": 0.2088,
+     "log_loss": 1.0323,
+     "brier": 0.6202,
+     "ece": 0.0341
+    },
+    "Ours: 1-season warm start": {
+     "n": 282,
+     "accuracy": 0.4291,
+     "rps": 0.2251,
+     "log_loss": 1.0828,
+     "brier": 0.6569,
+     "ece": 0.0552
+    },
+    "Ours: full-history warm start": {
+     "n": 282,
+     "accuracy": 0.4787,
+     "rps": 0.2054,
+     "log_loss": 1.0218,
+     "brier": 0.6116,
+     "ece": 0.0372
+    }
+   }
+  }
+ },
+ "pooled": {
+  "Full set": {
+   "Baseline (H/D/A rates)": {
+    "n": 8887,
+    "accuracy": 0.4357,
+    "rps": 0.2298,
+    "log_loss": 1.0729
+   },
+   "penaltyblog Dixon-Coles": {
+    "n": 8887,
+    "accuracy": 0.5239,
+    "rps": 0.2017,
+    "log_loss": 0.9925
+   },
+   "Ours: 1-season warm start": {
+    "n": 8887,
+    "accuracy": 0.5017,
+    "rps": 0.2089,
+    "log_loss": 1.0174
+   },
+   "Ours: full-history warm start": {
+    "n": 8887,
+    "accuracy": 0.5241,
+    "rps": 0.2009,
+    "log_loss": 0.9885
+   },
+   "Bookmaker closing odds": {
+    "n": 7885,
+    "accuracy": 0.5432,
+    "rps": 0.1939,
+    "log_loss": 0.9668,
+    "brier": 0.5749,
+    "ece": 0.0084
+   }
+  },
+  "Early season (MD1-6)": {
+   "Baseline (H/D/A rates)": {
+    "n": 1452,
+    "accuracy": 0.4174,
+    "rps": 0.2294,
+    "log_loss": 1.0845
+   },
+   "penaltyblog Dixon-Coles": {
+    "n": 1452,
+    "accuracy": 0.522,
+    "rps": 0.1973,
+    "log_loss": 0.9989
+   },
+   "Ours: 1-season warm start": {
+    "n": 1452,
+    "accuracy": 0.4401,
+    "rps": 0.2219,
+    "log_loss": 1.0696
+   },
+   "Ours: full-history warm start": {
+    "n": 1452,
+    "accuracy": 0.522,
+    "rps": 0.1947,
+    "log_loss": 0.9821
+   },
+   "Bookmaker closing odds": {
+    "n": 1288,
+    "accuracy": 0.5411,
+    "rps": 0.1866,
+    "log_loss": 0.9539,
+    "brier": 0.5668,
+    "ece": 0.0285
+   }
+  }
+ },
+ "bootstrap": {
+  "Full set": {
+   "Baseline (H/D/A rates)": {
+    "n": 8887,
+    "mean_rps_improvement": 0.028893267467071947,
+    "ci_low": 0.026269685131996394,
+    "ci_high": 0.03141214320693213
+   },
+   "penaltyblog Dixon-Coles": {
+    "n": 8887,
+    "mean_rps_improvement": 0.000764427611669124,
+    "ci_low": 0.00035856991476890086,
+    "ci_high": 0.0011847727315667756
+   },
+   "Ours: 1-season warm start": {
+    "n": 8887,
+    "mean_rps_improvement": 0.008003790261799199,
+    "ci_low": 0.006445406336704458,
+    "ci_high": 0.0095572736136556
+   },
+   "Bookmaker closing odds": {
+    "n": 7885,
+    "mean_rps_improvement": -0.006376530401729925,
+    "ci_low": -0.007514320941661689,
+    "ci_high": -0.005268746992118015
+   }
+  },
+  "Early season (MD1-6)": {
+   "Baseline (H/D/A rates)": {
+    "n": 1452,
+    "mean_rps_improvement": 0.034742098840017256,
+    "ci_low": 0.028854328959774654,
+    "ci_high": 0.040692894855124714
+   },
+   "penaltyblog Dixon-Coles": {
+    "n": 1452,
+    "mean_rps_improvement": 0.002628052561374621,
+    "ci_low": 0.0006418600181912942,
+    "ci_high": 0.0046950789845215
+   },
+   "Ours: 1-season warm start": {
+    "n": 1452,
+    "mean_rps_improvement": 0.027231580710295897,
+    "ci_low": 0.021329077261865757,
+    "ci_high": 0.03330868634179758
+   },
+   "Bookmaker closing odds": {
+    "n": 1288,
+    "mean_rps_improvement": -0.007114903937387554,
+    "ci_low": -0.009807277294783435,
+    "ci_high": -0.00442954762537308
+   }
+  }
+ },
+ "bookmaker_closing_odds": {
+  "full": {
+   "n": 7885,
+   "accuracy": 0.5432,
+   "rps": 0.1939,
+   "log_loss": 0.9668,
+   "brier": 0.5749,
+   "ece": 0.0084
+  },
+  "early_season": {
+   "n": 1288,
+   "accuracy": 0.5411,
+   "rps": 0.1866,
+   "log_loss": 0.9539,
+   "brier": 0.5668,
+   "ece": 0.0285
+  }
+ }
+}

@@ -1,0 +1,58 @@
+{
+ "by_league": {
+  "en.1": {
+   "compared": 6064,
+   "disagreements": 0
+  },
+  "es.1": {
+   "compared": 4747,
+   "disagreements": 0
+  },
+  "it.1": {
+   "compared": 4482,
+   "disagreements": 1
+  },
+  "de.1": {
+   "compared": 4320,
+   "disagreements": 0
+  },
+  "fr.1": {
+   "compared": 3949,
+   "disagreements": 1
+  }
+ },
+ "total_compared": 23562,
+ "total_disagreements": 2,
+ "disagreements": [
+  {
+   "league": "it.1",
+   "home": "Hellas Verona FC",
+   "away": "AS Roma",
+   "openfootball_date": "2020-09-19",
+   "footballdata_date": "2020-09-19",
+   "openfootball_score": [
+    3,
+    0
+   ],
+   "footballdata_score": [
+    0,
+    0
+   ]
+  },
+  {
+   "league": "fr.1",
+   "home": "SC Bastia",
+   "away": "Olympique Lyonnais",
+   "openfootball_date": "2017-04-16",
+   "footballdata_date": "2017-04-16",
+   "openfootball_score": [
+    0,
+    0
+   ],
+   "footballdata_score": [
+    0,
+    3
+   ]
+  }
+ ]
+}

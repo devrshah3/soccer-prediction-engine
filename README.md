@@ -70,5 +70,14 @@ pytest && ruff check . && mypy kickcast_engine --ignore-missing-imports
 
 ## Data credit
 
-Historical data: [StatsBomb Open Data](https://github.com/statsbomb/open-data).
+Historical data: [StatsBomb Open Data](https://github.com/statsbomb/open-data),
+[openfootball](https://github.com/openfootball) (CC0),
+[martj42/international_results](https://github.com/martj42/international_results) (CC0).
 Comparison model: [penaltyblog](https://github.com/martineastwood/penaltyblog) (MIT).
+
+Match stats, cards and historical closing odds: [football-data.co.uk](https://www.football-data.co.uk/).
+No formal license/terms-of-use text restricting research or personal use was found on the site
+(checked the homepage, `/notes.txt` and `/disclaimer.php`); it's a long-established free dataset
+widely used in football-analytics research, with no robots.txt restriction either. Downloaded
+once into `data/footballdata_uk/` via `scripts/fetch_footballdata_uk.py` (not scraped live per
+request), with a manifest recording what was fetched and when.
