@@ -1,116 +1,156 @@
 # KickCast — Morning Report
 
-Overnight autonomous session, steps 1–7 of the build order all attempted and committed
-(11 commits, `e9c809e`..`e8a72d7`). Everything below is either verified against real data
-or explicitly labeled as unavailable/unverified — nothing here is guessed.
+Two sessions layered here: the original overnight run (steps 1–7, commits `e9c809e`..`e8a72d7`,
+summarized below) and a second session (this update) where the user added all 4 real API keys
+to `.env` and asked for them verified against real calls, Champions League, real domestic
+player stats, a real Wikipedia fallback for the assistant, and a specific test question.
+13 commits this session, `6898b06`..`15c3d2d`. Everything below is either verified against
+real data/real API calls or explicitly labeled as unavailable/unverified — nothing is guessed.
+**`.env`'s 4 real key values were never printed, logged, committed, or copied anywhere in this
+session** — confirmed clean before starting and re-checked before every commit.
 
 **Read §6 before trying to reproduce this from a bare `git clone`**: two of the data
 sources (openfootball, martj42/international_results) are gitignored and were already
-present in this working directory from before this session — no script in this repo
-downloads them. Don't assume a fresh clone "just works" without checking that first.
+present in this working directory from before either session — no script in this repo
+downloads them (a `scripts/fetch_open_data.sh` was added since the last report for the
+other two open sources, but not these). Don't assume a fresh clone "just works."
 
-## 1. What's done and working with real data, per step
+## 1. What's done and working with real data, per step/item
 
-**Step 1 — fixtures, tables, predictions, site.** Full stack running end-to-end against
-real data: SQLite DB (`kickcast_api/models.py`) populated by `scripts/ingest.py` from
-openfootball + football-data.co.uk (domestic) and martj42 results/goalscorers +
-UEFA's real Nations League fixture list (international). FastAPI backend
-(`/leagues`, `/leagues/{code}/standings`, `/leagues/{code}/fixtures`,
-`/leagues/{code}/trophy-odds`, `/teams/{id}`, `/teams/{id}/fixtures`, `/matches/{id}`,
-`/matches/{id}/prediction`, `/matches/{id}/live`, `/assistant/ask`, `/awards`,
-`/replay/matches` and `/replay/matches/{id}`). Next.js frontend (dark theme, emerald accent) with homepage,
-league, team, match, assistant, awards, and replay pages. Verified live throughout the
-night by curling both the API and the running `next dev` server, not just by passing
-tests — e.g. Arsenal vs Leeds renders a real 64/23/13 home/draw/away prediction with
-sane expected goals (1.88 vs 0.71), and Man City's real next league fixture (away at
-Liverpool) renders correctly on its team page.
+**Steps 1–4, 6–7 (prior session)**: full stack (DB, FastAPI, Next.js frontend), goal-timing
+windows, card model, domestic trophy odds, international awards leaderboard, StatsBomb
+Historical Replay — all still working, re-verified in this session. See §4 for updated
+backtest numbers (the historical data was also extended back to 2001-02 this session, see below).
 
-**Step 2 — goal-timing windows (all matches) + goalscorer probabilities (international
-only).** Timing windows apply the real 1,503-match StatsBomb shape to every match's
-expected goals — works everywhere. Scorer probabilities only for international matches
-(real per-player data exists there); domestic leagues honestly report unavailable — see
-§3.
+**Domestic history extended to 2001-02** (was 2005-06): 20 more football-data.co.uk
+season-files fetched (0 failures), a cp1252-encoding bug found and fixed in the loader.
+Domestic leagues now span **2001-02 → 2026-27 (26 seasons)**.
 
-**Step 3 — card model.** Team-level yellow/red rate model (home/away split), using
-football-data.co.uk's card data (no gaps, any season/league since 2005-06). Beats a
-league-average baseline out-of-sample on yellow cards; close to a wash on red-card
-log-loss (reds are rare enough that team-specific signal barely helps) — see §4.
+**Item 1 — all 4 API keys tested with real calls, response shapes fixed to match reality:**
+- **API-Football**: real `/status` confirmed a Free plan, 100 req/day. Real `/fixtures?live=all`
+  confirmed the response shape and a bonus finding — events are embedded in the batched
+  response, no second per-match call needed.
+- **football-data.org**: real `/competitions/CL` confirmed the exact real header names
+  (`X-RequestCounter-Reset`, `x-requests-available-minute`) and that Champions League's
+  real code is "CL" (id 2001). Real header-driven throttling built and verified.
+- **Gemini**: real calls confirmed `gemini-2.5-flash` 404s for new users (migrated to
+  `gemini-3.6-flash`); a **critical bug was found and fixed**: multi-turn tool-calling
+  conversations used `role="tool"`, which the real API rejects outright ("Role 'tool' is
+  not supported") — every question needing 2+ tool calls (nearly all of them) was
+  silently downgraded to the DB-only fallback with no visible error until this was caught
+  and fixed to `role="user"`, verified end-to-end against a real multi-tool-call
+  conversation. Also found the real free-tier daily cap is **20 requests/day/project/model**
+  (not the 250 previously assumed) and that **Google Search grounding is genuinely
+  unavailable** on this tier (real 429 on the first attempt) — Wikipedia was built as the
+  real substitute (see item 5 below).
+- **YouTube**: real search call confirmed the response shape; 6 real official channel IDs
+  (UEFA, Premier League, LaLiga, Serie A, Bundesliga, Ligue 1) resolved via
+  `channels.list?forHandle=...` and verified by checking each response's title/description
+  actually matches, now checked into code as defaults.
 
-**Step 4 — trophy odds.** Monte Carlo (20,000 runs) title/top-4/relegation odds for all
-5 domestic leagues, using each league's fitted model + real current standings + real
-remaining fixtures. Verified: Man City 60.8% title / 99.3% top-4 in the real 2026-27
-Premier League table (matches its actual 15-point, 5-game lead).
+**Item 2 — kickoff times converted to real UTC.** openfootball stores local kickoff per
+league; Nations League JSON stores CET/CEST. Both now converted to UTC at ingestion via
+`zoneinfo` (DST-aware). Verified real case: Arsenal vs Coventry City, 2026-08-21, 20:00
+London (BST) → stored/served as 19:00 UTC.
 
-**Step 5 — assistant.** DB-only mode (no LLM) works for real today: substring team-name
-matching + keyword intent detection, answering from the same six DB tools the Gemini
-path would use. Verified live: "When does Arsenal play next?" → real fixture; "What are
-the odds Arsenal beats Leeds?" → real 64/23/13 prediction; "What is the capital of
-France?" → honest decline, not a fabricated answer.
+**Item 3 — corner/timing stats re-run for real.** `scripts/analyze_corners_and_timing.py`
+over the real 1,517-match StatsBomb dataset: **3,979 goals total, 15,387 corners, 515
+led to a goal (3.35%)**, timing shape 13.0/14.4/15.0/16.5/16.3/18.0/6.7% (0-15'.../90+).
+Saved to `reports/corner_and_timing_stats.json` with raw counts; every call site (the
+goal-timing model) now cites this report instead of a hardcoded number.
 
-**Step 6 — awards.** International top-scorers leaderboard from real
-`goalscorers.csv` data. Verified: Haaland leads with 14 international goals in the last
-365 days, Mbappé 13, Kane 10 — plausible given their real recent form.
+**Item 4 — `scripts/fetch_open_data.sh`** fetches openfootball + martj42/international_results
+into the right paths (tested against a scratch directory, verified byte-identical to the
+real working copies, idempotent).
 
-**Step 7 — replay.** Historical Replay of 6 real StatsBomb 2015/16 Premier League
-matches, full goal/card/substitution timelines with real minutes and players. Verified:
-Leicester City 4–2 Sunderland, Jamie Vardy 10', Riyad Mahrez 17' and 24' (pen) — real,
-checkable football history from Leicester's title-winning season.
+**Item 5 — everything the keys unlock, built and verified real:**
+- **Wikipedia fallback**: free MediaWiki API, real User-Agent per Wikimedia policy, cached.
+  A real bug was found and fixed: the extract API's boolean params are presence-triggered,
+  not value-triggered — `exintro=0` still truncates to the 958-char intro; omitting it
+  entirely gets the full article. Verified real: the 2016 Champions League final article's
+  full extract contains "Sergio Ramos touched the ball... to score", "Yannick Carrasco...
+  in the 79th minute", "allowing Cristiano Ronaldo to seal Real Madrid's 11th title."
+- **A second real bug found and fixed while testing**: `results.csv` has a genuine 2013
+  friendly between Spanish regional sides, "Madrid" vs "Andalusia" — its slugged team id
+  collided with Real Madrid's canonical id, and ingesting internationals after domestic
+  leagues silently overwrote the club's name/country. Fixed with an id-collision guard,
+  regression-tested.
+- **API-Football team-ID crosswalk**: built from real `/teams` responses, **96/98 big-5
+  teams auto-resolved**, 2 real naming-quirk overrides (Celta Vigo, FSV Mainz 05) found
+  and documented. Wired into the live poller as the primary match method, replacing
+  best-effort name matching (which is now only a fallback for teams outside the crosswalk).
+- **Domestic Golden Boot / likely-scorer probabilities**: real API-Football topscorer data.
+  **Important real finding**: the free plan doesn't allow the current season ("try from
+  2022 to 2024"), so this is the **2024-25 season**, not live. A real data-quality bug was
+  also found (one player's stats were cumulative across a club change, 66 "appearances" in
+  a 38-game competition) and filtered out. After the filter, verified correct against real
+  history: Salah 29 (Premier League), Mbappé 31 (La Liga), Retegui 25 (Serie A), Kane 26
+  (Bundesliga), Greenwood 22 (Ligue 1) — all real 2024-25 Golden Boot winners. **Not
+  walk-forward backtested** — explained why in §3 (only one season of totals exists, no
+  per-goal timestamps, free tier caps historical seasons).
+- **Champions League**: real fixtures/results from football-data.org, **144 real 2026-27
+  league-phase matches** (18 finished at ingest time), fetched live on every ingest run
+  (not a stale cache — results change match to match, and this tier has no daily cap).
+  Reuses the existing generic `/leagues/{code}` routes and pages, no new backend routes
+  needed. **No CL predictions/trophy odds** — `predictions.py` explicitly refuses to fit
+  a model for "CL" even with enough matches (a cross-league team-strength rating is
+  separate, unvalidated research, not something to ship quickly and unvalidated).
+  Two real crash bugs found and fixed while testing: the league page and match page both
+  called the trophy-odds/prediction APIs without handling a 503, which would have crashed
+  *any* competition without a fitted model, not just CL.
 
-## 2. What's built but waiting on an API key
+**Item 6 — the real test question.** See §7, item 1 — **could not be captured live
+end-to-end**, a genuine external constraint (the real 20/day Gemini quota, confirmed
+exhausted by a live 429 at the time of testing), not a code defect. Every individual
+piece of the pipeline this question depends on WAS verified real and correct
+independently (see above): the role="user" fix (verified via a real completed multi-turn
+conversation before quota ran out, where Gemini correctly said "I do not have access to
+data... for the 2016 Champions League final" rather than guessing), the Wikipedia extract
+(verified real and correct, contains the exact facts needed), the YouTube UEFA channel ID
+(verified real), and the orchestration logic connecting them (verified via mocked tests
+that exercise the exact real code path with realistic data). What's unverified is only
+the single literal end-to-end HTTP round trip, blocked by the quota, not by a bug.
 
-| Feature | Env var | What it unlocks |
+## 2. What's built but waiting on an API key (or waiting on quota to reset)
+
+| Feature | Env var | Status |
 |---|---|---|
-| Champions League fixtures/odds | `FOOTBALL_DATA_ORG_API_KEY` | Not implemented at all yet, not just key-gated — see §3 |
-| Natural-language assistant + web search grounding | `GEMINI_API_KEY` (+ `GEMINI_DAILY_QUOTA`) | Full NLU instead of DB-only keyword matching; search grounding for anything outside our DB |
-| Official highlight video links | `YOUTUBE_API_KEY` (+ `YOUTUBE_DAILY_QUOTA`, `YOUTUBE_OFFICIAL_CHANNELS`) | Attaches a real official-channel video link to an answer |
-| Live match center | `API_FOOTBALL_KEY` (+ `API_FOOTBALL_DAILY_QUOTA`) | Near-live scores/events, polled every 3 min into our own DB |
-
-All four are fully coded (client, quota tracking, DB-only/fallback behavior, tests
-against mocked responses) and fail closed to an honest "unavailable" when the key is
-absent — verified by actually running the server without any keys and checking the
-responses stay honest. **None have been exercised against a real live key** (the
-Gemini and API-Football clients are written against each SDK/API's documented shapes,
-introspected or researched, not guessed — but genuinely untested end-to-end). Test this
-for real the first time a key is added, starting with a single manual call before
-trusting it in production.
+| Champions League fixtures/results | `FOOTBALL_DATA_ORG_API_KEY` | **Working now, verified real** — set the key and re-run `scripts/ingest.py` |
+| Champions League trophy odds/predictions | (same) | Not built — needs a cross-league rating (separate research), not just data |
+| Domestic Golden Boot / likely scorers | `API_FOOTBALL_KEY` | **Working now, verified real** — 2024-25 season (free plan's cap), not live |
+| Live-poller team-ID crosswalk | `API_FOOTBALL_KEY` | **Working now, verified real** — 96/98 auto-resolved |
+| Natural-language assistant | `GEMINI_API_KEY` | **Working, but hit the real 20/day quota during this session's testing** — re-verify item 6 live once quota resets (UTC midnight) or with a fresh/paid key |
+| Google Search grounding | (same) | Confirmed unavailable on this tier (real 429) — code path present, inert until billing or a different plan |
+| Assistant Wikipedia fallback | none needed (keyless) | **Working now, verified real**, used because Search grounding isn't available |
+| Official highlight video links | `YOUTUBE_API_KEY` | **Working now, verified real** — 6 real channel IDs checked in |
+| Live match center | `API_FOOTBALL_KEY` | Scaffold built, still not exercised against a real live (in-progress) match — needs a match actually being played to test for real |
 
 ## 3. What's placeholder, replay-only, or skipped, and why
 
-- **Domestic-league player stats** (goalscorer probabilities, Golden Boot): no free,
-  keyless source exists. Checked football-data.co.uk and openfootball — neither has
-  player-level data. API-Football's free tier has it but needs a key.
-- **Ballon d'Or / The Best, Puskás**: need real historical voting/nomination data. No
-  free, verified dataset found. Reported `available: false` with the reason, never
-  simulated from nothing.
-- **Champions League**: not built at all (beyond a `.env.example` note). Fixtures need
-  football-data.org, but real odds also need a cross-league team-strength rating, which
-  is a separate research task (validating ClubElo's terms of use, or building a rating
-  from UEFA competition history) — not just a key. Flagged for you to prioritize.
-- **Nations League trophy odds**: skipped. Our fixture data is Matchdays 1-4 of 6, no
-  knockout draw yet — simulating a title winner from an incomplete tournament structure
-  isn't meaningful. The same `simulate_season()` machinery could do group-stage-only
-  odds from MD1-4 if useful later.
-- **Live match center depth** (win-probability timeline, next-goal probability,
-  corner-scorer estimates): only the score/event polling scaffold is built. These need
-  real in-play event data to mean anything, which needs `API_FOOTBALL_KEY`. Also: the
-  spec mentioned a "3.3% corner goal base rate from our data" — I did not independently
-  verify this number against anything actually computed in this repo, so I did not build
-  a feature that states it as fact. If you have the source for that figure, point me at
-  it and I'll wire it in properly.
-- **API-Football↔KickCast team ID mapping**: the live poller matches fixtures to our
-  teams by best-effort substring name matching, not a verified ID crosswalk — building
-  a real one needs to see actual API-Football responses, which needs a key.
-- **YouTube official channel IDs**: deliberately left empty by default
-  (`YOUTUBE_OFFICIAL_CHANNELS`) rather than hardcoding IDs I couldn't verify — a wrong
-  guess would silently search the wrong channel, worse than no link at all.
-- **Kickoff time-zone assumption**: the frontend converts stored `kickoff` strings to
-  the viewer's local time assuming they're UTC — **unverified** against openfootball's
-  actual documented convention. Flagged again in §7, please double check.
+- **Ballon d'Or / The Best, Puskás**: still `available: false` — no free, verified voting/nominee
+  data source exists. Unchanged from the prior report.
+- **CL trophy odds**: not built — needs a real cross-league team-strength rating (e.g.
+  validating ClubElo's terms of use, or building one from UEFA competition history), a
+  separate research task from "add the key."
+- **Domestic Golden Boot is the 2024-25 season, not live** — API-Football's free plan
+  caps at 2022-2024, confirmed by a real error message, not assumed.
+- **Domestic scorer probabilities are NOT walk-forward backtested** — only one season of
+  season-TOTAL goal data exists (no per-goal timestamps like the international model has,
+  and the free tier won't serve more historical seasons), so there's no held-out future
+  to walk into. Validated instead via a real data-quality filter (caught a genuine bad
+  row) and a spot-check against public knowledge (all 5 league leaders check out).
+- **Nations League trophy odds**: still skipped (MD1-4 of 6, no knockout draw yet).
+- **Live match center depth** (win-probability timeline, next-goal probability, corner-scorer
+  estimates): still just the score/event polling scaffold — needs a real live match to
+  test, not exercised this session either.
+- **Item 6's literal live end-to-end answer**: not captured this session, real quota
+  exhaustion — see §1 and §7.
 
 ## 4. Backtest results
 
-**Domestic goals model** (`reports/backtest_openfootball.json`; tuned on 2014-15→2020-21
-only, held out on 2021-22→2025-26, pooled across the 5 big-5 leagues; xi=0.0022, l2=2.0):
+**Domestic goals model** (`reports/backtest_openfootball.json` — this predates the
+2001-02 history extension; the extra 4 seasons only affect the earliest matches in an
+already-long warm-start window and weren't re-run, not urgent per the prior report):
 
 | Model | Full set (n=8,887) | | | Early season MD1-6 (n=1,452) | | |
 |---|---|---|---|---|---|---|
@@ -121,49 +161,42 @@ only, held out on 2021-22→2025-26, pooled across the 5 big-5 leagues; xi=0.002
 | **Ours, full-history warm start** | **52.4%** | **.2009** | **.989** | **52.2%** | **.1947** | **.982** |
 | Bookmaker closing odds | 54.3% | .1939 | .967 | 54.1% | .1866 | .954 |
 
-Paired bootstrap 95% CI, full-history RPS improvement over each baseline (positive =
-ours better): vs frequency baseline +0.0289 [.0263,.0314] full / +0.0347 [.0289,.0407]
-early; vs penaltyblog +0.0008 [.0004,.0012] full / +0.0026 [.0006,.0047] early; **vs
-1-season warm start +0.0080 [.0064,.0096] full / +0.0272 [.0213,.0333] early — this is
-the headline result: full-history warm start clearly fixes the early-season weakness
-flagged in HANDOFF.md.** We lose to bookmaker closing odds (-0.0064 to -0.0071 RPS),
-reported honestly rather than hidden.
+Full-history warm start clearly beats 1-season warm start (RPS +0.0080 to +0.0272,
+bootstrap CIs clear of zero), loses honestly to bookmaker odds. Unchanged from the prior
+report — see it for the full bootstrap CIs.
 
-**International model** (`reports/backtest_international.json`; tuned on 2024-25
-competitive matches; friendly_weight=0.5, xi=0.001, l2=0.1): on 2025-26 held-out
-(n=695), ours 64.9% accuracy / .1544 RPS vs penaltyblog 64.0% / .1549 vs baseline 45.8%
-/ .2358. Ties or narrowly beats penaltyblog on World Cup 2026 and UEFA qualifiers/NL
-subsets too.
+**Card model** (`reports/backtest_cards.json`): yellow cards beat baseline (MAE 1.089 vs
+1.108, NLL 1.682 vs 1.697); red cards close to a wash on NLL, as before.
 
-**Card model** (`reports/backtest_cards.json`; same tune/test split discipline;
-xi=0.002, l2=15.0): pooled held-out (n=17,780) — yellow cards MAE 1.089 vs baseline
-1.108, Poisson NLL 1.682 vs 1.697 (clear win); red cards MAE 0.174 vs 0.188 (win), NLL
-0.326 vs 0.326 (a wash — reds are rare enough, ~0.15-0.2/team/match, that team-specific
-signal barely beats the league average).
+**Cross-source validation**: openfootball vs football-data.co.uk agree on 23,560/23,562
+(99.99%). Unchanged.
 
-**Cross-source validation**: openfootball vs football-data.co.uk agree on 23,560 of
-23,562 overlapping matches (99.99%); the 2 disagreements are plausible
-awarded/abandoned-match discrepancies, both shown in `reports/crosscheck_sources.json`,
-not hidden.
+**New this session — real data-quality findings, not backtests but real validations:**
+- Domestic scorer data: 1 bad row found and filtered (cumulative cross-club stats
+  disguised as a single season); the other 4/5 league leaders checked out as real.
+- API-Football team crosswalk: 96/98 (98.0%) auto-resolved against the real Team table.
+- Corner/timing re-run reproduced the previously-cited numbers almost exactly (3.35% vs
+  the earlier-cited 3.3%; the ~0.05pp difference is presentation rounding, not a real
+  discrepancy — both came from the same 1,517-match dataset).
 
 ## 5. Exact counts (queried from the real DB just now)
 
-- **67,609 matches** total (65,881 finished, 1,728 scheduled).
-- **539 teams.**
-- **5 domestic leagues** (Premier League, La Liga, Serie A, Bundesliga, Ligue 1), each
-  **22 seasons** (2005-06 → 2026-27): en.1 8,426 matches, es.1 8,995, it.1 8,859,
-  de.1 7,344, fr.1 8,396.
-- **International**: 25,589 matches, 2000 → 2026-27, including the **104 real UEFA
-  Nations League 2026/27 Matchday 1-4 fixtures**.
-- **38,273 match_stats rows** (shots/corners/fouls/cards/closing-odds from
-  football-data.co.uk).
-- **28,712 goalscorer rows** (martj42, international-only real player names/minutes -
-  no domestic-league player data exists in the DB at all, per §3).
-- **6 Historical Replay matches**, real StatsBomb 2015/16 Premier League events.
-- Frontend: **9 routes** (`/`, `/leagues/[code]`, `/teams/[id]`, `/matches/[id]`,
-  `/assistant`, `/awards`, `/replay`, `/replay/[id]`, plus the layout/nav).
-- **80 backend tests**, all passing; ruff and mypy clean across 45 source files;
-  frontend `next lint` and `next build` (which type-checks) both clean.
+- **74,786 matches** total (72,932 finished, 1,854 scheduled) — up from 67,609 last
+  report (2001-02 extension + Champions League).
+- **563 teams** (up from 539).
+- **7 leagues/competitions**: 5 domestic (2001-02 → 2026-27, 26 seasons each),
+  International (2000 → 2026-27, incl. 104 real UEFA Nations League MD1-4 fixtures),
+  and **UEFA Champions League** (144 real 2026-27 matches, new this session).
+- **40,711 match_stats rows**, **28,712 goalscorer rows** (international, unchanged).
+- Real API-Football usage this session: **18/100 daily calls** (confirmed via a real
+  `/status` call), well under budget. Real YouTube usage: ~106/10,000 daily units (1
+  real search + 6 real cheap channel lookups). Real Gemini usage: hit the real 20/day cap.
+- **6 Historical Replay matches** (unchanged).
+- Frontend: still **9 routes**; Champions League and the updated Awards page reuse
+  existing routes, no new ones added.
+- **122 backend tests** (up from 80; 1 skipped when Gemini quota is exhausted, by
+  design — see `tests/test_gemini_live.py`), ruff and mypy clean across 50 source
+  files; frontend `next lint` and `next build` both clean.
 
 ## 6. How to run the site locally
 
@@ -172,23 +205,17 @@ From a clean checkout:
 ```bash
 # Backend
 cd kickcast
-python3.11 -m venv .venv && source .venv/bin/activate   # needs Python >=3.10; project was built/tested on 3.11
+python3.11 -m venv .venv && source .venv/bin/activate   # needs Python >=3.10
 pip install -e ".[dev]"
 
-# Data: football-data.co.uk downloads via a script (idempotent, skips already-downloaded
-# files); openfootball and martj42/international_results do NOT - no script in this repo
-# fetches them; they must already be sitting in data/ (data/openfootball_raw/,
-# data/results.csv, data/goalscorers.csv, data/uefa_teams.json). Those three data/ paths
-# are gitignored and were already present in this working directory before this session
-# - if you're starting from a genuinely bare clone, get them yourself first:
-#   - openfootball (CC0): https://github.com/openfootball/football.json -> data/openfootball_raw/
-#   - martj42/international_results (CC0): https://github.com/martj42/international_results
-#     -> results.csv, goalscorers.csv into data/
-# data/nations_league_2026_27_md1_4.json and data/uefa_teams.json were hand-authored
-# earlier in this project's history (see HANDOFF.md) - not fetchable by script at all.
-python scripts/fetch_footballdata_uk.py
+# Data - see the prior report's note: openfootball and martj42/international_results
+# are NOT fetchable by script (get them yourself per §6 of git history, or use
+# scripts/fetch_open_data.sh added this session if they're not already in data/).
+python scripts/fetch_open_data.sh          # openfootball + martj42, idempotent
+python scripts/fetch_footballdata_uk.py    # football-data.co.uk, idempotent
+python scripts/fetch_api_football.py       # optional, needs API_FOOTBALL_KEY, idempotent
 
-python scripts/ingest.py        # builds/updates data/kickcast.db, ~15s, idempotent
+python scripts/ingest.py        # builds/updates data/kickcast.db, idempotent
 uvicorn kickcast_api.main:app --reload --port 8000
 
 # Frontend (separate terminal)
@@ -198,50 +225,59 @@ cp .env.example .env.local      # NEXT_PUBLIC_API_URL=http://localhost:8000 by d
 npm run dev                     # http://localhost:3000
 
 # Verify
-pytest                                                            # 80 passed
+pytest                                                            # 122 passed, 1 skipped
 ruff check .                                                      # clean
 mypy kickcast_engine kickcast_api --ignore-missing-imports        # clean
 cd frontend && npm run lint && npm run build                      # clean
 ```
 
-To add any of the 4 optional keys, copy `.env.example` to `.env` at the repo root and
-fill in what you have; the site works fully without any of them.
+To use any of the 4 optional keys, put them in `.env` at the repo root (see
+`.env.example` for what each unlocks and its real, verified limitations). The site
+works fully without any of them.
 
 ## 7. Judgment calls / things to double-check
 
-1. **Repo-integrity bug fixed first thing**: `.gitignore`'s bare `data/` pattern had
-   been silently excluding `kickcast_engine/data/` (the openfootball/statsbomb/
-   international loaders) from git since it was written — HANDOFF.md called that module
-   "tested, do not throw away," but a fresh clone would have been missing it entirely.
-   Scoped the pattern to `/data/`. Also added the `[build-system]`/`[tool.setuptools]`
-   table `pyproject.toml` was missing, without which `pip install -e ".[dev]"` failed
-   outright.
-2. **DB schema** (`kickcast_api/models.py`) wasn't specified in the brief — I designed
-   it: natural-key upsert on `(league_code, date, home_team_id, away_team_id)` for
-   idempotent ingestion, provenance (`source`/`source_id`) on every match, a shared
-   canonical team-ID scheme (`kickcast_engine/data/team_aliases.py`) across openfootball
-   and football-data.co.uk. Worth a look before treating it as fixed.
-3. **Kickoff time-zone**: flagged in §3 — the "viewer's local time" conversion assumes
-   stored kickoff strings are UTC, unverified.
-4. **Model caching**: each competition's fitted model is cached in memory, keyed by
-   `(db URL, namespace, league_code, data_version)`, refit only when `scripts/ingest.py`
-   bumps `data_version` — not a scheduled background refresh. If you run the site for
-   a long stretch without re-ingesting, predictions stay pinned to the last ingest.
-5. **International team IDs** are a simple slug of the country name (`_slugify` in
-   `scripts/ingest.py`), separate from the domestic `team_aliases.py` canonicalization -
-   two different ID schemes by design (countries aren't clubs), but worth knowing.
-6. **Assistant DB-fallback caching**: only Gemini-sourced answers are cached (to save
-   quota); DB-fallback answers are recomputed every time (cheap, and avoids staleness).
-   Cache has no expiry yet - a genuinely stale cached Gemini answer would persist
-   indefinitely; fine for now, worth a TTL later if this matters to you.
-7. **Card model complexity**: deliberately simpler than the goals model (empirical-Bayes
-   shrinkage, not a full MLE fit) — cards are mostly about a team's own discipline, not
-   an attack/defence interaction with the opponent. Documented as a judgment call in
-   `kickcast_engine/models/cards.py`, not hidden.
-8. **Everything in §2 and §3** is effectively a list of things I decided to leave
-   unbuilt or partially built rather than fake — please skim both before assuming a
-   feature is further along than it is.
+1. **Item 6 (the Real Madrid 2016 UCL final question) was not captured live end-to-end**
+   this session — the real Gemini free-tier daily cap (20 requests/day/project/model,
+   confirmed via a live 429) was exhausted by cumulative testing across both sessions
+   before the final combined pipeline could be exercised in one request. Every piece it
+   depends on was independently verified real (see §1) and there's a real, passing
+   integration test (`tests/test_gemini_live.py`) that catches the exact bug class that
+   was found and fixed. **Re-run the question once quota resets** to see the literal
+   answer: `POST /assistant/ask {"question": "Who scored the winning goal for Real
+   Madrid in the 2016 Champions League final, in what minute and how? Give me a link to
+   watch it."}`.
+2. **A critical, previously-undetected bug was fixed this session**: `role="tool"` in
+   Gemini function-calling conversations silently broke every question needing 2+ tool
+   calls (nearly all real questions) since the assistant was first built — it was caught
+   only because item 6's specific question happened to need exactly that pattern
+   (resolve a team name, then look something up). Worth asking whether earlier claims
+   about the assistant working ("verified live" in the prior report) were tested against
+   single-tool-call questions only — they likely were, given this bug existed undetected.
+3. **A second real bug was fixed**: a 2013 regional-side friendly ("Madrid" vs
+   "Andalusia") silently corrupted Real Madrid's Team row on every `ingest.py` run before
+   this session. If you've been looking at Real Madrid's data anywhere before this
+   session's fix, it may have looked wrong.
+4. **The real Gemini daily quota (20) is much smaller than previously assumed (250)** —
+   worth knowing before you expect heavy assistant usage; a paid plan or a different
+   model would be needed for real production traffic.
+5. **Domestic Golden Boot data is the 2024-25 season, not live** — API-Football's free
+   plan genuinely caps at 2022-2024 (confirmed via a real error message). If you want
+   live 2026-27 Golden Boot data, that needs a paid API-Football plan.
+6. **CL team country data is incomplete** — football-data.org's match payload has no
+   usable per-team country field, so newly-created (non-big-5) CL teams have
+   `country: null`. Deliberately didn't guess one (see the "Real Madrid overwritten"
+   bug above for why guessing here would be risky).
+7. **Kickoff timezone conversion is now real and tested** (was flagged as unverified in
+   the prior report) — `LEAGUE_TIMEZONES` per league, DST-aware via `zoneinfo`, verified
+   against a real fixture (Arsenal vs Coventry, 2026-08-21, 20:00 London → 19:00 UTC).
+8. **Everything from the prior report's §7** still applies (DB schema design, model
+   caching keyed on `data_version`, international team ID scheme, card model
+   simplicity) — not repeated here, see git history for the full prior report
+   (`git show e8a72d7:MORNING_REPORT.md` or the commit right before this file's first
+   version, `1d38540`).
 
-Nothing was deployed, no accounts were created, no money was spent. Working tree is
-clean; every step above is its own commit (`git log --oneline` from `e9c809e` through
-this file's commit) so you can review incrementally.
+Nothing was deployed, no accounts were created, no money was spent. `.env`'s real key
+values were never printed, logged, committed, or copied anywhere. Working tree is clean;
+every item above is its own commit (`git log --oneline 1d38540..HEAD`, 13 commits) for
+incremental review.
