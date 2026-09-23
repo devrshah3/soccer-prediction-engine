@@ -3,17 +3,32 @@ name = "kickcast"
 version = "0.1.0"
 description = "Soccer match prediction engine: xG-informed Dixon-Coles with walk-forward evaluation"
 requires-python = ">=3.10"
-dependencies = ["numpy", "scipy", "requests"]
+dependencies = [
+    "numpy", "scipy", "requests",
+    "fastapi", "uvicorn", "sqlalchemy", "apscheduler", "python-dotenv",
+]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff", "mypy", "penaltyblog"]
+dev = ["pytest", "ruff", "mypy", "penaltyblog", "httpx"]
 
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["kickcast_engine", "kickcast_engine.models", "kickcast_engine.data"]
+packages = [
+    "kickcast_engine", "kickcast_engine.models", "kickcast_engine.data",
+    "kickcast_api", "kickcast_api.routes",
+]
 
 [tool.ruff]
 line-length = 110
+
+[tool.mypy]
+explicit_package_bases = true
+mypy_path = "."
+
+[tool.ruff.lint]
+# B008: FastAPI's `Depends(...)` as an argument default is the documented, idiomatic pattern,
+# not the "mutable default" footgun this rule exists for.
+ignore = ["B008"]

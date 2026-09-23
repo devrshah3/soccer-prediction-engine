@@ -1,0 +1,106 @@
+"""SQLAlchemy ORM schema for the KickCast site database.
+
+Every match row carries `source`/`source_id` provenance (ground rule: never lose track of
+where a fact came from). Natural-key uniqueness (league_code, date, home_team_id,
+away_team_id) makes ingestion idempotent: re-running scripts/ingest.py updates rows in
+place instead of duplicating them.
+"""
+
+from __future__ import annotations
+
+from datetime import date as Date
+
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Date as SADate
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class League(Base):
+    __tablename__ = "leagues"
+
+    code: Mapped[str] = mapped_column(String, primary_key=True)  # "en.1", "international", ...
+    name: Mapped[str] = mapped_column(String)
+    country: Mapped[str | None] = mapped_column(String, nullable=True)
+    kind: Mapped[str] = mapped_column(String)  # "domestic_league" | "international"
+
+
+class Team(Base):
+    __tablename__ = "teams"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)  # canonical id, see team_aliases.py
+    name: Mapped[str] = mapped_column(String)
+    country: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class Match(Base):
+    __tablename__ = "matches"
+    __table_args__ = (
+        UniqueConstraint("league_code", "date", "home_team_id", "away_team_id", name="uq_match_natural_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    league_code: Mapped[str] = mapped_column(ForeignKey("leagues.code"), index=True)
+    season: Mapped[str] = mapped_column(String, index=True)
+    date: Mapped[Date] = mapped_column(SADate, index=True)
+    kickoff: Mapped[str | None] = mapped_column(String, nullable=True)
+    home_team_id: Mapped[str] = mapped_column(ForeignKey("teams.id"), index=True)
+    away_team_id: Mapped[str] = mapped_column(ForeignKey("teams.id"), index=True)
+    home_goals: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    away_goals: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String)  # "scheduled" | "finished"
+    round: Mapped[str | None] = mapped_column(String, nullable=True)  # "Matchday 3" or tournament name
+    neutral: Mapped[bool] = mapped_column(Boolean, default=False)
+    source: Mapped[str] = mapped_column(String)
+    source_id: Mapped[str] = mapped_column(String)
+
+
+class MatchStats(Base):
+    """Optional per-match extras from football-data.co.uk. Nullable: not every match has them."""
+
+    __tablename__ = "match_stats"
+
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), primary_key=True)
+    home_shots: Mapped[float | None] = mapped_column(Float, nullable=True)
+    away_shots: Mapped[float | None] = mapped_column(Float, nullable=True)
+    home_shots_on_target: Mapped[float | None] = mapped_column(Float, nullable=True)
+    away_shots_on_target: Mapped[float | None] = mapped_column(Float, nullable=True)
+    home_corners: Mapped[float | None] = mapped_column(Float, nullable=True)
+    away_corners: Mapped[float | None] = mapped_column(Float, nullable=True)
+    home_fouls: Mapped[float | None] = mapped_column(Float, nullable=True)
+    away_fouls: Mapped[float | None] = mapped_column(Float, nullable=True)
+    home_yellow: Mapped[float | None] = mapped_column(Float, nullable=True)
+    away_yellow: Mapped[float | None] = mapped_column(Float, nullable=True)
+    home_red: Mapped[float | None] = mapped_column(Float, nullable=True)
+    away_red: Mapped[float | None] = mapped_column(Float, nullable=True)
+    closing_odds_home: Mapped[float | None] = mapped_column(Float, nullable=True)
+    closing_odds_draw: Mapped[float | None] = mapped_column(Float, nullable=True)
+    closing_odds_away: Mapped[float | None] = mapped_column(Float, nullable=True)
+    odds_source: Mapped[str | None] = mapped_column(String, nullable=True)
+    source: Mapped[str] = mapped_column(String)
+
+
+class Goalscorer(Base):
+    __tablename__ = "goalscorers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    match_id: Mapped[int | None] = mapped_column(ForeignKey("matches.id"), nullable=True, index=True)
+    date: Mapped[Date] = mapped_column(SADate)
+    team_id: Mapped[str] = mapped_column(String, index=True)
+    scorer_name: Mapped[str] = mapped_column(String, index=True)
+    minute: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    own_goal: Mapped[bool] = mapped_column(Boolean, default=False)
+    penalty: Mapped[bool] = mapped_column(Boolean, default=False)
+    source: Mapped[str] = mapped_column(String)
+
+
+class Meta(Base):
+    """Small key/value table; `data_version` lets the API know when to refit cached models."""
+
+    __tablename__ = "meta"
+
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[str] = mapped_column(String)
