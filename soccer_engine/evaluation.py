@@ -111,3 +111,30 @@ def score(preds: list[dict]) -> Report:
         calibration=cal,
         predictions=preds,
     )
+
+
+def walk_forward_window(
+    matches: Sequence[MatchResult],
+    fit: Callable[[list[MatchResult], object], Callable[[MatchResult], Probs]],
+    start,
+    end,
+    block_days: int = 7,
+    include: Callable[[MatchResult], bool] | None = None,
+) -> Report:
+    """Walk-forward over [start, end): refit per block on matches strictly before it."""
+    ms = sorted(matches, key=lambda m: m.date)
+    blocks: dict[int, list[MatchResult]] = {}
+    for m in ms:
+        if start <= m.date < end and (include is None or include(m)):
+            blocks.setdefault((m.date - start).days // block_days, []).append(m)
+    preds: list[dict] = []
+    for k in sorted(blocks):
+        block = blocks[k]
+        cutoff = min(m.date for m in block)
+        train = [m for m in ms if m.date < cutoff]
+        assert train and max(m.date for m in train) < cutoff, "leakage"
+        predict = fit(train, cutoff)
+        for m in block:
+            p = np.clip(np.array(predict(m), dtype=float), 1e-9, 1)
+            preds.append({"match": m, "p": p / p.sum(), "o": outcome(m), "cutoff": cutoff})
+    return score(preds)

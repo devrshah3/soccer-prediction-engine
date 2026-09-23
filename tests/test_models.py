@@ -75,3 +75,32 @@ def test_walk_forward_never_trains_on_future():
 
     rep = walk_forward(ms, fit, warmup=20)
     assert rep.n == len(ms) - 20 and len(seen) > 5
+
+
+def test_standings_matches_manual_table():
+    from soccer_engine.data.openfootball import standings
+
+    rows = [
+        {"season": "24-25", "status": "finished", "home": "A", "away": "B", "home_goals": 2, "away_goals": 1},
+        {"season": "24-25", "status": "finished", "home": "B", "away": "A", "home_goals": 0, "away_goals": 0},
+        {"season": "24-25", "status": "finished", "home": "A", "away": "C", "home_goals": 1, "away_goals": 1},
+        {"season": "24-25", "status": "scheduled", "home": "B", "away": "C", "home_goals": None, "away_goals": None},
+    ]
+    tbl = {t["team"]: t for t in standings(rows, "24-25")}
+    assert tbl["A"]["played"] == 3 and tbl["A"]["pts"] == 5  # W(home) + D(away) + D(home)
+    assert tbl["B"]["played"] == 2 and tbl["B"]["pts"] == 1  # L(away) + D(home)
+    assert tbl["C"]["played"] == 1 and tbl["C"]["pts"] == 1
+    assert all(r["status"] != "scheduled" or r["home_goals"] is None for r in rows)  # unplayed excluded
+
+
+def test_openfootball_no_future_leakage_in_training_set():
+    from datetime import date
+
+    from soccer_engine.data.openfootball import to_training_matches
+
+    rows = [
+        {"date": "2026-09-20", "home": "A", "away": "B", "home_goals": 2, "away_goals": 0, "status": "finished"},
+        {"date": "2026-10-10", "home": "A", "away": "C", "home_goals": None, "away_goals": None, "status": "scheduled"},
+    ]
+    ms = to_training_matches(rows)
+    assert len(ms) == 1 and ms[0].date == date(2026, 9, 20)

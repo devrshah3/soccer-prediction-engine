@@ -32,6 +32,7 @@ class MatchResult:
     neutral: bool = False
     home_xg: float | None = None  # non-penalty xG + penalty xG, if known
     away_xg: float | None = None
+    weight: float = 1.0  # match importance (e.g. friendlies < competitive games)
 
 
 class LeakageError(ValueError):
@@ -87,7 +88,7 @@ class DixonColes:
             )
         neutral = np.array([m.neutral for m in data], dtype=float)
         age = np.array([(as_of - m.date).days for m in data], dtype=float)
-        w = np.exp(-self.xi * age)
+        w = np.exp(-self.xi * age) * np.array([m.weight for m in data])
 
         const = gammaln(x + 1) + gammaln(y + 1)
         l2 = self.l2
