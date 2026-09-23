@@ -100,9 +100,9 @@ real working copies, idempotent).
   *any* competition without a fitted model, not just CL.
 
 **Item 6 — the real test question.** See §7, item 1 — **could not be captured live
-end-to-end**, a genuine external constraint (the real 20/day Gemini quota, confirmed
-exhausted by a live 429 at the time of testing), not a code defect. Every individual
-piece of the pipeline this question depends on WAS verified real and correct
+end-to-end with Gemini**, a genuine external constraint (the real 20/day Gemini quota,
+confirmed exhausted by a live 429 at the time of testing), not a code defect. Every
+individual piece of the pipeline this question depends on WAS verified real and correct
 independently (see above): the role="user" fix (verified via a real completed multi-turn
 conversation before quota ran out, where Gemini correctly said "I do not have access to
 data... for the 2016 Champions League final" rather than guessing), the Wikipedia extract
@@ -110,6 +110,20 @@ data... for the 2016 Champions League final" rather than guessing), the Wikipedi
 (verified real), and the orchestration logic connecting them (verified via mocked tests
 that exercise the exact real code path with realistic data). What's unverified is only
 the single literal end-to-end HTTP round trip, blocked by the quota, not by a bug.
+
+**A real bug WAS found and fixed by actually running the literal item 6 question**
+against the live server (a follow-up check after this session's first pass): with Gemini
+quota exhausted, the question fell through to `db_fallback`, whose naive keyword matcher
+matched "score" inside "scored" and "Real Madrid" by name, then confidently returned Real
+Madrid's most recent *unrelated 2026-27* result as if it answered a question about the
+*2016* Champions League final - a wrong answer stated with no hedge, exactly the failure
+mode the "never invent a fact" rule exists to prevent. Fixed in `kickcast_api/assistant/fallback.py`
+(commit `0a4c153`, after this section was first written): none of the fallback's tools are
+date-parametrized (they only ever answer next/most-recent/current), so a question naming
+a year outside the current season now declines honestly instead of guessing. Verified live:
+the real question now returns "...not a specific match from 2016..." instead of the wrong
+score. Regression-tested. **The literal Gemini-powered answer is still pending quota reset**
+- re-run the question below once `GEMINI_API_KEY` has fresh quota to see it end-to-end.
 
 ## 2. What's built but waiting on an API key (or waiting on quota to reset)
 
@@ -194,7 +208,7 @@ report — see it for the full bootstrap CIs.
 - **6 Historical Replay matches** (unchanged).
 - Frontend: still **9 routes**; Champions League and the updated Awards page reuse
   existing routes, no new ones added.
-- **122 backend tests** (up from 80; 1 skipped when Gemini quota is exhausted, by
+- **123 backend tests** (up from 80; 1 skipped when Gemini quota is exhausted, by
   design — see `tests/test_gemini_live.py`), ruff and mypy clean across 50 source
   files; frontend `next lint` and `next build` both clean.
 
@@ -237,16 +251,20 @@ works fully without any of them.
 
 ## 7. Judgment calls / things to double-check
 
-1. **Item 6 (the Real Madrid 2016 UCL final question) was not captured live end-to-end**
-   this session — the real Gemini free-tier daily cap (20 requests/day/project/model,
-   confirmed via a live 429) was exhausted by cumulative testing across both sessions
-   before the final combined pipeline could be exercised in one request. Every piece it
-   depends on was independently verified real (see §1) and there's a real, passing
-   integration test (`tests/test_gemini_live.py`) that catches the exact bug class that
-   was found and fixed. **Re-run the question once quota resets** to see the literal
-   answer: `POST /assistant/ask {"question": "Who scored the winning goal for Real
-   Madrid in the 2016 Champions League final, in what minute and how? Give me a link to
-   watch it."}`.
+1. **Item 6 (the Real Madrid 2016 UCL final question) was not captured live end-to-end
+   with Gemini** this session — the real Gemini free-tier daily cap (20 requests/day/
+   project/model, confirmed via a live 429) was exhausted by cumulative testing across
+   both sessions before the final combined pipeline could be exercised in one request.
+   Every piece it depends on was independently verified real (see §1) and there's a
+   real, passing integration test (`tests/test_gemini_live.py`) that catches the exact
+   bug class that was found and fixed. Actually running the literal question against
+   the live server (with quota still exhausted) surfaced and led to fixing a second,
+   unrelated real bug in the DB-fallback path (commit `0a4c153` — it was confidently
+   answering an unrelated 2026-27 match instead of declining; now it declines
+   honestly). **Re-run the question once quota resets** to see the literal
+   Gemini-powered answer: `POST /assistant/ask {"question": "Who scored the winning goal
+   for Real Madrid in the 2016 Champions League final, in what minute and how? Give me a
+   link to watch it."}`.
 2. **A critical, previously-undetected bug was fixed this session**: `role="tool"` in
    Gemini function-calling conversations silently broke every question needing 2+ tool
    calls (nearly all real questions) since the assistant was first built — it was caught
