@@ -118,6 +118,45 @@ class AssistantCache(Base):
     created_at: Mapped[str] = mapped_column(String)
 
 
+class LiveMatchState(Base):
+    """Polled (never on-page-load) from API-Football, key-gated - see
+    kickcast_api/live/api_football.py. `last_updated_at` is what lets the frontend show
+    "based on score at X', updated Y min ago" rather than pretending to be truly live."""
+
+    __tablename__ = "live_match_state"
+
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), primary_key=True)
+    minute: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    home_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    away_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    match_status: Mapped[str] = mapped_column(String)  # e.g. "1H"/"HT"/"2H"/"FT" (API-Football's codes)
+    last_updated_at: Mapped[str] = mapped_column(String)  # ISO8601 UTC
+    source: Mapped[str] = mapped_column(String)
+
+
+class LiveEvent(Base):
+    __tablename__ = "live_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), index=True)
+    minute: Mapped[int] = mapped_column(Integer)
+    event_type: Mapped[str] = mapped_column(String)  # "goal" | "card" | "substitution" | ...
+    team_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    player: Mapped[str | None] = mapped_column(String, nullable=True)
+    detail: Mapped[str | None] = mapped_column(String, nullable=True)
+    source: Mapped[str] = mapped_column(String)
+
+
+class ExternalApiQuota(Base):
+    """Same day-row pattern as AssistantQuota, for API-Football's separate 100-call/day
+    free tier - kept as its own table since it's a different budget entirely."""
+
+    __tablename__ = "external_api_quota"
+
+    day: Mapped[str] = mapped_column(String, primary_key=True)
+    api_football_calls: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class AssistantQuota(Base):
     """One row per UTC calendar day: how many Gemini calls the assistant has made, so we
     can stop before hitting the free-tier daily limit and fall back to the DB-only path."""

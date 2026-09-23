@@ -19,7 +19,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = [
     "kickcast_engine", "kickcast_engine.models", "kickcast_engine.data",
-    "kickcast_api", "kickcast_api.routes", "kickcast_api.assistant",
+    "kickcast_api", "kickcast_api.routes", "kickcast_api.assistant", "kickcast_api.live",
 ]
 
 [tool.ruff]

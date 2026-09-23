@@ -5,6 +5,7 @@ __pycache__/
 .ruff_cache/
 .venv/
 /data/
+!/data/statsbomb_replays.json
 *.jsonl
 .env
 *.egg-info/

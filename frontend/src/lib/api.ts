@@ -140,6 +140,21 @@ export type Awards = {
   puskas: { available: boolean; reason: string };
 };
 
+export type ReplayMatchSummary = {
+  id: string;
+  competition: string;
+  season: string;
+  date: string;
+  home: string;
+  away: string;
+  home_goals: number;
+  away_goals: number;
+};
+
+export type ReplayMatch = ReplayMatchSummary & {
+  timeline: { type: string; minute: number; team: string | null; player?: string | null; detail?: string | null; player_off?: string | null; player_on?: string | null; card?: string }[];
+};
+
 export const api = {
   leagues: () => apiFetch<League[]>("/leagues"),
   standings: (code: string, season?: string) =>
@@ -157,6 +172,8 @@ export const api = {
       }
     ),
   awards: () => apiFetch<Awards>("/awards"),
+  replayMatches: () => apiFetch<{ source: string; matches: ReplayMatchSummary[] }>("/replay/matches"),
+  replayMatch: (id: string) => apiFetch<ReplayMatch>(`/replay/matches/${encodeURIComponent(id)}`),
   match: (id: number) => apiFetch<Match>(`/matches/${id}`),
   prediction: (id: number) => apiFetch<Prediction | null>(`/matches/${id}/prediction`).catch((e) => {
     if (e instanceof ApiError && e.status === 503) return null;

@@ -1,0 +1,487 @@
+{
+ "source": "StatsBomb Open Data (CC0, historical only)",
+ "matches": [
+  {
+   "id": "3754078",
+   "source": "statsbomb_open_data",
+   "competition": "Premier League",
+   "season": "2015/2016",
+   "date": "2015-08-08",
+   "home": "Chelsea",
+   "away": "Swansea City",
+   "home_goals": 2,
+   "away_goals": 2,
+   "timeline": [
+    {
+     "type": "goal",
+     "minute": 22,
+     "team": "Chelsea",
+     "player": "Oscar dos Santos Emboaba J\u00fanior",
+     "detail": "Free Kick"
+    },
+    {
+     "type": "goal",
+     "minute": 28,
+     "team": "Swansea City",
+     "player": "Andr\u00e9 Ayew Pel\u00e9",
+     "detail": "Open Play"
+    },
+    {
+     "type": "own_goal",
+     "minute": 29,
+     "team": "Swansea City",
+     "player": "Federico Fern\u00e1ndez"
+    },
+    {
+     "type": "substitution",
+     "minute": 40,
+     "team": "Swansea City",
+     "player_off": "Sung-Yeung Ki",
+     "player_on": "Jack Frank Porteous Cork"
+    },
+    {
+     "type": "card",
+     "minute": 53,
+     "team": "Chelsea",
+     "player": "John Terry",
+     "card": "Yellow Card"
+    },
+    {
+     "type": "substitution",
+     "minute": 53,
+     "team": "Chelsea",
+     "player_off": "Oscar dos Santos Emboaba J\u00fanior",
+     "player_on": "Asmir Begovi\u0107"
+    },
+    {
+     "type": "goal",
+     "minute": 54,
+     "team": "Swansea City",
+     "player": "Baf\u00e9timbi Gomis",
+     "detail": "Penalty"
+    },
+    {
+     "type": "substitution",
+     "minute": 70,
+     "team": "Swansea City",
+     "player_off": "Jefferson Antonio Montero Vite",
+     "player_on": "Wayne Routledge"
+    },
+    {
+     "type": "substitution",
+     "minute": 75,
+     "team": "Chelsea",
+     "player_off": "Francesc F\u00e0bregas i Soler",
+     "player_on": "Kurt Happy Zouma"
+    },
+    {
+     "type": "substitution",
+     "minute": 78,
+     "team": "Swansea City",
+     "player_off": "Baf\u00e9timbi Gomis",
+     "player_on": "\u00c9derzito Ant\u00f3nio Macedo Lopes"
+    },
+    {
+     "type": "substitution",
+     "minute": 83,
+     "team": "Chelsea",
+     "player_off": "Willian Borges da Silva",
+     "player_on": "Radamel Falcao Garc\u00eda Z\u00e1rate"
+    }
+   ]
+  },
+  {
+   "id": "3754097",
+   "source": "statsbomb_open_data",
+   "competition": "Premier League",
+   "season": "2015/2016",
+   "date": "2015-08-08",
+   "home": "Manchester United",
+   "away": "Tottenham Hotspur",
+   "home_goals": 1,
+   "away_goals": 0,
+   "timeline": [
+    {
+     "type": "own_goal",
+     "minute": 21,
+     "team": "Tottenham Hotspur",
+     "player": "Kyle Walker"
+    },
+    {
+     "type": "substitution",
+     "minute": 52,
+     "team": "Tottenham Hotspur",
+     "player_off": "Nabil Bentaleb",
+     "player_on": "Ryan Mason"
+    },
+    {
+     "type": "substitution",
+     "minute": 59,
+     "team": "Manchester United",
+     "player_off": "Michael Carrick",
+     "player_on": "Bastian Schweinsteiger"
+    },
+    {
+     "type": "substitution",
+     "minute": 67,
+     "team": "Manchester United",
+     "player_off": "Memphis Depay",
+     "player_on": "Ander Herrera Ag\u00fcera"
+    },
+    {
+     "type": "substitution",
+     "minute": 67,
+     "team": "Tottenham Hotspur",
+     "player_off": "Mousa Sidi Yaya Demb\u00e9l\u00e9",
+     "player_on": "Erik Lamela"
+    },
+    {
+     "type": "substitution",
+     "minute": 76,
+     "team": "Tottenham Hotspur",
+     "player_off": "Eric Dier",
+     "player_on": "Bamidele Alli"
+    },
+    {
+     "type": "substitution",
+     "minute": 80,
+     "team": "Manchester United",
+     "player_off": "Matteo Darmian",
+     "player_on": "Luis Antonio Valencia Mosquera"
+    }
+   ]
+  },
+  {
+   "id": "3754128",
+   "source": "statsbomb_open_data",
+   "competition": "Premier League",
+   "season": "2015/2016",
+   "date": "2015-08-08",
+   "home": "AFC Bournemouth",
+   "away": "Aston Villa",
+   "home_goals": 0,
+   "away_goals": 1,
+   "timeline": [
+    {
+     "type": "substitution",
+     "minute": 52,
+     "team": "AFC Bournemouth",
+     "player_off": "Joshua King",
+     "player_on": "Yann Kermorgant"
+    },
+    {
+     "type": "substitution",
+     "minute": 58,
+     "team": "Aston Villa",
+     "player_off": "Jordan Ayew",
+     "player_on": "Rudy Gestede"
+    },
+    {
+     "type": "substitution",
+     "minute": 68,
+     "team": "AFC Bournemouth",
+     "player_off": "Marc Pugh",
+     "player_on": "Max-Alain Gradel"
+    },
+    {
+     "type": "substitution",
+     "minute": 71,
+     "team": "Aston Villa",
+     "player_off": "Jordan Veretout",
+     "player_on": "Carlos Alberto S\u00e1nchez Moreno"
+    },
+    {
+     "type": "goal",
+     "minute": 71,
+     "team": "Aston Villa",
+     "player": "Rudy Gestede",
+     "detail": "Open Play"
+    },
+    {
+     "type": "substitution",
+     "minute": 77,
+     "team": "Aston Villa",
+     "player_off": "Scott Sinclair",
+     "player_on": "Kieran Richardson"
+    },
+    {
+     "type": "substitution",
+     "minute": 83,
+     "team": "AFC Bournemouth",
+     "player_off": "Dan Gosling",
+     "player_on": "Eunan O''Kane"
+    }
+   ]
+  },
+  {
+   "id": "3754138",
+   "source": "statsbomb_open_data",
+   "competition": "Premier League",
+   "season": "2015/2016",
+   "date": "2015-08-08",
+   "home": "Norwich City",
+   "away": "Crystal Palace",
+   "home_goals": 1,
+   "away_goals": 3,
+   "timeline": [
+    {
+     "type": "goal",
+     "minute": 37,
+     "team": "Crystal Palace",
+     "player": "Wilfried Zaha",
+     "detail": "Open Play"
+    },
+    {
+     "type": "goal",
+     "minute": 48,
+     "team": "Crystal Palace",
+     "player": "Damien Delaney",
+     "detail": "Open Play"
+    },
+    {
+     "type": "substitution",
+     "minute": 53,
+     "team": "Norwich City",
+     "player_off": "Lewis Grabban",
+     "player_on": "Cameron Jerome"
+    },
+    {
+     "type": "substitution",
+     "minute": 53,
+     "team": "Norwich City",
+     "player_off": "Alexander Banor Tettey",
+     "player_on": "Nathan Redmond"
+    },
+    {
+     "type": "goal",
+     "minute": 68,
+     "team": "Norwich City",
+     "player": "Nathan Redmond",
+     "detail": "Open Play"
+    },
+    {
+     "type": "substitution",
+     "minute": 71,
+     "team": "Crystal Palace",
+     "player_off": "Wilfried Zaha",
+     "player_on": "Yannick Bolasie Yala"
+    },
+    {
+     "type": "substitution",
+     "minute": 72,
+     "team": "Crystal Palace",
+     "player_off": "Jordon Mutch",
+     "player_on": "Mile Jedinak"
+    },
+    {
+     "type": "substitution",
+     "minute": 79,
+     "team": "Norwich City",
+     "player_off": "Graham Dorrans",
+     "player_on": "Gary Hooper"
+    },
+    {
+     "type": "substitution",
+     "minute": 81,
+     "team": "Crystal Palace",
+     "player_off": "Glenn Murray",
+     "player_on": "Connor Wickham"
+    },
+    {
+     "type": "goal",
+     "minute": 93,
+     "team": "Crystal Palace",
+     "player": "Yohan Cabaye",
+     "detail": "Open Play"
+    }
+   ]
+  },
+  {
+   "id": "3754237",
+   "source": "statsbomb_open_data",
+   "competition": "Premier League",
+   "season": "2015/2016",
+   "date": "2015-08-08",
+   "home": "Leicester City",
+   "away": "Sunderland",
+   "home_goals": 4,
+   "away_goals": 2,
+   "timeline": [
+    {
+     "type": "goal",
+     "minute": 10,
+     "team": "Leicester City",
+     "player": "Jamie Vardy",
+     "detail": "Open Play"
+    },
+    {
+     "type": "goal",
+     "minute": 17,
+     "team": "Leicester City",
+     "player": "Riyad Mahrez",
+     "detail": "Open Play"
+    },
+    {
+     "type": "goal",
+     "minute": 24,
+     "team": "Leicester City",
+     "player": "Riyad Mahrez",
+     "detail": "Penalty"
+    },
+    {
+     "type": "substitution",
+     "minute": 29,
+     "team": "Sunderland",
+     "player_off": "Lee Cattermole",
+     "player_on": "Steven Fletcher"
+    },
+    {
+     "type": "substitution",
+     "minute": 53,
+     "team": "Sunderland",
+     "player_off": "Billy Jones",
+     "player_on": "Adam Matthews"
+    },
+    {
+     "type": "goal",
+     "minute": 59,
+     "team": "Sunderland",
+     "player": "Jermain Defoe",
+     "detail": "Open Play"
+    },
+    {
+     "type": "goal",
+     "minute": 65,
+     "team": "Leicester City",
+     "player": "Marc Albrighton",
+     "detail": "Open Play"
+    },
+    {
+     "type": "goal",
+     "minute": 70,
+     "team": "Sunderland",
+     "player": "Steven Fletcher",
+     "detail": "Open Play"
+    },
+    {
+     "type": "substitution",
+     "minute": 74,
+     "team": "Leicester City",
+     "player_off": "Ritchie De Laet",
+     "player_on": "Yohan Benalouane"
+    },
+    {
+     "type": "substitution",
+     "minute": 76,
+     "team": "Leicester City",
+     "player_off": "Riyad Mahrez",
+     "player_on": "Christian Fuchs"
+    },
+    {
+     "type": "substitution",
+     "minute": 81,
+     "team": "Leicester City",
+     "player_off": "Jamie Vardy",
+     "player_on": "N''Golo Kant\u00e9"
+    },
+    {
+     "type": "card",
+     "minute": 90,
+     "team": "Leicester City",
+     "player": "Jeffrey Schlupp",
+     "card": "Yellow Card"
+    }
+   ]
+  },
+  {
+   "id": "3754300",
+   "source": "statsbomb_open_data",
+   "competition": "Premier League",
+   "season": "2015/2016",
+   "date": "2015-08-08",
+   "home": "Everton",
+   "away": "Watford",
+   "home_goals": 2,
+   "away_goals": 2,
+   "timeline": [
+    {
+     "type": "goal",
+     "minute": 12,
+     "team": "Watford",
+     "player": "Miguel Arturo Lay\u00fan Prado",
+     "detail": "Open Play"
+    },
+    {
+     "type": "substitution",
+     "minute": 58,
+     "team": "Watford",
+     "player_off": "Miguel Arturo Lay\u00fan Prado",
+     "player_on": "Juan Carlos Paredes Reasco"
+    },
+    {
+     "type": "substitution",
+     "minute": 62,
+     "team": "Everton",
+     "player_off": "Brendan Joel Zibusiso Galloway",
+     "player_on": "Arouna Kon\u00e9"
+    },
+    {
+     "type": "card",
+     "minute": 65,
+     "team": "Watford",
+     "player": "Jos\u00e9 Holebas",
+     "card": "Yellow Card"
+    },
+    {
+     "type": "substitution",
+     "minute": 73,
+     "team": "Watford",
+     "player_off": "Jos\u00e9 Manuel Jurado Mar\u00edn",
+     "player_on": "Odion Jude Ighalo"
+    },
+    {
+     "type": "goal",
+     "minute": 75,
+     "team": "Everton",
+     "player": "Ross Barkley",
+     "detail": "Open Play"
+    },
+    {
+     "type": "substitution",
+     "minute": 76,
+     "team": "Everton",
+     "player_off": "Kevin Mirallas",
+     "player_on": "Bryan Oviedo"
+    },
+    {
+     "type": "substitution",
+     "minute": 78,
+     "team": "Watford",
+     "player_off": "Valon Behrami",
+     "player_on": "Ben Watson"
+    },
+    {
+     "type": "goal",
+     "minute": 82,
+     "team": "Watford",
+     "player": "Odion Jude Ighalo",
+     "detail": "Open Play"
+    },
+    {
+     "type": "goal",
+     "minute": 85,
+     "team": "Everton",
+     "player": "Arouna Kon\u00e9",
+     "detail": "Open Play"
+    },
+    {
+     "type": "substitution",
+     "minute": 90,
+     "team": "Everton",
+     "player_off": "Romelu Lukaku Menama",
+     "player_on": "Steven Naismith"
+    }
+   ]
+  }
+ ]
+}
