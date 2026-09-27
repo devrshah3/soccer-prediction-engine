@@ -1,11 +1,11 @@
 const COLOR: Record<string, string> = {
-  W: "bg-emerald-500 text-emerald-950",
-  D: "bg-zinc-500 text-zinc-950",
-  L: "bg-red-500/80 text-red-950",
+  W: "bg-success/20 text-success ring-1 ring-inset ring-success/40",
+  D: "bg-muted-2/20 text-muted ring-1 ring-inset ring-border-strong",
+  L: "bg-danger/20 text-danger ring-1 ring-inset ring-danger/40",
 };
 
 export function FormDots({ form }: { form: ("W" | "D" | "L")[] | null | undefined }) {
-  if (!form || form.length === 0) return <span className="text-xs text-zinc-500">-</span>;
+  if (!form || form.length === 0) return <span className="text-xs text-muted">&ndash;</span>;
   return (
     <div className="flex gap-1">
       {form.map((r, i) => (

@@ -13,8 +13,8 @@ const FLAGS: Record<string, string> = {
 export function LeagueChip({ name, country }: { name: string; country: string | null }) {
   const flag = country ? FLAGS[country] : "\u{1F310}"; // globe for international
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-medium text-zinc-300">
-      <span>{flag}</span>
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-raised px-2.5 py-1 text-xs font-medium text-muted">
+      <span className="text-[13px] leading-none">{flag}</span>
       {name}
     </span>
   );
