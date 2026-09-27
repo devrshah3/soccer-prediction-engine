@@ -10,6 +10,8 @@ for every row of a list view.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -20,6 +22,8 @@ from ..serialize import match_dict
 
 router = APIRouter(tags=["batch"])
 
+UPCOMING_WINDOW_DAYS = 7
+
 
 @router.get("/fixtures")
 def fixtures_by_league(
@@ -27,16 +31,29 @@ def fixtures_by_league(
 ) -> dict[str, list[dict]]:
     """Fixtures for several leagues in one request. `leagues` is a comma-separated list of
     league codes; unknown codes just come back with an empty list rather than erroring the
-    whole batch."""
+    whole batch.
+
+    For status="scheduled" (what the homepage asks for), fixtures are hard-bounded to
+    [now, now + 7 days], no exceptions, regardless of league/competition. Without this,
+    a league whose most recent "scheduled" row is stale (e.g. a postponed match from years
+    ago that was never marked finished, or the final matchday of a season not yet ingested
+    as finished) surfaces as the "next" fixture - which is how the homepage ended up
+    showing La Liga/Serie A "Matchday 38" games from over a year ago alongside Nations
+    League games days in the past, all labeled "upcoming" in the same list.
+    """
     if status not in ("scheduled", "finished", "all"):
         raise HTTPException(400, "status must be 'scheduled', 'finished', or 'all'")
     codes = [c for c in leagues.split(",") if c]
     order = Match.date.asc() if status != "finished" else Match.date.desc()
     out: dict[str, list[dict]] = {}
+    now = datetime.now(UTC).date()
+    horizon = now + timedelta(days=UPCOMING_WINDOW_DAYS)
     for code in codes:
         q = session.query(Match).filter(Match.league_code == code)
         if status != "all":
             q = q.filter(Match.status == status)
+        if status == "scheduled":
+            q = q.filter(Match.date >= now, Match.date <= horizon)
         matches = q.order_by(order).limit(limit).all()
         out[code] = [match_dict(session, m) for m in matches]
     return out
