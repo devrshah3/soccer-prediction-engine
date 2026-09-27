@@ -5,18 +5,26 @@ export default async function ReplayListPage() {
   const { source, matches } = await api.replayMatches();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-50">Historical Replay</h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Historical Replay</h1>
+        <p className="mt-2 text-sm text-muted">
           Real event data from {source}. This is a REPLAY of a past match, not a live feed.
         </p>
       </div>
-      <ul className="divide-y divide-zinc-800 rounded-lg border border-zinc-800">
+      <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
         {matches.map((m) => (
-          <li key={m.id} className="px-4 py-3 text-sm">
-            <Link href={`/replay/${m.id}`} className="hover:text-emerald-400">
-              {m.date} &middot; {m.home} {m.home_goals} - {m.away_goals} {m.away} ({m.competition} {m.season})
+          <li key={m.id}>
+            <Link
+              href={`/replay/${m.id}`}
+              className="flex items-center justify-between gap-3 px-4 py-3 text-sm transition-colors hover:bg-surface-hover"
+            >
+              <span className="truncate text-foreground">
+                {m.home} <span className="font-semibold tabular-nums">{m.home_goals} &ndash; {m.away_goals}</span> {m.away}
+              </span>
+              <span className="shrink-0 text-muted-2">
+                {m.competition} {m.season} &middot; {m.date}
+              </span>
             </Link>
           </li>
         ))}

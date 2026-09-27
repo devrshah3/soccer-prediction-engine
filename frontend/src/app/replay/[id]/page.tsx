@@ -26,18 +26,18 @@ export default async function ReplayMatchPage({ params }: { params: Promise<{ id
 
   return (
     <div className="space-y-6">
-      <div className="rounded-md border border-amber-700/50 bg-amber-950/30 px-3 py-2 text-xs text-amber-400">
-        Historical Replay - {match.competition} {match.season}, {match.date}. This already happened; it is
+      <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+        Historical Replay &mdash; {match.competition} {match.season}, {match.date}. This already happened; it is
         not a live match.
       </div>
-      <h1 className="text-xl font-semibold text-zinc-50">
-        {match.home} {match.home_goals} - {match.away_goals} {match.away}
+      <h1 className="text-xl font-semibold tracking-tight text-foreground">
+        {match.home} <span className="tabular-nums">{match.home_goals} &ndash; {match.away_goals}</span> {match.away}
       </h1>
-      <ul className="space-y-2">
+      <ul className="space-y-1 rounded-xl border border-border bg-surface p-2">
         {match.timeline.map((e, i) => (
-          <li key={i} className="flex gap-3 text-sm">
-            <span className="w-10 shrink-0 text-zinc-500">{e.minute}&apos;</span>
-            <span className="text-zinc-200">{describeEvent(e)}</span>
+          <li key={i} className="flex gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-surface-hover">
+            <span className="w-9 shrink-0 tabular-nums text-muted-2">{e.minute}&apos;</span>
+            <span className="text-foreground">{describeEvent(e)}</span>
           </li>
         ))}
       </ul>

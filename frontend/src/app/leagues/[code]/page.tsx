@@ -32,47 +32,47 @@ export default async function LeaguePage({
       : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-zinc-50">{code}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">{code}</h1>
         <SeasonSelect code={code} season={standings.season} seasons={standings.available_seasons} />
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-zinc-800">
+      <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full min-w-[640px] text-sm">
-          <thead className="bg-zinc-900 text-left text-xs uppercase tracking-wide text-zinc-500">
+          <thead className="text-left text-[11px] uppercase tracking-wide text-muted-2">
             <tr>
-              <th className="px-3 py-2">#</th>
-              <th className="px-3 py-2">Team</th>
-              <th className="px-2 py-2 text-center">P</th>
-              <th className="px-2 py-2 text-center">W</th>
-              <th className="px-2 py-2 text-center">D</th>
-              <th className="px-2 py-2 text-center">L</th>
-              <th className="px-2 py-2 text-center">GF</th>
-              <th className="px-2 py-2 text-center">GA</th>
-              <th className="px-2 py-2 text-center">GD</th>
-              <th className="px-2 py-2 text-center font-bold">Pts</th>
-              <th className="px-3 py-2">Form</th>
+              <th className="px-4 py-3 font-medium">#</th>
+              <th className="px-3 py-3 font-medium">Team</th>
+              <th className="px-2 py-3 text-right font-medium">P</th>
+              <th className="px-2 py-3 text-right font-medium">W</th>
+              <th className="px-2 py-3 text-right font-medium">D</th>
+              <th className="px-2 py-3 text-right font-medium">L</th>
+              <th className="px-2 py-3 text-right font-medium">GF</th>
+              <th className="px-2 py-3 text-right font-medium">GA</th>
+              <th className="px-2 py-3 text-right font-medium">GD</th>
+              <th className="px-2 py-3 pr-4 text-right font-medium text-foreground">Pts</th>
+              <th className="px-3 py-3 font-medium">Form</th>
             </tr>
           </thead>
           <tbody>
             {standings.table.map((row) => (
-              <tr key={row.team_id} className="border-t border-zinc-800 hover:bg-zinc-900/60">
-                <td className="px-3 py-2 text-zinc-500">{row.position}</td>
-                <td className="px-3 py-2">
-                  <Link href={`/teams/${encodeURIComponent(row.team_id)}`} className="hover:text-emerald-400">
+              <tr key={row.team_id} className="border-t border-border transition-colors hover:bg-surface-hover">
+                <td className="px-4 py-2.5 tabular-nums text-muted-2">{row.position}</td>
+                <td className="px-3 py-2.5">
+                  <Link href={`/teams/${encodeURIComponent(row.team_id)}`} className="font-medium text-foreground hover:text-accent">
                     {row.team_name}
                   </Link>
                 </td>
-                <td className="px-2 py-2 text-center text-zinc-400">{row.played}</td>
-                <td className="px-2 py-2 text-center text-zinc-400">{row.w}</td>
-                <td className="px-2 py-2 text-center text-zinc-400">{row.d}</td>
-                <td className="px-2 py-2 text-center text-zinc-400">{row.l}</td>
-                <td className="px-2 py-2 text-center text-zinc-400">{row.gf}</td>
-                <td className="px-2 py-2 text-center text-zinc-400">{row.ga}</td>
-                <td className="px-2 py-2 text-center text-zinc-400">{row.gd}</td>
-                <td className="px-2 py-2 text-center font-bold text-zinc-100">{row.pts}</td>
-                <td className="px-3 py-2">
+                <td className="px-2 py-2.5 text-right tabular-nums text-muted">{row.played}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums text-muted">{row.w}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums text-muted">{row.d}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums text-muted">{row.l}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums text-muted">{row.gf}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums text-muted">{row.ga}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums text-muted">{row.gd}</td>
+                <td className="px-2 py-2.5 pr-4 text-right font-bold tabular-nums text-foreground">{row.pts}</td>
+                <td className="px-3 py-2.5">
                   <FormDots form={row.form} />
                 </td>
               </tr>
@@ -82,45 +82,46 @@ export default async function LeaguePage({
       </div>
       {trophyOdds && (
         <div>
-          <h2 className="mb-1 text-lg font-semibold text-zinc-200">Trophy odds</h2>
-          <p className="mb-3 text-xs text-zinc-500">
+          <h2 className="mb-1 text-lg font-semibold text-foreground">Trophy odds</h2>
+          <p className="mb-4 text-xs text-muted-2">
             Monte Carlo simulation of the rest of the season ({trophyOdds.n_sims.toLocaleString()} runs over{" "}
             {trophyOdds.remaining_fixtures} remaining fixtures), model as of {trophyOdds.model_as_of}. Not a
             promise of accuracy.
           </p>
-          <div className="overflow-x-auto rounded-lg border border-zinc-800">
-            <table className="w-full min-w-[480px] text-sm">
-              <thead className="bg-zinc-900 text-left text-xs uppercase tracking-wide text-zinc-500">
-                <tr>
-                  <th className="px-3 py-2">Team</th>
-                  <th className="px-2 py-2 text-center">Title</th>
-                  <th className="px-2 py-2 text-center">Top 4</th>
-                  <th className="px-2 py-2 text-center">Relegation</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trophyOdds.teams.map((t) => (
-                  <tr key={t.team_id} className="border-t border-zinc-800">
-                    <td className="px-3 py-2">
-                      <Link href={`/teams/${encodeURIComponent(t.team_id)}`} className="hover:text-emerald-400">
-                        {t.team_name}
-                      </Link>
-                    </td>
-                    <td className="px-2 py-2 text-center text-zinc-300">{(t.title_pct * 100).toFixed(1)}%</td>
-                    <td className="px-2 py-2 text-center text-zinc-300">{(t.top4_pct * 100).toFixed(1)}%</td>
-                    <td className="px-2 py-2 text-center text-zinc-300">{(t.relegation_pct * 100).toFixed(1)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {trophyOdds.teams.map((t) => (
+              <Link
+                key={t.team_id}
+                href={`/teams/${encodeURIComponent(t.team_id)}`}
+                className="rounded-xl border border-border bg-surface p-4 transition-colors hover:border-border-strong hover:bg-surface-hover"
+              >
+                <p className="mb-3 truncate text-sm font-medium text-foreground">{t.team_name}</p>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <OddStat label="Title" value={t.title_pct} />
+                  <OddStat label="Top 4" value={t.top4_pct} />
+                  <OddStat label="Releg." value={t.relegation_pct} tone="danger" />
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       )}
-      <p className="text-xs text-zinc-600">
+      <p className="text-xs text-muted-2">
         Top scorers for this league (2024-25 season, most recent available on our free data
-        tier) are on the <Link href="/awards" className="text-emerald-500 hover:underline">Awards</Link> page.
+        tier) are on the <Link href="/awards" className="text-accent hover:underline">Awards</Link> page.
         A full assists/stat-leaders table isn&apos;t built yet.
       </p>
+    </div>
+  );
+}
+
+function OddStat({ label, value, tone }: { label: string; value: number; tone?: "danger" }) {
+  return (
+    <div>
+      <p className={`text-sm font-bold tabular-nums ${tone === "danger" ? "text-danger" : "text-accent"}`}>
+        {(value * 100).toFixed(1)}%
+      </p>
+      <p className="text-[10px] uppercase tracking-wide text-muted-2">{label}</p>
     </div>
   );
 }
