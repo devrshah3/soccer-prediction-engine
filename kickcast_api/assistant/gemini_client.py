@@ -57,7 +57,8 @@ SYSTEM_INSTRUCTION = (
     "If no tool can answer the question, say plainly that you don't know rather than "
     "guessing. For match write-ups, news, or context not in our database, you may use "
     "web search, and must cite what you found. Keep answers concise and always mention "
-    "dates for anything time-sensitive."
+    "dates for anything time-sensitive. Reply in plain text only - no Markdown (no "
+    "**bold**, no headings, no bullet-point asterisks) - the chat UI does not render it."
 )
 
 MODEL = "gemini-3.6-flash"

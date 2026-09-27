@@ -61,6 +61,39 @@ def _mentioned_teams(session: Session, question: str) -> list[dict]:
     return out
 
 
+def is_simple_lookup(session: Session, question: str) -> bool:
+    """True if this question is one of our narrow, keyword-matched DB-lookup shapes (next
+    match, last result, table position, head-to-head prediction) naming the right number
+    of teams we recognize - regardless of whether the specific lookup then succeeds (a
+    "we don't have that on record" answer is still a DB-only answer, not a reason to spend
+    a Gemini call). Used to route these straight to `answer()` below with no LLM call at
+    all: an LLM adds nothing here since it would just call the exact same tools.py
+    functions to produce the exact same fact.
+
+    False for a question naming an out-of-scope year even if it otherwise contains a
+    result/table/etc. keyword - e.g. "what was the score of the 2016 Champions League
+    final" contains "score", but needs a real write-up (Wikipedia/Gemini), not our "most
+    recent finished match" lookup, which can never answer a specific past match by year.
+    """
+    if _references_other_season(question) is not None:
+        return False
+    q = question.lower()
+    has_predict = any(w in q for w in _PREDICT_WORDS)
+    has_next = any(w in q for w in _NEXT_WORDS)
+    has_result = any(w in q for w in _RESULT_WORDS)
+    has_table = any(w in q for w in _TABLE_WORDS)
+    if not (has_predict or has_next or has_result or has_table):
+        return False  # no recognized keyword at all - skip the DB query, not our shape
+    teams = _mentioned_teams(session, question)
+    if has_predict and len(teams) == 2:
+        return True
+    if has_next and teams:
+        return True
+    if has_result and teams:
+        return True
+    return has_table
+
+
 def answer(session: Session, question: str) -> dict:
     q = question.lower()
     teams = _mentioned_teams(session, question)

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from . import cache, fallback, gemini_client, wikipedia, youtube
+from . import cache, fallback, gemini_client, text_format, wikipedia, youtube
 
 _VIDEO_WORDS = ("watch", "video", "highlight", "highlights", "clip", "link")
 _CHANNEL_HINTS = (
@@ -95,19 +95,37 @@ def ask(session: Session, question: str) -> dict:
     if cached is not None:
         return {**cached, "cached": True}
 
+    # Route pure DB lookups (next match, last result, table position, head-to-head
+    # prediction) straight to the DB with zero Gemini calls: an LLM would just call the
+    # same tools.py functions to produce the exact same fact, at the cost of real quota.
+    if fallback.is_simple_lookup(session, question):
+        fb = fallback.answer(session, question)
+        return {"text": text_format.strip_markdown(fb["text"]), "sources": fb["sources"], "mode": "db_lookup", "cached": False}
+
     if gemini_client.available():
+        # DB -> Wikipedia -> Gemini: for everything that isn't a simple lookup (write-ups,
+        # historical context, "how did X happen"), try the free Wikipedia source BEFORE
+        # spending a Gemini tool-calling round trip that our narrow DB tools can't answer
+        # anyway. Only treated as final if it didn't come back a decline (a generic/
+        # opinion question can hit a wrong or empty Wikipedia article; in that case fall
+        # through to Gemini's own reasoning below instead of surfacing a bad decline).
+        wiki = _try_wikipedia(session, question)
+        if wiki is not None and not _looks_like_decline(wiki["text"]):
+            answer = _maybe_attach_video(session, question, wiki)
+            answer = {"text": text_format.strip_markdown(answer["text"]), "sources": answer["sources"], "mode": "gemini"}
+            cache.set_cached(session, question, answer)
+            return {**answer, "cached": False}
+
         result = gemini_client.ask_gemini(session, question)
         if result is not None:
             if _all_tools_missed(result["sources"]) or _looks_like_decline(result["text"]):
                 outside_db = gemini_client.ask_gemini_with_search(session, question)
-                if outside_db is None:
-                    outside_db = _try_wikipedia(session, question)
                 if outside_db is not None:
                     result = outside_db
             result = _maybe_attach_video(session, question, result)
-            answer = {"text": result["text"], "sources": result["sources"], "mode": "gemini"}
+            answer = {"text": text_format.strip_markdown(result["text"]), "sources": result["sources"], "mode": "gemini"}
             cache.set_cached(session, question, answer)  # only Gemini answers are cached - they cost quota
             return {**answer, "cached": False}
 
     fb = fallback.answer(session, question)
-    return {"text": fb["text"], "sources": fb["sources"], "mode": "db_fallback", "cached": False}
+    return {"text": text_format.strip_markdown(fb["text"]), "sources": fb["sources"], "mode": "db_fallback", "cached": False}

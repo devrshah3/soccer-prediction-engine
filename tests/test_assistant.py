@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from kickcast_api.assistant import cache, fallback, quota, service
+from kickcast_api.assistant import cache, fallback, quota, service, text_format
 from kickcast_api.assistant import tools as assistant_tools
 from kickcast_api.models import Base, League, Match, Team
 
@@ -135,6 +135,39 @@ def test_fallback_never_fabricates_result_for_team_with_no_finished_matches(sess
     assert r["sources"] == []
 
 
+# ---------------------------------------------------------------- fallback.is_simple_lookup
+
+
+def test_is_simple_lookup_true_for_next_match_result_table_and_predict(session):
+    assert fallback.is_simple_lookup(session, "When does Ridgeway United play next?") is True
+    assert fallback.is_simple_lookup(session, "What was the score for Ridgeway United?") is True
+    assert fallback.is_simple_lookup(session, "Where are Ridgeway United in the table?") is True
+    assert fallback.is_simple_lookup(session, "Predict Ridgeway United vs Rovers 1") is True
+
+
+def test_is_simple_lookup_false_for_specific_past_year_even_with_a_result_keyword(session):
+    # Contains "won" (_RESULT_WORDS) but names a specific past match by year - needs a
+    # real write-up (Wikipedia/Gemini), not our "most recent result" lookup.
+    assert fallback.is_simple_lookup(session, "How did Real Madrid win the 2016 Champions League final?") is False
+
+
+def test_is_simple_lookup_false_for_unrecognized_question():
+    assert fallback.is_simple_lookup(None, "Who is the best young player right now?") is False
+
+
+# ---------------------------------------------------------------- text_format.py
+
+
+def test_strip_markdown_removes_bold_italic_code_headers_and_links():
+    raw = "**October 10, 2026** vs *maybe* - see `docs` for more.\n## Heading\n[KickCast](https://kickcast.example)"
+    out = text_format.strip_markdown(raw)
+    assert "*" not in out
+    assert "#" not in out
+    assert "`" not in out
+    assert "October 10, 2026" in out
+    assert "KickCast (https://kickcast.example)" in out
+
+
 # ---------------------------------------------------------------- cache.py
 
 
@@ -162,11 +195,23 @@ def test_quota_decrements_and_records(session):
 # ---------------------------------------------------------------- service.py orchestration
 
 
-def test_service_uses_db_fallback_when_no_gemini_key(session, monkeypatch):
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+def test_service_routes_simple_lookup_to_db_with_zero_gemini_calls(session, monkeypatch):
+    """The core Issue 2.2 fix: a recognized DB-lookup question skips Gemini entirely -
+    proven here by making gemini_client.available() blow up if it's even checked."""
+
+    def _must_not_be_called():
+        raise AssertionError("gemini_client.available() should not even be checked for a simple lookup")
+
+    monkeypatch.setattr(service.gemini_client, "available", _must_not_be_called)
     result = service.ask(session, "When does Ridgeway United play next?")
-    assert result["mode"] == "db_fallback"
+    assert result["mode"] == "db_lookup"
     assert "Ridgeway United" in result["text"]
+
+
+def test_service_uses_db_fallback_when_no_gemini_key_and_question_is_unrecognized(session, monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    result = service.ask(session, "What's the meaning of life?")
+    assert result["mode"] == "db_fallback"
 
 
 def test_service_never_fabricates_when_gemini_and_search_both_miss(session, monkeypatch):
@@ -212,38 +257,66 @@ def test_service_augments_with_search_when_db_tools_miss(session, monkeypatch):
     monkeypatch.setattr(service.gemini_client, "available", lambda: True)
     monkeypatch.setattr(service.gemini_client, "ask_gemini", fake_ask_gemini)
     monkeypatch.setattr(service.gemini_client, "ask_gemini_with_search", fake_ask_gemini_with_search)
+    monkeypatch.setattr(service.wikipedia, "lookup", lambda s, q: None)  # simulates: Wikipedia has nothing either
 
     result = service.ask(session, "some question not in our db")
     assert result["text"] == "Found via search: real news answer."
     assert result["sources"][0]["url"] == "https://example.com"
 
 
-def test_service_uses_wikipedia_when_search_grounding_unavailable(session, monkeypatch):
-    """Search grounding is genuinely 429'd on the free tier this project uses (see
-    gemini_client.py) - this is the real substitute path. Verify it only ever states
-    what the (mocked) Wikipedia-grounded call actually said, and cites Wikipedia."""
+def test_service_tries_wikipedia_before_gemini_tool_calling(session, monkeypatch):
+    """Issue 2.3: the intended order is DB -> Wikipedia -> Gemini. Verify Wikipedia is
+    consulted BEFORE gemini_client.ask_gemini (the tool-calling round trip) - not just
+    that Wikipedia's answer wins after both were tried - by making ask_gemini blow up if
+    it's ever called for a question Wikipedia can already answer. Also proves markdown
+    from the (mocked) LLM-composed answer is stripped before it reaches the caller."""
 
-    def fake_ask_gemini(sess, question):
-        return {"text": "not in our db", "sources": [{"type": "kickcast_tool", "tool": "resolve_team", "args": {}, "result": {"found": False}}], "used_search": False}
+    def _must_not_be_called(sess, question):
+        raise AssertionError("ask_gemini (tool-calling) should not run when Wikipedia already answered")
 
     def fake_lookup(sess, query):
         return {"found": True, "title": "2016 UEFA Champions League final", "url": "https://en.wikipedia.org/wiki/2016_UEFA_Champions_League_final", "extract": "Real Madrid won 5-3 on penalties.", "source": "Wikipedia (CC BY-SA)"}
 
     def fake_context(sess, question, context, label):
         assert "Real Madrid won 5-3 on penalties." in context
-        return {"text": "Real Madrid won on penalties, per the Wikipedia article.", "used_search": False}
+        return {"text": "**Real Madrid** won on penalties, per the Wikipedia article.", "used_search": False}
 
     monkeypatch.setattr(service.gemini_client, "available", lambda: True)
-    monkeypatch.setattr(service.gemini_client, "ask_gemini", fake_ask_gemini)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini", _must_not_be_called)
     monkeypatch.setattr(service.gemini_client, "ask_gemini_with_search", lambda s, q: None)
     monkeypatch.setattr(service.wikipedia, "lookup", fake_lookup)
     monkeypatch.setattr(service.gemini_client, "ask_gemini_with_context", fake_context)
 
     result = service.ask(session, "Who won the 2016 Champions League final?")
+    assert result["mode"] == "gemini"
     assert result["text"] == "Real Madrid won on penalties, per the Wikipedia article."
+    assert "**" not in result["text"]  # markdown stripped
     wiki_sources = [s for s in result["sources"] if s["type"] == "wikipedia"]
     assert len(wiki_sources) == 1
     assert wiki_sources[0]["license"] == "Wikipedia (CC BY-SA)"
+
+
+def test_service_falls_through_to_gemini_when_wikipedia_answer_is_a_decline(session, monkeypatch):
+    """A Wikipedia hit that's the wrong article (or that the grounded call couldn't use)
+    must not get surfaced as a bad decline - fall through to Gemini's own reasoning."""
+
+    def fake_lookup(sess, query):
+        return {"found": True, "title": "Unrelated Article", "url": "https://en.wikipedia.org/wiki/x", "extract": "irrelevant text", "source": "Wikipedia (CC BY-SA)"}
+
+    def fake_context(sess, question, context, label):
+        return {"text": "I don't know from this source.", "used_search": False}
+
+    def fake_ask_gemini(sess, question):
+        return {"text": "Reasoned answer from Gemini's own knowledge.", "sources": [], "used_search": False}
+
+    monkeypatch.setattr(service.gemini_client, "available", lambda: True)
+    monkeypatch.setattr(service.wikipedia, "lookup", fake_lookup)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini_with_context", fake_context)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini", fake_ask_gemini)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini_with_search", lambda s, q: None)
+
+    result = service.ask(session, "Who is the best young player right now?")
+    assert result["text"] == "Reasoned answer from Gemini's own knowledge."
 
 
 def test_service_attaches_video_link_only_when_asked(session, monkeypatch):

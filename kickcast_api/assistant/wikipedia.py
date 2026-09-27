@@ -24,6 +24,7 @@ the same call truncated to 958 chars and contained none of that.
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import datetime, timezone
 
 import requests
@@ -34,6 +35,22 @@ from ..models import WikipediaCache
 API_URL = "https://en.wikipedia.org/w/api.php"
 USER_AGENT = "KickCast/0.1 (devrshah3@gmail.com)"
 MAX_EXTRACT_CHARS = 12000  # generous for a full article; keeps prompts/cache rows bounded
+
+# MediaWiki's search is a bag-of-words relevance ranker, and interrogative/auxiliary words
+# dilute it enough to rank the WRONG article top for a real question we tested this
+# against: "How did Real Madrid win the 2016 Champions League final?" ranked the 2017
+# final first (raw question as the query); stripping these words correctly ranks the 2016
+# final first. Verified against the live API, not just reasoned about.
+_STOPWORDS = frozenset({
+    "how", "did", "does", "do", "what", "who", "when", "where", "why", "which",
+    "is", "are", "was", "were", "will", "would", "should", "could", "can",
+})
+
+
+def _search_query(question: str) -> str:
+    words = re.findall(r"[\w'-]+", question)
+    kept = [w for w in words if w.lower() not in _STOPWORDS]
+    return " ".join(kept) if kept else question
 
 
 def _key(query: str) -> str:
@@ -68,7 +85,7 @@ def lookup(session: Session, query: str) -> dict | None:
             "extract": cached.extract, "source": "Wikipedia (CC BY-SA)",
         }
 
-    search = _get({"action": "query", "list": "search", "srsearch": query, "srlimit": 1})
+    search = _get({"action": "query", "list": "search", "srsearch": _search_query(query), "srlimit": 1})
     if search is None:
         return None
     hits = search.get("query", {}).get("search", [])
