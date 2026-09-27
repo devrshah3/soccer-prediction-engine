@@ -24,7 +24,19 @@ def _db_path() -> Path:
 def make_engine(db_path: Path | None = None):
     path = db_path or _db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    return create_engine(f"sqlite:///{path}", connect_args={"check_same_thread": False})
+    # Default QueuePool (size 5, overflow 10 = 15 total) is too small for this API: a single
+    # page load fans out into dozens of concurrent per-request DB sessions (e.g. the homepage
+    # firing one request per league's fixtures plus one per candidate prediction), which was
+    # exhausting the pool and surfacing as real 500s (sqlalchemy.exc.TimeoutError) under
+    # ordinary browsing, not just heavy load. pool_pre_ping avoids handing out a connection
+    # that's gone stale (e.g. after the SQLite file was replaced by a fresh ingest.py run).
+    return create_engine(
+        f"sqlite:///{path}",
+        connect_args={"check_same_thread": False},
+        pool_size=20,
+        max_overflow=20,
+        pool_pre_ping=True,
+    )
 
 
 engine = make_engine()

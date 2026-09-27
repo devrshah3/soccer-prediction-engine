@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { League, Match, Prediction } from "@/lib/api";
+import type { League, Match, PredictionSummary } from "@/lib/api";
 import { timeAgo } from "@/lib/time";
 import { KickoffTime } from "./KickoffTime";
 import { LeagueChip } from "./LeagueChip";
@@ -13,7 +13,7 @@ export function MatchRow({
 }: {
   match: Match;
   league?: League;
-  prediction?: Prediction | null;
+  prediction?: PredictionSummary | null;
 }) {
   const finished = match.status === "finished";
   return (

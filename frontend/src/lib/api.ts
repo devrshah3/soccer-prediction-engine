@@ -114,6 +114,16 @@ export type Prediction = {
   };
 };
 
+// The subset of Prediction a list view (MatchRow) actually renders. Returned by
+// /predictions/summary, which skips the likely-scorers/cards/goal-timing extras that
+// /matches/{id}/prediction computes per match - not worth that cost for every row of a list.
+export type PredictionSummary = {
+  model_version: string;
+  as_of: string;
+  evidence: "A" | "B" | "C";
+  probabilities: { home: number; draw: number; away: number };
+};
+
 class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -175,6 +185,14 @@ export const api = {
     apiFetch<Standings>(`/leagues/${encodeURIComponent(code)}/standings${season ? `?season=${season}` : ""}`),
   leagueFixtures: (code: string, status: "scheduled" | "finished" | "all" = "scheduled", limit = 20) =>
     apiFetch<Match[]>(`/leagues/${encodeURIComponent(code)}/fixtures?status=${status}&limit=${limit}`),
+  // Fixtures for several leagues in one request (see kickcast_api/routes/batch.py) - used by
+  // the homepage instead of one /leagues/{code}/fixtures call per league.
+  fixturesByLeagues: (codes: string[], status: "scheduled" | "finished" | "all" = "scheduled", limit = 6) =>
+    codes.length === 0
+      ? Promise.resolve({} as Record<string, Match[]>)
+      : apiFetch<Record<string, Match[]>>(
+          `/fixtures?leagues=${codes.map(encodeURIComponent).join(",")}&status=${status}&limit=${limit}`
+        ),
   team: (id: string) => apiFetch<TeamDetail>(`/teams/${encodeURIComponent(id)}`),
   teamFixtures: (id: string, status: "scheduled" | "finished" | "all" = "all", limit = 100) =>
     apiFetch<Match[]>(`/teams/${encodeURIComponent(id)}/fixtures?status=${status}&limit=${limit}`),
@@ -193,6 +211,12 @@ export const api = {
     if (e instanceof ApiError && e.status === 503) return null;
     throw e;
   }),
+  // Probabilities for several matches in one request (see kickcast_api/routes/batch.py) -
+  // used by the homepage instead of one /matches/{id}/prediction call per candidate match.
+  predictionsSummary: (matchIds: number[]) =>
+    matchIds.length === 0
+      ? Promise.resolve({} as Record<string, PredictionSummary | null>)
+      : apiFetch<Record<string, PredictionSummary | null>>(`/predictions/summary?match_ids=${matchIds.join(",")}`),
 };
 
 export { ApiError };

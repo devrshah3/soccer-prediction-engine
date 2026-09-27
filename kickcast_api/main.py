@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .live import scheduler as live_scheduler
-from .routes import assistant, awards, leagues, live, matches, replay, teams
+from .routes import assistant, awards, batch, leagues, live, matches, replay, teams
 
 
 @asynccontextmanager
@@ -40,6 +40,7 @@ app.include_router(assistant.router)
 app.include_router(awards.router)
 app.include_router(live.router)
 app.include_router(replay.router)
+app.include_router(batch.router)
 
 
 @app.get("/")
