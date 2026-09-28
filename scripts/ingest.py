@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from kickcast_api import football_data_org
 from kickcast_api.db import SessionLocal, engine, init_db
 from kickcast_api.models import Goalscorer, League, Match, MatchStats, Meta, Team
+from kickcast_api.precompute import PRECOMPUTE_WINDOW_DAYS, precompute_predictions
 from kickcast_engine.data import footballdata_uk, international, openfootball
 from kickcast_engine.data.kickoff import LEAGUE_TIMEZONES, to_utc_hhmm
 from kickcast_engine.data.team_aliases import canonical
@@ -382,6 +383,12 @@ def main() -> None:
             ingested_row.value = now
         session.commit()
         print(f"\ndata_version -> {next_version}, ingested_at -> {now}")
+
+        # B.8: precompute predictions for every scheduled match in the next 90 days right
+        # after ingest, rather than waiting for the first request (or the nightly
+        # schedule) to compute them - keeps GET /matches?date=... a fast DB read.
+        precomputed = precompute_predictions(session)
+        print(f"precompute: {precomputed} prediction(s) stored for the next {PRECOMPUTE_WINDOW_DAYS} days")
     finally:
         session.close()
     engine.dispose()

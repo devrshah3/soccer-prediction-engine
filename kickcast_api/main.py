@@ -19,7 +19,7 @@ from .routes import assistant, awards, batch, leagues, live, matches, replay, te
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    live_scheduler.start()  # no-op unless API_FOOTBALL_KEY is set
+    live_scheduler.start()  # nightly precompute always runs; API-Football jobs only if a key is set
     yield
     live_scheduler.stop()
 

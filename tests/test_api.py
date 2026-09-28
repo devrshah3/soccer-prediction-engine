@@ -5,7 +5,7 @@ as tests/test_models.py's synthetic() fixture).
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -187,6 +187,102 @@ def test_team_fixtures_scheduled_is_ascending(client):
     assert r.status_code == 200
     dates = [m["date"] for m in r.json()]
     assert dates == sorted(dates)
+
+
+def test_matches_by_date_returns_only_that_dates_matches(client):
+    fixtures_today = client.get("/leagues/test.1/fixtures?status=finished&limit=100").json()
+    target = fixtures_today[0]["date"]
+    r = client.get(f"/matches?date={target}")
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body) > 0
+    assert all(m["date"] == target for m in body)
+
+
+def test_matches_by_date_rejects_a_bad_date(client):
+    assert client.get("/matches?date=not-a-date").status_code == 400
+
+
+def test_matches_by_date_empty_date_returns_empty_list(client):
+    assert client.get("/matches?date=2099-01-01").json() == []
+
+
+def test_matches_by_date_attaches_precomputed_prediction_and_flags(tmp_path):
+    """B.8: a scheduled match inside the window gets its stored prediction attached, with
+    long_range/date_may_change set from real day-counts, not guessed. A match just added
+    (never precomputed) still gets a prediction via the live-compute fallback - never
+    silently omitted."""
+    from kickcast_api import precompute as precompute_module
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'test_by_date.db'}")
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine)
+    session = TestSession()
+    session.add(League(code="bd.1", name="By-Date League", country="Testland", kind="domestic_league"))
+    for i in range(8):
+        session.add(Team(id=f"bd-{i}", name=f"BD Team {i}", country="Testland"))
+    session.commit()
+    d = date(2024, 8, 1)
+    for match_id in range(1, 25):
+        i = match_id - 1
+        h, a = i % 8, (i + 1) % 8
+        session.add(
+            Match(
+                league_code="bd.1", season="2024-25", date=d, kickoff="15:00",
+                home_team_id=f"bd-{h}", away_team_id=f"bd-{a}",
+                home_goals=match_id % 4, away_goals=(match_id + 1) % 3,
+                status="finished", round=f"Matchday {match_id}", neutral=False,
+                source="synthetic", source_id=f"synthetic:bd:{match_id}",
+            )
+        )
+        d += timedelta(days=7)
+    today = datetime.now(UTC).date()
+    near_date = today + timedelta(days=5)  # inside LONG_RANGE_DAYS (14)
+    far_date = today + timedelta(days=100)  # past DATE_MAY_CHANGE_DAYS (28) AND the 90-day precompute window
+    session.add(
+        Match(
+            league_code="bd.1", season="2025-26", date=near_date, kickoff="15:00",
+            home_team_id="bd-0", away_team_id="bd-1", home_goals=None, away_goals=None,
+            status="scheduled", round="Matchday 25", neutral=False,
+            source="synthetic", source_id="synthetic:bd:near",
+        )
+    )
+    session.add(
+        Match(
+            league_code="bd.1", season="2025-26", date=far_date, kickoff="15:00",
+            home_team_id="bd-2", away_team_id="bd-3", home_goals=None, away_goals=None,
+            status="scheduled", round="Matchday 30", neutral=False,
+            source="synthetic", source_id="synthetic:bd:far-not-precomputed",
+        )
+    )
+    session.commit()
+    precompute_module.precompute_predictions(session)  # only the near match is inside the 90-day window
+
+    def override():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_session] = override
+    try:
+        c = TestClient(app)
+        near_body = c.get(f"/matches?date={near_date.isoformat()}").json()
+        far_body = c.get(f"/matches?date={far_date.isoformat()}").json()
+    finally:
+        app.dependency_overrides.clear()
+
+    assert len(near_body) == 1
+    assert near_body[0]["prediction"] is not None
+    assert abs(sum(near_body[0]["prediction"]["probabilities"].values()) - 1) < 1e-6
+    assert near_body[0]["long_range"] is False
+    assert near_body[0]["date_may_change"] is False
+
+    assert len(far_body) == 1
+    assert far_body[0]["prediction"] is not None  # live-compute fallback, never precomputed
+    assert far_body[0]["long_range"] is True
+    assert far_body[0]["date_may_change"] is True
 
 
 def test_match_detail(client):

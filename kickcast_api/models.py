@@ -106,6 +106,23 @@ class Meta(Base):
     value: Mapped[str] = mapped_column(String)
 
 
+class PrecomputedPrediction(Base):
+    """B.8: a stored prediction for a scheduled match, computed after every ingest (and
+    on a nightly schedule) rather than on each request - see kickcast_api/precompute.py.
+    `prediction_json` is the full dict predictions.py's model.predict() returns (same
+    shape GET /matches/{id}/prediction serves live), so serving from here vs computing
+    live is a drop-in swap. `computed_at`/`data_cutoff`/`model_version` are shown on the
+    frontend so a stale precomputed row is visible, never silently presented as fresh."""
+
+    __tablename__ = "precomputed_predictions"
+
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), primary_key=True)
+    prediction_json: Mapped[str] = mapped_column(String)
+    model_version: Mapped[str] = mapped_column(String)
+    computed_at: Mapped[str] = mapped_column(String)  # ISO8601 UTC
+    data_cutoff: Mapped[str] = mapped_column(String)  # ISO date, DixonColes.as_of
+
+
 class AssistantCache(Base):
     """Cached assistant answers, keyed by a hash of the normalized question, so repeat
     questions don't cost Gemini/YouTube quota twice."""

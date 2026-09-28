@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from datetime import date as date_module
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -9,11 +12,18 @@ from .. import domestic_scorers
 from ..cards import get_card_model
 from ..db import get_session
 from ..models import Goalscorer, Match
+from ..precompute import get_precomputed_prediction
 from ..predictions import get_model, get_model_computed_at
 from ..scorers import team_likely_scorers
 from ..serialize import match_dict, team_names
 
 router = APIRouter(prefix="/matches", tags=["matches"])
+
+# B.8: matches further out than this get a "long-range" note (form/team news can change);
+# further than this, a "date may change" note too (no real "provisional" flag exists in
+# our data yet - see this module's date_may_change comment below).
+LONG_RANGE_DAYS = 14
+DATE_MAY_CHANGE_DAYS = 28
 
 
 def _get_match(session: Session, match_id: int) -> Match:
@@ -21,6 +31,45 @@ def _get_match(session: Session, match_id: int) -> Match:
     if m is None:
         raise HTTPException(404, f"unknown match {match_id!r}")
     return m
+
+
+@router.get("")
+def matches_by_date(date: str, league: str | None = None, session: Session = Depends(get_session)) -> list[dict]:
+    """B.8: every match on a given local date (grouping by competition/league filtering
+    is a frontend concern - it already has /leagues to cross-reference league_code). A
+    scheduled match's prediction is served from the precompute store when one exists;
+    if not (a fixture added after the last precompute run), it's computed live rather
+    than silently omitted. A finished match's real result is returned instead."""
+    try:
+        target_date = date_module.fromisoformat(date)
+    except ValueError:
+        raise HTTPException(400, "date must be YYYY-MM-DD") from None
+
+    q = session.query(Match).filter(Match.date == target_date)
+    if league:
+        q = q.filter(Match.league_code == league)
+    matches = q.order_by(Match.kickoff.asc()).all()
+
+    today = datetime.now(UTC).date()
+    days_out = (target_date - today).days
+    out = []
+    for m in matches:
+        row = match_dict(session, m)
+        if m.status == "scheduled":
+            pred = get_precomputed_prediction(session, m.id)
+            if pred is None:
+                model = get_model(session, m.league_code)
+                if model is not None:
+                    pred = model.predict(m.home_team_id, m.away_team_id, neutral=m.neutral)
+                    pred["computed_at"] = get_model_computed_at(session, m.league_code)
+            row["prediction"] = pred
+            row["long_range"] = days_out > LONG_RANGE_DAYS
+            # "or it's more than 4 weeks away" (the brief's other trigger, a source
+            # marking a fixture provisional, isn't something any of our sources expose -
+            # not fabricated here).
+            row["date_may_change"] = days_out > DATE_MAY_CHANGE_DAYS
+        out.append(row)
+    return out
 
 
 @router.get("/{match_id}")
