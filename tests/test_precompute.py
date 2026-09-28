@@ -96,3 +96,45 @@ def test_precompute_updates_an_existing_row_rather_than_duplicating(session):
     precompute.precompute_predictions(session)
     precompute.precompute_predictions(session)  # run again, e.g. simulating the nightly job
     assert session.query(PrecomputedPrediction).filter(PrecomputedPrediction.match_id == near.id).count() == 1
+
+
+def test_precompute_produces_exactly_one_current_row_per_scheduled_match(session):
+    """E.13: across every scheduled match in the window (not just one), precompute must
+    leave exactly one row each - never zero (silently missing), never more than one (a
+    stale duplicate), and re-running (the nightly job, or another ingest) updates that
+    same row in place rather than growing the table."""
+    # Add two more in-window scheduled matches alongside the existing "upcoming-near" one,
+    # so this genuinely exercises "every scheduled match", not just a single one.
+    today = datetime.now(UTC).date()
+    session.add(
+        Match(
+            league_code="test.1", season="2024-25", date=today + timedelta(days=20),
+            kickoff="15:00", home_team_id="team-2", away_team_id="team-3",
+            home_goals=None, away_goals=None, status="scheduled", round="Matchday 27",
+            neutral=False, source="synthetic", source_id="synthetic:upcoming-b",
+        )
+    )
+    session.add(
+        Match(
+            league_code="test.1", season="2024-25", date=today + timedelta(days=30),
+            kickoff="15:00", home_team_id="team-4", away_team_id="team-5",
+            home_goals=None, away_goals=None, status="scheduled", round="Matchday 28",
+            neutral=False, source="synthetic", source_id="synthetic:upcoming-c",
+        )
+    )
+    session.commit()
+
+    scheduled_ids = {
+        m.id for m in session.query(Match).filter(
+            Match.status == "scheduled", Match.date >= today, Match.date <= today + timedelta(days=90)
+        )
+    }
+    assert len(scheduled_ids) == 3  # near + b + c (far is outside the 90-day window)
+
+    precompute.precompute_predictions(session)
+    precompute.precompute_predictions(session)  # simulate a second run (nightly job)
+
+    rows = session.query(PrecomputedPrediction).all()
+    row_match_ids = [r.match_id for r in rows]
+    assert set(row_match_ids) == scheduled_ids
+    assert len(row_match_ids) == len(set(row_match_ids))  # no duplicates for any of them
