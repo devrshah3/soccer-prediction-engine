@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from ..models import League, Match
 from ..serialize import match_dict
 from . import cache, fallback, gemini_client, quota, text_format, wikipedia, youtube
-from .entities import find_teams
+from .entities import find_entities, find_teams, mentions_entity
 from .intent import DB_INTENTS, Intent, classify
 
 AI_PAUSED_NOTE = " (AI phrasing paused for today.)"
@@ -100,7 +100,7 @@ def _wikipedia_answer(session: Session, question: str, wiki: dict) -> dict | Non
     surface a decline sourced from the wrong article."""
     sources = [{"type": "wikipedia", "title": wiki["title"], "url": wiki["url"], "license": wiki["source"]}]
     facts = f"Wikipedia article: {wiki['title']}\n\n{wiki['extract']}"
-    plain_text = f"From Wikipedia ({wiki['title']}): {wiki['extract'][:1000]}\n\nSource: {wiki['url']}"
+    plain_text = f"From Wikipedia ({wiki['title']}): {text_format.first_sentences(wiki['extract'], 2)}\n\nSource: {wiki['url']}"
 
     if not _gemini_lookup_ready():
         # B2: no AI available/enabled at all - show the extract + link directly, no
@@ -187,6 +187,23 @@ def _video_answer(session: Session, question: str) -> dict:
     return _plain(f"{head} {NO_VERIFIED_LINK}", sources)  # no verified channel / no API key
 
 
+def _gated_wikipedia(session: Session, question: str) -> dict | None:
+    """Wikipedia for general history/context only, and only with a relevance gate: the search is
+    built from RECOGNISED entities (team, player, competition, year) - never the raw sentence, so
+    filler like "give em" or "I wanna" can't steer it - and the article is accepted only if its
+    title or lead mentions one of them. Anything else is treated as unknown."""
+    entities = find_entities(session, question)
+    if not any(e.kind != "year" for e in entities):
+        return None  # nothing football-shaped recognised: don't search at all
+    wiki = wikipedia.lookup(session, " ".join(e.display for e in entities))
+    if wiki is None or not wiki.get("found"):
+        return None
+    lead = wiki["extract"].strip().split("\n\n", 1)[0][:600]
+    if not mentions_entity(f"{wiki['title']} {lead}", entities):
+        return None
+    return wiki
+
+
 def ask(session: Session, question: str) -> dict:
     question = question.strip()
     if not question:
@@ -209,8 +226,8 @@ def ask(session: Session, question: str) -> dict:
 
     # 3. General history/context: Wikipedia (free, no quota) before any Gemini call.
     if intent is Intent.HISTORY:
-        wiki = wikipedia.lookup(session, question)
-        if wiki is not None and wiki.get("found"):
+        wiki = _gated_wikipedia(session, question)
+        if wiki is not None:
             wiki_answer = _wikipedia_answer(session, question, wiki)
             if wiki_answer is not None:
                 return wiki_answer

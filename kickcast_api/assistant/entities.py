@@ -135,11 +135,37 @@ def find_players(session: Session, question: str) -> list[str]:
     return found[:3]
 
 
+@dataclass(frozen=True)
+class Entity:
+    kind: str  # team | competition | player | year
+    display: str
+    phrases: tuple[str, ...]  # normalised phrases that count as a mention of it
+
+
+def find_entities(session: Session, question: str) -> list[Entity]:
+    out: list[Entity] = []
+    for t in find_teams(session, question):
+        variants = team_title_variants(session, t["id"]) or [normalize(t["name"])]
+        out.append(Entity("team", t["name"], tuple(variants)))
+    for code in find_competitions(question):
+        out.append(Entity("competition", COMPETITION_NAMES[code], tuple(normalize(n) for n in COMPETITION_ALIASES[code])))
+    for name in find_players(session, question):
+        parts = normalize(name).split()
+        out.append(Entity("player", name, tuple({normalize(name), parts[-1]} if len(parts) > 1 else {normalize(name)})))
+    for year in find_years(question):
+        out.append(Entity("year", year, (year,)))
+    seen: set[str] = set()
+    return [e for e in out if not (e.display in seen or seen.add(e.display))]
+
+
 def recognised_terms(session: Session, question: str) -> list[str]:
     """Display strings for every recognised entity - the ONLY material a Wikipedia search is
     built from (never the raw sentence)."""
-    terms = [t["name"] for t in find_teams(session, question)]
-    terms += [COMPETITION_NAMES[c] for c in find_competitions(question)]
-    terms += find_players(session, question)
-    terms += find_years(question)
-    return list(dict.fromkeys(terms))
+    return [e.display for e in find_entities(session, question)]
+
+
+def mentions_entity(text: str, entities: list[Entity]) -> bool:
+    """True if the (title / lead) text mentions any recognised NON-year entity. A bare year is
+    not enough: an article titled "2016" is not evidence of a football answer."""
+    normalised = normalize(text)
+    return any(contains_phrase(normalised, p) for e in entities if e.kind != "year" for p in e.phrases)

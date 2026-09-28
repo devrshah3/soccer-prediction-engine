@@ -29,3 +29,24 @@ def strip_markdown(text: str) -> str:
     text = _CODE.sub(r"\1", text)
     text = _HEADER.sub("", text)
     return text.strip()
+
+
+_ABBREVIATIONS = ("St.", "Mr.", "Dr.", "vs.", "No.", "Jr.", "Sr.", "F.C.", "A.C.", "U.S.")
+
+
+def first_sentences(text: str, n: int = 2) -> str:
+    """The first n sentences of the lead paragraph (never the whole article)."""
+    lead = text.strip().split("\n\n", 1)[0].replace("\n", " ")
+    sentences: list[str] = []
+    current = ""
+    for token in lead.split(" "):
+        current = f"{current} {token}".strip()
+        ends = token.endswith((".", "!", "?")) and token not in _ABBREVIATIONS and not re.fullmatch(r"[A-Z]\.", token)
+        if ends:
+            sentences.append(current)
+            current = ""
+            if len(sentences) == n:
+                break
+    if current and len(sentences) < n:
+        sentences.append(current)
+    return " ".join(sentences)

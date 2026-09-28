@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 
 from kickcast_api.assistant import cache, fallback, quota, service, text_format
 from kickcast_api.assistant import tools as assistant_tools
+from kickcast_api.assistant.entities import find_entities
 from kickcast_api.models import Base, League, Match, Team
 
 
@@ -556,6 +557,91 @@ def test_highlights_with_no_finished_match_and_with_no_team(session, monkeypatch
     assert "don't have a finished match on record" in service.ask(session, "highlights of Newcomers United")["text"]
     assert "Which match do you mean?" in service.ask(session, "A video link I wanna watch the highlights")["text"]
     assert seen == []  # nothing searched without a match record
+
+
+# ---------------------------------------------------------------- wikipedia relevance gate
+
+
+def _wiki_env(monkeypatch, article):
+    seen = []
+    monkeypatch.setattr(service.gemini_client, "available", lambda: False)
+
+    def fake(sess, query):
+        seen.append(query)
+        return article
+
+    monkeypatch.setattr(service.wikipedia, "lookup", fake)
+    return seen
+
+
+REAL_MADRID_ARTICLE = {
+    "found": True, "title": "Real Madrid CF", "url": "https://en.wikipedia.org/wiki/Real_Madrid_CF", "source": "Wikipedia (CC BY-SA)",
+    "extract": "Real Madrid Club de Futbol is a Spanish professional football club based in Madrid. Founded in 1902 as Madrid Football Club, "
+               "the club has traditionally worn a white home kit. It plays at the Santiago Bernabeu. It has won many titles.",
+}
+DRAKE_ARTICLE = {
+    "found": True, "title": "Drake (musician)", "url": "https://en.wikipedia.org/wiki/Drake_(musician)", "source": "Wikipedia (CC BY-SA)",
+    "extract": "Aubrey Drake Graham is a Canadian rapper and singer. He is one of the best-selling music artists.",
+}
+
+
+def test_entities_are_found_with_aliases_and_years(session):
+    session.add(Team(id="madrid", name="Real Madrid"))
+    session.commit()
+    ents = find_entities(session, "Who won the 2016 Champions League final against Real Madrid?")
+    assert [(e.kind, e.display) for e in ents] == [("team", "Real Madrid"), ("competition", "Champions League"), ("year", "2016")]
+
+
+def test_wikipedia_query_is_built_from_entities_not_the_raw_sentence(session, monkeypatch):
+    session.add(Team(id="madrid", name="Real Madrid"))
+    session.commit()
+    seen = _wiki_env(monkeypatch, REAL_MADRID_ARTICLE)
+    service.ask(session, "Give em the history of Real Madrid, I wanna know")
+    assert seen == ["Real Madrid"]  # no "give em" / "I wanna" - filler never reaches the search
+
+
+def test_an_article_naming_a_recognised_entity_is_accepted_and_limited_to_two_sentences(session, monkeypatch):
+    session.add(Team(id="madrid", name="Real Madrid"))
+    session.commit()
+    _wiki_env(monkeypatch, REAL_MADRID_ARTICLE)
+    result = service.ask(session, "Tell me about the history of Real Madrid")
+    assert result["mode"] == "fallback"
+    body = result["text"].split("\n\n")[0]
+    assert body == (
+        "From Wikipedia (Real Madrid CF): Real Madrid Club de Futbol is a Spanish professional football club based in Madrid. "
+        "Founded in 1902 as Madrid Football Club, the club has traditionally worn a white home kit."
+    )
+    assert "Santiago" not in result["text"]  # sentence 3 onward is never shown
+
+
+def test_an_article_that_mentions_the_entity_only_in_the_lead_is_accepted(session, monkeypatch):
+    session.add(Team(id="madrid", name="Real Madrid"))
+    session.commit()
+    _wiki_env(monkeypatch, {**REAL_MADRID_ARTICLE, "title": "El Clasico", "extract": "El Clasico is the name given to any match between Barcelona and Real Madrid."})
+    assert "El Clasico" in service.ask(session, "Tell me about the history of Real Madrid")["text"]
+
+
+def test_an_unrelated_article_is_rejected_and_treated_as_unknown(session, monkeypatch):
+    session.add(Team(id="madrid", name="Real Madrid"))
+    session.commit()
+    _wiki_env(monkeypatch, DRAKE_ARTICLE)
+    result = service.ask(session, "Tell me about the history of Real Madrid")
+    assert result["mode"] == "fallback"
+    assert "Drake" not in result["text"] and result["text"].startswith("I don't recognize that one.")
+
+
+def test_no_recognised_entity_means_no_wikipedia_search_at_all(session, monkeypatch):
+    seen = _wiki_env(monkeypatch, DRAKE_ARTICLE)
+    for q in ("Tell me about Drake", "what happened in 2016"):  # a year alone is not an entity either
+        result = service.ask(session, q)
+        assert result["text"].startswith("I don't recognize that one.")
+    assert seen == []
+
+
+def test_first_sentences_handles_initials_abbreviations_and_short_text():
+    assert text_format.first_sentences("A. B. Smith scored. He won. He left.", 2) == "A. B. Smith scored. He won."
+    assert text_format.first_sentences("Only one sentence without a full stop", 2) == "Only one sentence without a full stop"
+    assert text_format.first_sentences("First para. Second sentence. Third.\n\nNext paragraph.", 2) == "First para. Second sentence."
 
 
 def test_db_intents_never_touch_wikipedia(session, monkeypatch):
