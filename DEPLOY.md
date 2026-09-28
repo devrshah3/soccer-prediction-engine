@@ -64,7 +64,7 @@ in short:
   Nations League and the scorers/cards of the domestic leagues, which nothing else we have
   does). It is **on** in this deployment (`ENABLE_ESPN=true` in `render.yaml`, a deliberate
   choice - set it to `"false"` to turn it off). The server reads it itself: at every start
-  and after every catch-up it re-reads the last 7 days, and during a match window it polls
+  and after every catch-up it re-reads the last 14 days, and during a match window it polls
   every 10 minutes. Nothing ESPN-derived is committed to the repo. Without it, a deployed
   site only has what the open sources knew at build time - typically no results at all for
   the last few days (the martj42 CSV lags by weeks) and no scorers for club matches.

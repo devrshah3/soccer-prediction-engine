@@ -159,7 +159,7 @@ def update_results_from_espn(session: Session, now: datetime | None = None) -> i
     return updated
 
 
-BACKFILL_DAYS = 7
+BACKFILL_DAYS = 14  # covers roughly two league matchweeks + the last international window
 last_backfill: dict = {"at": None, "report": None}  # for /meta
 
 
