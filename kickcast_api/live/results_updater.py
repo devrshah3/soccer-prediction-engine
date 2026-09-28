@@ -159,6 +159,35 @@ def update_results_from_espn(session: Session, now: datetime | None = None) -> i
     return updated
 
 
+BACKFILL_DAYS = 7
+
+
+def backfill_from_espn(session: Session, days: int = BACKFILL_DAYS, now: datetime | None = None) -> dict:
+    """Re-read the last `days` days from ESPN for every competition we hold matches in, so a
+    freshly built or freshly woken instance (Render's free disk resets to the build snapshot, which
+    only has what the open sources had at build time) gets its recent results, scorers and cards
+    straight away instead of waiting for a live window. Idempotent; a no-op when ESPN is disabled."""
+    from . import espn
+
+    now = now or datetime.now(timezone.utc)
+    report = {"days": 0, "fixtures": 0, "changed": 0}
+    if not espn.available():
+        return report
+    for back in range(days + 1):
+        day = (now - timedelta(days=back)).date().isoformat()
+        codes = {m.league_code for m in _todays_candidate_matches(session, day)}
+        if not codes:
+            continue
+        fixtures = espn.fetch_fixtures(day, codes)
+        if fixtures is None:
+            continue
+        report["days"] += 1
+        report["fixtures"] += len(fixtures)
+        report["changed"] += _apply_fixtures(session, day, fixtures, now)
+    log.info("results/espn backfill: %s", report)
+    return report
+
+
 def _apply_fixtures(session: Session, day: str, fixtures: list[dict], now: datetime) -> int:
     candidates = _todays_candidate_matches(session, day)
     now_iso = now.isoformat()
@@ -217,4 +246,4 @@ def _fetch_final_events(session: Session, m: Match, fx: dict) -> None:
         sync_events(session, m, events)
 
 
-__all__ = ["POLL_INTERVAL_MINUTES", "dates_needing_check", "in_match_window", "needs_result_check", "update_results_from_espn", "update_todays_results"]
+__all__ = ["POLL_INTERVAL_MINUTES", "backfill_from_espn", "dates_needing_check", "in_match_window", "needs_result_check", "update_results_from_espn", "update_todays_results"]

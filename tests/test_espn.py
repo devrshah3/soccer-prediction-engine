@@ -129,3 +129,23 @@ def test_production_default_is_off(monkeypatch):
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.delenv("ENABLE_ESPN", raising=False)
     assert espn.available() is False
+
+
+def test_backfill_walks_the_recent_days_and_fills_in_results_scorers_and_cards(session, monkeypatch):
+    """A freshly built/woken instance only has what the open sources knew at build time; the
+    backfill re-reads the last week from ESPN so finished matches get score, scorers and cards."""
+    _serve(monkeypatch, [_real("Sweden"), _real("Armenia")])
+    report = results_updater.backfill_from_espn(session, days=3, now=NOW)
+    assert report["days"] == 1 and report["changed"] == 2  # only Sep 28 holds matches (the fake answers every slug)
+    m = session.query(Match).filter_by(home_team_id="sweden").one()
+    assert (m.status, m.home_goals, m.away_goals) == ("finished", 3, 1)
+    ev = events_for_matches(session, [m])[m.id]
+    assert len(ev["goals"]) == 4 and len(ev["cards"]) == 4
+    # idempotent: a second run changes nothing
+    assert results_updater.backfill_from_espn(session, days=3, now=NOW)["changed"] == 0
+
+
+def test_backfill_is_a_noop_when_espn_is_disabled(session, monkeypatch):
+    monkeypatch.setenv("ENABLE_ESPN", "false")
+    monkeypatch.setattr(espn.requests, "get", lambda *a, **k: pytest.fail("must not call ESPN when disabled"))
+    assert results_updater.backfill_from_espn(session, days=3, now=NOW) == {"days": 0, "fixtures": 0, "changed": 0}

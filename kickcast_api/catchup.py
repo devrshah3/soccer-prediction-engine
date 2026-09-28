@@ -27,6 +27,7 @@ from pathlib import Path
 import requests
 
 from .db import SessionLocal
+from .live.results_updater import backfill_from_espn
 from .models import Meta
 from .precompute import precompute_predictions
 
@@ -102,6 +103,7 @@ def run_catchup(force: bool = False) -> dict:
             return {"fetched": fetched, "ingest": "failed"}
         session = SessionLocal()
         try:
+            backfill_from_espn(session)  # re-apply recent results/scorers on top of the fresh ingest
             predictions = precompute_predictions(session)
         finally:
             session.close()

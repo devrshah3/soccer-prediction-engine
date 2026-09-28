@@ -20,7 +20,7 @@ from ..db import SessionLocal
 from . import api_football, espn
 from .poller import POLL_INTERVAL_MINUTES, poll_live_matches
 from .results_updater import POLL_INTERVAL_MINUTES as RESULTS_POLL_INTERVAL_MINUTES
-from .results_updater import update_results_from_espn, update_todays_results
+from .results_updater import backfill_from_espn, update_results_from_espn, update_todays_results
 
 NIGHTLY_PRECOMPUTE_HOUR_UTC = 3  # low-traffic hour; the C.9 daily re-ingest should run before this
 
@@ -47,6 +47,14 @@ def _espn_job() -> None:
     session = SessionLocal()
     try:
         update_results_from_espn(session)  # no-op outside a match window / catch-up need
+    finally:
+        session.close()
+
+
+def _espn_backfill_job() -> None:
+    session = SessionLocal()
+    try:
+        backfill_from_espn(session)
     finally:
         session.close()
 
@@ -97,6 +105,9 @@ def start() -> BackgroundScheduler:
         _scheduler.add_job(
             _espn_job, "interval", minutes=RESULTS_POLL_INTERVAL_MINUTES, id="update_results_espn", next_run_time=datetime.now(timezone.utc)
         )
+        # One-off at startup: Render's free disk resets to the build snapshot, which only has what the
+        # open sources knew at build time - pull the last week of results/scorers/cards straight away.
+        _scheduler.add_job(_espn_backfill_job, id="espn_backfill_startup", next_run_time=datetime.now(timezone.utc))
     _scheduler.start()
     return _scheduler
 
