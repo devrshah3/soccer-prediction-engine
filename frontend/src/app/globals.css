@@ -24,9 +24,10 @@
   --out-draw-from: #f5b942;
   --out-draw-to: #ffd98a;
   --out-draw-glow: rgba(245, 185, 66, 0.5);
-  --out-away-from: #ff5d7a;
-  --out-away-to: #ff9aae;
-  --out-away-glow: rgba(255, 93, 122, 0.5);
+  --out-away-from: #1fa89b;
+  --out-away-to: #4fcdbd;
+  --out-away-glow: rgba(45, 190, 175, 0.5);
+  --out-away-dot: #33bdae;
   --glass-blur: blur(18px) saturate(150%);
   --glass-border: rgba(255, 255, 255, 0.16);
   --glass-highlight: rgba(255, 255, 255, 0.35);

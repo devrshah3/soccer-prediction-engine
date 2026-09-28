@@ -1,7 +1,7 @@
 type Outcome = "home" | "draw" | "away";
 
 // Each outcome has ONE fixed colour on every bar (tokens --out-home/--out-draw/--out-away in
-// globals.css): home = blue (left), draw = amber, away = rose (right). The most likely
+// globals.css): home = blue (left), draw = amber, away = toned-down teal (right). The most likely
 // segment is full brightness with a soft glow; the other two stay clearly coloured but
 // dimmed. Colour is never the only signal - the row below names each outcome with a dot,
 // a label and a percentage.
@@ -19,7 +19,7 @@ const STYLE: Record<Outcome, { gradient: string; glow: string; dot: string }> = 
   away: {
     gradient: "linear-gradient(90deg, var(--out-away-from), var(--out-away-to))",
     glow: "var(--out-away-glow)",
-    dot: "var(--out-away-to)",
+    dot: "var(--out-away-dot)",
   },
 };
 
@@ -61,7 +61,7 @@ export function ProbabilityBar({
   const legend = (o: Outcome, align: string) => (
     <span
       key={o}
-      className={`flex min-w-0 items-center gap-1.5 ${align} ${o === leader ? "font-semibold text-foreground" : ""}`}
+      className={`flex min-w-0 items-center gap-1.5 ${align} ${o === leader ? "font-semibold text-foreground" : "text-foreground/85"}`}
       title={`${names[o]} ${pct(values[o])}`}
     >
       <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ background: STYLE[o].dot }} />

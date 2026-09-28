@@ -33,7 +33,7 @@ const px = await page.evaluate(async ({ b64, boxes }) => {
   const at = (x, y) => Array.from(ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data.slice(0, 3));
   return boxes.map((b) => ({ bg: at(b.x + 4, b.y - 6), segs: b.segs.map((s) => (s.w > 6 ? at(s.cx, s.cy) : null)) }));
 }, { b64: png.toString("base64"), boxes });
-const names = ["home (blue)", "draw (amber)", "away (rose)"];
+const names = ["home (blue)", "draw (amber)", "away (teal)"];
 const worst = [[], [], []];
 const leaderVsDim = { leader: [], dim: [] };
 px.forEach((p, i) => p.segs.forEach((c, k) => {
