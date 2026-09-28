@@ -17,7 +17,7 @@ from typing import Any
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from ..models import Match, Team
+from ..models import League, Match, Team
 from ..predictions import get_model
 from ..serialize import latest_season, match_dict, standings
 
@@ -74,9 +74,13 @@ def team_league_position(session: Session, team_id: str) -> dict:
     season = latest_season(session, league_code)
     if season is None:
         return {"found": False}
+    # league_name is the real display name from the leagues table (e.g. "Premier League"),
+    # not the internal code - never state "en.1" to a user, see fallback.py's callers.
+    league = session.get(League, league_code)
+    league_name = league.name if league else league_code
     for r in standings(session, league_code, season):
         if r["team_id"] == team_id:
-            return {"found": True, "league_code": league_code, "season": season, **r}
+            return {"found": True, "league_code": league_code, "league_name": league_name, "season": season, **r}
     return {"found": False}
 
 

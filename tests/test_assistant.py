@@ -71,6 +71,7 @@ def test_league_standings_top_and_position(session):
     pos = assistant_tools.team_league_position(session, "team-0")
     assert pos["found"] is True
     assert pos["league_code"] == "test.1"
+    assert pos["league_name"] == "Test League"  # the real DB name, never the raw code, in any user-facing text
 
 
 def test_match_prediction_lookup_real_numbers(session):
@@ -92,6 +93,17 @@ def test_fallback_answers_next_match_from_real_data(session):
     r = fallback.answer(session, "When does Ridgeway United play next?")
     assert r["found"] is True
     assert "Ridgeway United" in r["text"]
+
+
+def test_fallback_standing_answer_uses_league_name_not_code(session):
+    """Item 4 regression: a "where do they stand" answer used to say "in test.1" (the
+    internal DB code) instead of the real league name - a raw code must never reach a
+    user-facing answer."""
+    r = fallback.answer(session, "Where does Ridgeway United stand in the table?")
+    assert r["found"] is True
+    assert "Test League" in r["text"]
+    assert "test.1" not in r["text"]
+    assert "test.1" not in r["facts"]
 
 
 def test_fallback_declines_unmatched_question_honestly():
@@ -166,6 +178,25 @@ def test_strip_markdown_removes_bold_italic_code_headers_and_links():
     assert "`" not in out
     assert "October 10, 2026" in out
     assert "KickCast (https://kickcast.example)" in out
+
+
+# ---------------------------------------------------------------- gemini_client.py
+
+
+def test_humanize_league_codes_strips_raw_code_for_gemini(session):
+    """Item 4 regression: a real live call ("Where does Arsenal stand?") produced "...in
+    en.1 for the 2026-27 season..." because the raw tool result (with a league_code key)
+    was handed to Gemini verbatim. This scrub runs on every tool result before Gemini
+    sees it - checked here at any nesting depth, since match_dict-shaped results nest a
+    league_code inside other tools' output too."""
+    from kickcast_api.assistant import gemini_client
+
+    raw = {"found": True, "league_code": "test.1", "season": "2024-25", "nested": {"league_code": "test.1"}}
+    clean = gemini_client._humanize_league_codes(session, raw)
+    assert clean["league_name"] == "Test League"
+    assert "league_code" not in clean
+    assert clean["nested"]["league_name"] == "Test League"
+    assert "league_code" not in clean["nested"]
 
 
 # ---------------------------------------------------------------- cache.py

@@ -6,7 +6,7 @@ import { ProbabilityBar } from "@/components/ProbabilityBar";
 import { Tabs } from "@/components/Tabs";
 import { TeamCrest } from "@/components/TeamCrest";
 import { api, ApiError } from "@/lib/api";
-import { slugForCode } from "@/lib/leagueSlugs";
+import { nameForCode, slugForCode } from "@/lib/leagueSlugs";
 
 export default async function TeamPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: rawId } = await params;
@@ -41,7 +41,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                 {" "}
                 &middot;{" "}
                 <Link href={`/leagues/${slugForCode(team.league_code)}`} className="hover:text-accent">
-                  {team.league_code}
+                  {nameForCode(team.league_code)}
                 </Link>
                 {team.position && ` — ${team.position}${ordinal(team.position)} (${team.season})`}
               </>

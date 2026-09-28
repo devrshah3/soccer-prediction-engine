@@ -176,9 +176,9 @@ def answer(session: Session, question: str) -> dict:
         if teams:
             r = tools.team_league_position(session, teams[0]["id"])
             if r["found"]:
-                text = f"{teams[0]['name']} are {r['position']}{_ordinal(r['position'])} in {r['league_code']} ({r['season']}) with {r['pts']} points."
+                text = f"{teams[0]['name']} are {r['position']}{_ordinal(r['position'])} in {r['league_name']} ({r['season']}) with {r['pts']} points."
                 facts = (
-                    f"{teams[0]['name']} standing: position {r['position']} in {r['league_code']} ({r['season']}), "
+                    f"{teams[0]['name']} standing: position {r['position']} in {r['league_name']} ({r['season']}), "
                     f"{r['pts']} points, played {r['played']}"
                     + (f", recent form (last 5, oldest first): {' '.join(r['form'])}" if r.get("form") else "")
                     + "."

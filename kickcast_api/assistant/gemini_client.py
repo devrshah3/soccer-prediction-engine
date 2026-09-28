@@ -46,8 +46,29 @@ from google import genai
 from google.genai import types
 from sqlalchemy.orm import Session
 
+from ..models import League
 from . import quota
 from .tools import TOOLS, TOOLS_BY_NAME
+
+
+def _humanize_league_codes(session: Session, obj: Any) -> Any:
+    """Item 4 regression fix: Gemini gets tool results verbatim as its function-response
+    context and will happily quote a raw field back ("...in en.1 for the 2026-27
+    season..."), verified live before this was added. Recursively swap any "league_code"
+    key for the real "league_name" (from the leagues table) before a tool result ever
+    reaches the model, so there is no internal code left for it to parrot."""
+    if isinstance(obj, dict):
+        out: dict[str, Any] = {}
+        for k, v in obj.items():
+            if k == "league_code" and isinstance(v, str):
+                league = session.get(League, v)
+                out["league_name"] = league.name if league else v
+            else:
+                out[k] = _humanize_league_codes(session, v)
+        return out
+    if isinstance(obj, list):
+        return [_humanize_league_codes(session, v) for v in obj]
+    return obj
 
 SYSTEM_INSTRUCTION = (
     "You are the KickCast soccer assistant. For any factual claim about a match score, "
@@ -57,8 +78,10 @@ SYSTEM_INSTRUCTION = (
     "If no tool can answer the question, say plainly that you don't know rather than "
     "guessing. For match write-ups, news, or context not in our database, you may use "
     "web search, and must cite what you found. Keep answers concise and always mention "
-    "dates for anything time-sensitive. Reply in plain text only - no Markdown (no "
-    "**bold**, no headings, no bullet-point asterisks) - the chat UI does not render it."
+    "dates for anything time-sensitive. Always refer to a competition by its real name "
+    "(e.g. \"Premier League\"), never an internal code. Reply in plain text only - no "
+    "Markdown (no **bold**, no headings, no bullet-point asterisks) - the chat UI does "
+    "not render it."
 )
 
 MODEL = "gemini-3.6-flash"
@@ -123,6 +146,7 @@ def ask_gemini(session: Session, question: str) -> dict | None:
             for call in calls:
                 tool_obj = TOOLS_BY_NAME.get(call.name)
                 result = tool_obj.run(session, **(call.args or {})) if tool_obj else {"found": False, "error": "unknown tool"}
+                result = _humanize_league_codes(session, result)
                 sources.append({"type": "kickcast_tool", "tool": call.name, "args": call.args, "result": result})
                 response_parts.append(types.Part(function_response=types.FunctionResponse(name=call.name, response=result)))
             # NOT role="tool" - VERIFIED against a real call (2026-09-23): the live API

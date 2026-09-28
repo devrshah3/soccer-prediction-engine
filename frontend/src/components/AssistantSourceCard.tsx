@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { slugForCode } from "@/lib/leagueSlugs";
+import { nameForCode, slugForCode } from "@/lib/leagueSlugs";
 import { ProbabilityBar } from "./ProbabilityBar";
 import { TeamCrest } from "./TeamCrest";
 
@@ -72,7 +72,7 @@ export function AssistantSourceCard({ source }: { source: Source }) {
       >
         <span className="font-semibold text-accent">#{s.position}</span>{" "}
         <span className="font-medium text-foreground">{s.team_name}</span>
-        <span className="text-muted-2"> &middot; {s.league_code} &middot; {s.pts} pts</span>
+        <span className="text-muted-2"> &middot; {nameForCode(s.league_code)} &middot; {s.pts} pts</span>
       </Link>
     );
   }
