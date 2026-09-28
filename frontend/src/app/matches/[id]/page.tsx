@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { KickoffTime } from "@/components/KickoffTime";
-import { MatchStatusLine, PRE_MATCH_ODDS_LABEL } from "@/components/MatchStatusLine";
+import { MatchStatusLine } from "@/components/MatchStatusLine";
 import { ProbabilityBar } from "@/components/ProbabilityBar";
 import { TeamCrest } from "@/components/TeamCrest";
 import { api, ApiError } from "@/lib/api";
@@ -33,7 +33,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     <div className="space-y-6">
       <p className="text-sm text-muted">
         {match.round} &middot; <KickoffTime date={match.date} kickoff={match.kickoff} />
-        <MatchStatusLine state={state} className="ml-2 inline-flex" />
+        <MatchStatusLine state={state} className="mt-1" />
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-4 glass px-4 py-8 sm:gap-6">
@@ -54,9 +54,11 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
 
       {state.kind !== "finished" && (
         <section className="glass p-5 sm:p-6">
-          <h2 className="mb-4 text-lg font-semibold text-foreground">
-            {state.kind === "live" ? PRE_MATCH_ODDS_LABEL : "Prediction"}
+          <h2 className="mb-1 text-lg font-semibold text-foreground">
+            {state.kind === "live" ? "Pre-match prediction" : "Prediction"}
           </h2>
+          {state.kind === "live" && <p className="mb-4 text-xs text-muted-2">Not updating live.</p>}
+          {state.kind !== "live" && <div className="mb-3" />}
           {prediction ? (
             <>
               <div className="mx-auto max-w-md">

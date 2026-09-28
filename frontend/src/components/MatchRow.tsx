@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { League, Match, PredictionSummary } from "@/lib/api";
 import { matchState } from "@/lib/matchState";
 import { isPredictionStale } from "@/lib/predictionFreshness";
-import { MatchStatusLine, PRE_MATCH_ODDS_LABEL } from "./MatchStatusLine";
+import { MatchStatusLine, PRE_MATCH_CAPTION } from "./MatchStatusLine";
 import { KickoffTime } from "./KickoffTime";
 import { LeagueChip } from "./LeagueChip";
 import { PredictionInfoPopover } from "./PredictionInfoPopover";
@@ -48,7 +48,7 @@ export function MatchRow({
           <TeamCrest name={match.home_team.name} />
           <span className="truncate text-sm font-medium text-foreground">{match.home_team.name}</span>
         </div>
-        {state.kind === "finished" && state.score ? (
+        {(state.kind === "finished" || state.kind === "live") && state.score ? (
           <span className="shrink-0 rounded-md bg-surface-raised px-2.5 py-1 text-sm font-bold tabular-nums text-foreground ring-1 ring-inset ring-border">
             {state.score.home} &ndash; {state.score.away}
           </span>
@@ -65,9 +65,6 @@ export function MatchRow({
 
       {showPrediction && prediction && (
         <div className="mt-4 border-t border-border pt-3">
-          {isLive && (
-            <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-2">{PRE_MATCH_ODDS_LABEL}</p>
-          )}
           <div className="flex items-start gap-2">
             <div className="flex-1">
               <ProbabilityBar
@@ -80,6 +77,7 @@ export function MatchRow({
             </div>
             <PredictionInfoPopover prediction={prediction} />
           </div>
+          {isLive && <p className="mt-1.5 text-[11px] text-muted-2">{PRE_MATCH_CAPTION}</p>}
           {/* D.11: cards otherwise show nothing about provenance/staleness - a warning
               only appears when it's actually justified (see isPredictionStale). */}
           {!isLive && isPredictionStale(prediction.computed_at, match.date) && (

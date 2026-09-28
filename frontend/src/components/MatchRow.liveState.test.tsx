@@ -44,8 +44,9 @@ describe("MatchRow live/finished display", () => {
 
   it("renders Live with the prediction bar still visible: kickoff 40 min ago, no finished flag", () => {
     render(<MatchRow match={matchKickedOff(40)} prediction={prediction} />);
-    expect(screen.getByText("Kickoff 40 min ago")).toBeTruthy();
-    expect(screen.getByText("Pre-match odds")).toBeTruthy();
+    expect(screen.getByText("Live · kickoff 40 min ago")).toBeTruthy();
+    expect(screen.getByText("No live score available")).toBeTruthy();
+    expect(screen.getByText(/Pre-match prediction/)).toBeTruthy();
     expect(bar()).not.toBeNull();
     expect(screen.queryByText(/Full time/)).toBeNull();
   });
@@ -53,8 +54,9 @@ describe("MatchRow live/finished display", () => {
   it("shows a live score next to the still-visible bar when a provider gives one", () => {
     const live = { match_status: "2H", minute: 63, home_score: 1, away_score: 0 };
     render(<MatchRow match={matchKickedOff(70, { live })} prediction={prediction} />);
-    expect(screen.getByText("1–0, 63'")).toBeTruthy();
-    expect(screen.getByText(/In progress/)).toBeTruthy();
+    expect(screen.getByText("1 – 0")).toBeTruthy();
+    expect(screen.getByText("Live · 63'")).toBeTruthy();
+    expect(screen.queryByText("No live score available")).toBeNull();
     expect(bar()).not.toBeNull();
   });
 
@@ -64,7 +66,7 @@ describe("MatchRow live/finished display", () => {
     expect(screen.getByText("Full time")).toBeTruthy();
     expect(screen.getByText("2 – 1")).toBeTruthy();
     expect(bar()).toBeNull();
-    expect(screen.queryByText("Pre-match odds")).toBeNull();
+    expect(screen.queryByText(/Pre-match prediction/)).toBeNull();
   });
 
   it("renders Finished with no bar via the 150-minute fallback: kickoff 200 min ago, no flag", () => {

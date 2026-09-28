@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FormDots } from "@/components/FormDots";
 import { KickoffTime } from "@/components/KickoffTime";
-import { MatchStatusLine, PRE_MATCH_ODDS_LABEL } from "@/components/MatchStatusLine";
+import { MatchStatusLine, PRE_MATCH_CAPTION } from "@/components/MatchStatusLine";
 import { ProbabilityBar } from "@/components/ProbabilityBar";
 import { Tabs } from "@/components/Tabs";
 import { TeamCrest } from "@/components/TeamCrest";
@@ -88,12 +88,9 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                 {team.next_match.away_team.name} <TeamCrest name={team.next_match.away_team.name} />
               </span>
             </p>
-            {nextState && <MatchStatusLine state={nextState} className="mb-3 justify-center" />}
+            {nextState && <MatchStatusLine state={nextState} className="mb-3 flex flex-col items-center" />}
             {nextState?.kind === "finished" ? null : nextPrediction ? (
               <>
-                {nextState?.kind === "live" && (
-                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-2">{PRE_MATCH_ODDS_LABEL}</p>
-                )}
                 <ProbabilityBar
                   size="lg"
                   home={nextPrediction.probabilities.home}
@@ -102,6 +99,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                   homeLabel={team.next_match.home_team.name}
                   awayLabel={team.next_match.away_team.name}
                 />
+                {nextState?.kind === "live" && <p className="mt-2 text-xs text-muted-2">{PRE_MATCH_CAPTION}</p>}
                 <p className="mt-3 text-xs text-muted-2">
                   as of {nextPrediction.as_of} &middot; evidence {nextPrediction.evidence} &middot;{" "}
                   expected goals {nextPrediction.expected_goals.home.toFixed(2)} -{" "}
