@@ -79,7 +79,7 @@ export default async function ReplayPage({ searchParams }: { searchParams: Promi
           )}
           <div className="grid gap-4 lg:grid-cols-2">
             {day.matches.map((m) => (
-              <ReplayMatchCard key={m.id} match={m} noEventsNote={day.no_events_note} />
+              <ReplayMatchCard key={m.id} match={m} />
             ))}
           </div>
         </>

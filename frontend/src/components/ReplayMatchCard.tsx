@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReplayMatch } from "@/lib/api";
+import { CardList } from "./CardList";
 import { LeagueChip } from "./LeagueChip";
 import { TeamCrest } from "./TeamCrest";
 
@@ -13,7 +14,7 @@ function outcomeLabel(outcome: Outcome, home: string, away: string): string {
 // real events we actually have, the pre-match-prediction-vs-result chip, and a recap written
 // only from verified facts. Nothing here is invented - when a source has no events for a
 // match, the card says so plainly instead of filling the space.
-export function ReplayMatchCard({ match, noEventsNote }: { match: ReplayMatch; noEventsNote: string }) {
+export function ReplayMatchCard({ match }: { match: ReplayMatch }) {
   const home = match.home_team.name;
   const away = match.away_team.name;
   const pr = match.prediction_result;
@@ -75,7 +76,7 @@ export function ReplayMatchCard({ match, noEventsNote }: { match: ReplayMatch; n
                 <li key={`${e.player}-${e.minute}-${i}`} className="glass-row flex items-center gap-3 px-3 py-2 text-sm">
                   <span className="w-10 shrink-0 tabular-nums text-muted-2">{e.minute != null ? `${e.minute}'` : "–"}</span>
                   <span className="min-w-0 flex-1 truncate text-foreground">
-                    {e.player} <span className="text-muted-2">({e.team_name})</span>
+                    {e.player} {e.team_name && <span className="text-muted-2">({e.team_name})</span>}
                   </span>
                   {(e.penalty || e.own_goal) && (
                     <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
@@ -94,7 +95,8 @@ export function ReplayMatchCard({ match, noEventsNote }: { match: ReplayMatch; n
               scorer. Cards and substitutions aren&apos;t available from our free data sources.
             </p>
           )}
-          {match.events_status === "none" && <p className="text-xs text-muted-2">{noEventsNote}</p>}
+          {match.events_note && <p className="text-xs text-muted-2">{match.events_note}</p>}
+          <CardList cards={match.cards} home={match.home_team} away={match.away_team} bare />
         </div>
       )}
 

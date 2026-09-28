@@ -24,6 +24,8 @@ const base: ReplayMatch = {
     { minute: 55, player: "B Winger", team_id: "netherlands", team_name: "Netherlands", own_goal: false, penalty: true },
     { minute: 88, player: "C Defender", team_id: "netherlands", team_name: "Netherlands", own_goal: true, penalty: false },
   ],
+  cards: [],
+  events_note: null,
   events_status: "complete",
   prediction: null,
   prediction_result: {
@@ -38,7 +40,7 @@ const base: ReplayMatch = {
 
 describe("ReplayMatchCard", () => {
   it("shows the score, every recorded goal with penalty/own-goal tags, and the recap label", () => {
-    render(<ReplayMatchCard match={base} noEventsNote={NOTE} />);
+    render(<ReplayMatchCard match={base} />);
     expect(screen.getByText(/1 . 2/)).toBeTruthy();
     expect(screen.getAllByRole("listitem")).toHaveLength(3);
     expect(screen.getByText("Penalty")).toBeTruthy();
@@ -48,7 +50,7 @@ describe("ReplayMatchCard", () => {
   });
 
   it("compares the pre-match prediction with the result", () => {
-    render(<ReplayMatchCard match={base} noEventsNote={NOTE} />);
+    render(<ReplayMatchCard match={base} />);
     expect(screen.getByText("Prediction missed")).toBeTruthy();
     expect(screen.getByText(/favoured Serbia win \(50%\), got Netherlands win \(25%\)/)).toBeTruthy();
   });
@@ -56,13 +58,29 @@ describe("ReplayMatchCard", () => {
   it("says plainly when no events are available and never invents a timeline", () => {
     render(
       <ReplayMatchCard
-        match={{ ...base, events: [], events_status: "none", prediction_result: null }}
-        noEventsNote={NOTE}
+        match={{ ...base, events: [], events_status: "none", events_note: NOTE, prediction_result: null }}
+       
       />
     );
     expect(screen.getByText(NOTE)).toBeTruthy();
     expect(screen.queryByRole("list", { name: "Match events" })).toBeNull();
     expect(screen.getByText("No pre-match prediction on record for this match.")).toBeTruthy();
+  });
+
+  it("shows the per-match note only when the match has no events - a match WITH events shows none", () => {
+    const { rerender } = render(<ReplayMatchCard match={base} />);
+    expect(screen.queryByText(/captured|aren't available/)).toBeNull();
+    rerender(<ReplayMatchCard match={{ ...base, events: [], events_status: "none", events_note: "Scorers for this match weren't captured." }} />);
+    expect(screen.getByText("Scorers for this match weren't captured.")).toBeTruthy();
+  });
+
+  it("lists cards under the goals when the source has them", () => {
+    render(
+      <ReplayMatchCard
+        match={{ ...base, cards: [{ team_id: "serbia", player: "Rash", minute: 61, card: "red" }] }}
+      />
+    );
+    expect(screen.getByRole("img", { name: "Red card" })).toBeTruthy();
   });
 
   it("shows no score and a pending note when the result hasn't arrived", () => {
@@ -75,9 +93,10 @@ describe("ReplayMatchCard", () => {
           away_goals: null,
           events: [],
           events_status: null,
+          events_note: null,
           prediction_result: null,
         }}
-        noEventsNote={NOTE}
+       
       />
     );
     expect(screen.getByText(/Result not available yet/)).toBeTruthy();

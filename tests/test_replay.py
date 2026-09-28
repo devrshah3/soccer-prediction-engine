@@ -126,6 +126,32 @@ def test_partial_and_missing_events_are_labelled_honestly(session):
     assert "not available" in by_id[3]["recap"]["text"]
 
 
+def test_events_note_is_per_match_not_a_blanket_default(session, monkeypatch):
+    """A match with recorded goals carries no 'not available' note; only one with a result and NO
+    events does, and the wording depends on whether API-Football (the only source that could
+    have supplied them) is enabled."""
+    monkeypatch.delenv("API_FOOTBALL_KEY", raising=False)
+    by_id = _by_id(replay.day_replay(session, YESTERDAY, 0))
+    assert by_id[1]["events_note"] is None and by_id[2]["events_note"] is None  # complete / partial
+    assert by_id[4]["events_note"] is None                                      # no result at all
+    assert by_id[3]["events_note"] == replay.NO_EVENTS_NOTE
+    monkeypatch.setenv("API_FOOTBALL_KEY", "fake-key")
+    assert _by_id(replay.day_replay(session, YESTERDAY, 0))[3]["events_note"] == replay.NOT_CAPTURED_NOTE
+
+
+def test_replay_includes_api_football_cards_and_goals_when_captured(session):
+    from kickcast_api.models import LiveEvent
+
+    session.add(LiveEvent(match_id=3, minute=30, event_type="goal", team_id=None, player="Live Scorer", detail="Normal Goal", source="api-football"))
+    session.add(LiveEvent(match_id=3, minute=40, event_type="card", team_id=None, player="Booked", detail="Yellow Card", source="api-football"))
+    session.commit()
+    m = _by_id(replay.day_replay(session, YESTERDAY, 0))[3]
+    assert [e["player"] for e in m["events"]] == ["Live Scorer"]
+    assert m["events"][0]["team_name"] is None            # unresolved team stays unresolved, not guessed
+    assert m["cards"] == [{"team_id": None, "player": "Booked", "minute": 40, "card": "yellow"}]
+    assert m["events_status"] == "partial"                 # 1 of 2 goals
+
+
 def test_match_without_a_result_shows_no_score_and_says_so(session):
     m = _by_id(replay.day_replay(session, YESTERDAY, 0))[4]
     assert m["has_result"] is False and m["home_goals"] is None

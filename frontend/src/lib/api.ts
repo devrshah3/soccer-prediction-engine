@@ -264,8 +264,8 @@ export type GoldenBootBacktest = {
 export type ReplayEvent = {
   minute: number | null;
   player: string;
-  team_id: string;
-  team_name: string;
+  team_id: string | null;
+  team_name: string | null;
   own_goal: boolean;
   penalty: boolean;
 };
@@ -285,6 +285,8 @@ export type ReplayMatch = {
   away_goals: number | null;
   has_result: boolean;
   events: ReplayEvent[];
+  cards: CardEvent[];
+  events_note: string | null;
   events_status: "complete" | "partial" | "none" | null;
   prediction: { probabilities: { home: number; draw: number; away: number }; as_of: string; computed_at: string | null; model_version: string; evidence: string | null } | null;
   prediction_result: {

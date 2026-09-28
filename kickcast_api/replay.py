@@ -28,12 +28,18 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from .assistant import cache, gemini_client, quota
-from .models import Goalscorer, League, Match
+from .live import api_football
+from .match_events import events_for_matches
+from .models import League, Match
 from .precompute import get_precomputed_prediction
 from .serialize import team_names
 
 RECAP_LABEL = "Recap written from verified match data"
 NO_EVENTS_NOTE = "Detailed events aren't available for this match on our free data sources."
+# When API-Football IS enabled it can supply events for any competition we cover, so a match
+# with none is a capture gap (its 100 calls/day budget, or the match finished while we weren't
+# polling) - not "no source exists". Say that, per match, rather than the blanket note.
+NOT_CAPTURED_NOTE = "Scorers for this match weren't captured - our live-events source has a small daily request limit."
 GEMINI_RECAP_RESERVE = 8  # never spend the last calls of the day's chat budget on recaps
 MAX_GEMINI_RECAPS_PER_REQUEST = 3
 
@@ -74,22 +80,6 @@ def most_recent_day_with_matches(session: Session, before: date, finished_only: 
 
 def _outcome(home_goals: int, away_goals: int) -> str:
     return "home" if home_goals > away_goals else "away" if away_goals > home_goals else "draw"
-
-
-def _events_for(session: Session, match_ids: list[int]) -> dict[int, list[Goalscorer]]:
-    if not match_ids:
-        return {}
-    rows = (
-        session.query(Goalscorer)
-        .filter(Goalscorer.match_id.in_(match_ids))
-        .order_by(Goalscorer.minute.asc())
-        .all()
-    )
-    out: dict[int, list[Goalscorer]] = {}
-    for r in rows:
-        if r.match_id is not None:
-            out.setdefault(r.match_id, []).append(r)
-    return out
 
 
 def _label_outcome(outcome: str, home: str, away: str) -> str:
@@ -174,8 +164,8 @@ def _recap(session: Session, row: dict, budget: list[int]) -> dict:
 
 def day_replay(session: Session, local_date: date, offset_minutes: int) -> dict:
     matches = matches_on_local_date(session, local_date, offset_minutes)
-    ids = [m.id for m in matches]
-    events_by_match = _events_for(session, ids)
+    events_by_match = events_for_matches(session, matches)
+    events_note = NOT_CAPTURED_NOTE if api_football.available() else NO_EVENTS_NOTE
     team_ids = {t for m in matches for t in (m.home_team_id, m.away_team_id)}
     names = team_names(session, team_ids)
     leagues = {lg.code: lg for lg in session.query(League).all()}
@@ -184,17 +174,17 @@ def day_replay(session: Session, local_date: date, offset_minutes: int) -> dict:
     for m in matches:
         hg, ag = m.home_goals, m.away_goals
         has_result = m.status == "finished" and hg is not None and ag is not None
-        goal_rows = events_by_match.get(m.id, [])
+        merged = events_by_match.get(m.id, {"goals": [], "cards": []})
         events = [
             {
-                "minute": e.minute,
-                "player": e.scorer_name,
-                "team_id": e.team_id,
-                "team_name": names.get(e.team_id, e.team_id),
-                "own_goal": e.own_goal,
-                "penalty": e.penalty,
+                "minute": e["minute"],
+                "player": e["scorer"],
+                "team_id": e["team_id"],
+                "team_name": names.get(e["team_id"], e["team_id"]) if e["team_id"] else None,
+                "own_goal": e["own_goal"],
+                "penalty": e["penalty"],
             }
-            for e in goal_rows
+            for e in merged["goals"]
         ]
         total_goals = (hg or 0) + (ag or 0)
         if not has_result:
@@ -239,7 +229,9 @@ def day_replay(session: Session, local_date: date, offset_minutes: int) -> dict:
             "away_goals": ag if has_result else None,
             "has_result": has_result,
             "events": events,
+            "cards": merged["cards"],
             "events_status": events_status,
+            "events_note": events_note if events_status == "none" else None,
             "prediction": prediction,
             "prediction_result": prediction_result,
         })
@@ -254,7 +246,7 @@ def day_replay(session: Session, local_date: date, offset_minutes: int) -> dict:
     return {
         "date": local_date.isoformat(),
         "matches": rows,
-        "no_events_note": NO_EVENTS_NOTE,
+        "no_events_note": events_note,
         "most_recent_day_with_matches": recent_any.isoformat() if recent_any else None,
         "most_recent_day_with_results": recent_results.isoformat() if recent_results else None,
     }
