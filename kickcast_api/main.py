@@ -1,4 +1,4 @@
-"""KickCast FastAPI app. Run locally with:
+"""Soccer Prediction Engine FastAPI app. Run locally with:
 
     uvicorn kickcast_api.main:app --reload --port 8000
 
@@ -27,7 +27,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     live_scheduler.stop()
 
 
-app = FastAPI(title="KickCast API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Soccer Prediction Engine API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,7 +48,7 @@ app.include_router(batch.router)
 
 @app.get("/")
 def root() -> dict:
-    return {"name": "KickCast API", "docs": "/docs"}
+    return {"name": "Soccer Prediction Engine API", "docs": "/docs"}
 
 
 @app.get("/meta")

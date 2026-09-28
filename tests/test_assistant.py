@@ -249,7 +249,7 @@ def test_service_hybrid_phrases_a_db_lookup_with_gemini_using_only_given_facts(s
     assert result["mode"] == "gemini+db"
     assert result["text"] == "Ridgeway United host Rovers 1 next."
     assert "Ridgeway United's next match" in seen["context"]
-    assert seen["label"] == "KickCast database facts"
+    assert seen["label"] == "Soccer Prediction Engine database facts"
 
 
 def test_service_db_lookup_falls_back_to_plain_template_when_gemini_disabled_for_lookups(session, monkeypatch):

@@ -62,7 +62,7 @@ export default function AboutPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Data sources &amp; credits</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted">
-          Everything on KickCast comes from the free sources below. Predictions are our own model, backtested
+          Everything on Soccer Prediction Engine comes from the free sources below. Predictions are our own model, backtested
           out-of-sample &mdash; not a promise of accuracy. We don&apos;t use any club, league or federation logos or
           crests.
         </p>

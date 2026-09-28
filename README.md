@@ -1,4 +1,4 @@
-# KickCast
+# Soccer Prediction Engine
 
 Pre-match prediction engine for soccer: win/draw/loss probabilities, likely scorelines,
 expected goals, totals and BTTS. It's built to power a free public soccer website.

@@ -66,7 +66,7 @@ for (const [vpName, viewport] of Object.entries(VIEWPORTS)) {
   // The assistant: closed bubble over a page, then the docked popup, then maximized.
   const page = await ctx.newPage();
   await page.goto(BASE + "/", { waitUntil: "networkidle" });
-  await page.getByLabel("Open KickCast assistant").click();
+  await page.getByLabel("Open assistant").click();
   await shoot(page, "assistant-docked", false);
   await page.getByLabel("Expand to full screen").click();
   await shoot(page, "assistant-maximized", false);

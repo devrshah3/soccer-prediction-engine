@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session
 from ..models import WikipediaCache
 
 API_URL = "https://en.wikipedia.org/w/api.php"
-USER_AGENT = "KickCast/0.1 (devrshah3@gmail.com)"
+USER_AGENT = "SoccerPredictionEngine/0.1 (devrshah3@gmail.com)"
 MAX_EXTRACT_CHARS = 12000  # generous for a full article; keeps prompts/cache rows bounded
 
 # MediaWiki's search is a bag-of-words relevance ranker, and interrogative/auxiliary words

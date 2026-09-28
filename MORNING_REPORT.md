@@ -1,4 +1,4 @@
-# KickCast — Morning Report
+# Soccer Prediction Engine — Morning Report
 
 Two sessions layered here: the original overnight run (steps 1–7, commits `e9c809e`..`e8a72d7`,
 summarized below) and a second session (this update) where the user added all 4 real API keys

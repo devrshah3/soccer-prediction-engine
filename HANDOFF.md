@@ -1,4 +1,4 @@
-# KickCast — Handoff Brief for Claude Code
+# Soccer Prediction Engine — Handoff Brief for Claude Code
 
 ## What exists already (in this repo, tested, do not throw away)
 

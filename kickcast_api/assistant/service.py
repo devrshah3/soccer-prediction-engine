@@ -107,7 +107,7 @@ def _db_lookup_answer(session: Session, question: str, fb: dict) -> dict:
     if cached is not None:
         return {**cached, "cached": True}
 
-    composed = gemini_client.ask_gemini_with_context(session, question, facts, "KickCast database facts")
+    composed = gemini_client.ask_gemini_with_context(session, question, facts, "Soccer Prediction Engine database facts")
     if composed is not None and not _looks_like_decline(composed["text"]):
         answer = {"text": text_format.strip_markdown(composed["text"]), "sources": sources, "mode": "gemini+db"}
         answer = _maybe_attach_video(session, question, answer)

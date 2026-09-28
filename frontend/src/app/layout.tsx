@@ -19,9 +19,19 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const DESCRIPTION = "Free soccer scores, fixtures, and our own match predictions.";
+
 export const metadata: Metadata = {
-  title: "KickCast",
-  description: "Free soccer scores, fixtures, and our own match predictions.",
+  title: { default: "Soccer Prediction Engine", template: "%s \u00b7 Soccer Prediction Engine" },
+  description: DESCRIPTION,
+  applicationName: "Soccer Prediction Engine",
+  openGraph: {
+    type: "website",
+    siteName: "Soccer Prediction Engine",
+    title: "Soccer Prediction Engine",
+    description: DESCRIPTION,
+  },
+  twitter: { card: "summary", title: "Soccer Prediction Engine", description: DESCRIPTION },
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
@@ -42,13 +52,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           >
             <Link
               href="/"
-              aria-label="KickCast home"
-              className="glass glass-float pointer-events-auto flex w-fit items-center gap-2 !rounded-full p-1 text-base font-bold tracking-tight text-foreground sm:pr-4"
+              aria-label="Soccer Prediction Engine home"
+              className="glass glass-float pointer-events-auto flex w-fit items-center gap-2 !rounded-full p-1 text-base font-bold tracking-tight text-foreground min-[1100px]:pr-4"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-2 text-sm text-accent-foreground shadow-[0_0_14px_var(--accent-glow)]">
-                K
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-2 text-[13px] tracking-tight text-accent-foreground shadow-[0_0_14px_var(--accent-glow)]">
+                SP
               </span>
-              <span className="hidden sm:inline">KickCast</span>
+              {/* The full name is long: only from 1100px up, so it can never crowd the pill or search. */}
+              <span className="hidden whitespace-nowrap min-[1100px]:inline">Soccer Prediction Engine</span>
             </Link>
             <div className="flex justify-center">
               <NavPill />

@@ -21,7 +21,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 BASE = "https://www.football-data.co.uk/mmz4281"
-UA = "kickcast-research-bot/0.1 (personal, non-commercial football prediction project)"
+UA = "soccer-prediction-engine-research-bot/0.1 (personal, non-commercial football prediction project)"
 # code used by football-data.co.uk -> internal league code used by kickcast_engine.data.openfootball
 LEAGUES = {"E0": "en.1", "SP1": "es.1", "I1": "it.1", "D1": "de.1", "F1": "fr.1"}
 FIRST_SEASON_START = 2001

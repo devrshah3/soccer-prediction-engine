@@ -71,7 +71,7 @@ def _humanize_league_codes(session: Session, obj: Any) -> Any:
     return obj
 
 SYSTEM_INSTRUCTION = (
-    "You are the KickCast soccer assistant. For any factual claim about a match score, "
+    "You are the Soccer Prediction Engine assistant. For any factual claim about a match score, "
     "scorer, minute, table position, fixture date, or our model's prediction, you MUST "
     "call one of the provided tools and use only what it returns - never state such a "
     "fact from your own knowledge, and never state a fact a tool reported as not found. "

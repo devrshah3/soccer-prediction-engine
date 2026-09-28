@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM schema for the KickCast site database.
+"""SQLAlchemy ORM schema for the Soccer Prediction Engine site database.
 
 Every match row carries `source`/`source_id` provenance (ground rule: never lose track of
 where a fact came from). Natural-key uniqueness (league_code, date, home_team_id,

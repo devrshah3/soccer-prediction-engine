@@ -124,7 +124,7 @@ async function DefaultHomePage({ today, leagues }: { today: string; leagues: Map
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">KickCast</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Soccer Prediction Engine</h1>
         <p className="mt-2 max-w-xl text-sm text-muted">
           Our own model &mdash; home / draw / away probabilities, backtested out-of-sample. Not a promise of
           accuracy.
