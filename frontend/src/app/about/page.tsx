@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { api } from "@/lib/api";
+import { timeAgo } from "@/lib/time";
 
 const SOURCES: { name: string; used: string; license: string; href?: string }[] = [
   {
@@ -56,7 +58,8 @@ const SOURCES: { name: string; used: string; license: string; href?: string }[] 
   },
 ];
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const meta = await api.meta().catch(() => ({ ingested_at: null, data_version: null }));
   return (
     <div className="space-y-6">
       <div>
@@ -66,6 +69,7 @@ export default function AboutPage() {
           out-of-sample &mdash; not a promise of accuracy. We don&apos;t use any club, league or federation logos or
           crests.
         </p>
+        {meta.ingested_at && <p className="mt-2 text-sm text-muted">Fixtures {timeAgo(meta.ingested_at)}.</p>}
         <Link href="/awards/method" className="mt-2 inline-block text-sm text-accent-text hover:underline">
           How the Golden Boot projection was tested &rarr;
         </Link>

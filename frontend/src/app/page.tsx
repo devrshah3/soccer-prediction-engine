@@ -47,8 +47,7 @@ async function SelectedDatePage({ date, leagues }: { date: string; leagues: Map<
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Matches</h1>
-        <p className="mt-1 text-sm text-muted">{formatShortDate(date)}</p>
-        <div className="mt-4">
+        <div className="mt-3">
           <DatePicker selected={date} />
         </div>
       </div>
@@ -125,11 +124,7 @@ async function DefaultHomePage({ today, leagues }: { today: string; leagues: Map
     <div className="space-y-10">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Soccer Prediction Engine</h1>
-        <p className="mt-2 max-w-xl text-sm text-muted">
-          Our own model &mdash; home / draw / away probabilities, backtested out-of-sample. Not a promise of
-          accuracy.
-        </p>
-        <div className="mt-4">
+        <div className="mt-3">
           <DatePicker selected={today} />
         </div>
       </div>

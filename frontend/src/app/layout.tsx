@@ -5,8 +5,6 @@ import { ChatWidget } from "@/components/ChatWidget";
 import { NavPill } from "@/components/glass/NavPill";
 import { SearchBox } from "@/components/SearchBox";
 import { SceneBackground } from "@/components/SceneBackground";
-import { api } from "@/lib/api";
-import { timeAgo } from "@/lib/time";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,9 +32,7 @@ export const metadata: Metadata = {
   twitter: { card: "summary", title: "Soccer Prediction Engine", description: DESCRIPTION },
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const meta = await api.meta().catch(() => ({ ingested_at: null, data_version: null }));
-
+export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
@@ -68,15 +64,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </nav>
         </header>
         <main className="relative z-0 mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
-        <footer className="relative z-0 px-4 pb-8 pt-4 text-center text-xs text-muted-2 sm:px-6">
-          <div className="glass mx-auto max-w-3xl !rounded-2xl px-4 py-3">
-            Predictions are our own model, backtested out-of-sample - not a promise of accuracy.
-            {meta.ingested_at && <> &middot; fixtures {timeAgo(meta.ingested_at)}</>}
-            {" "}&middot;{" "}
-            <Link href="/about" className="text-accent-text hover:underline">
-              Data sources &amp; credits
-            </Link>
-          </div>
+        {/* One plain, quiet link - no box or glass. Bottom padding clears the assistant bubble
+            (bottom-right, ~76px tall from the edge) so it never covers the last cards or this link. */}
+        <footer className="relative z-0 px-4 pb-28 pt-8 text-center">
+          <Link href="/about" className="text-[11px] text-muted-2/70 underline-offset-2 hover:text-muted hover:underline">
+            Data sources &amp; credits
+          </Link>
         </footer>
         <ChatWidget />
       </body>
