@@ -7,6 +7,7 @@ Expects data/kickcast.db to exist (run `python scripts/ingest.py` first).
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -21,8 +22,22 @@ from .models import Meta
 from .routes import assistant, awards, batch, leagues, live, matches, replay, teams
 
 
+def _load_seed() -> None:
+    from .db import SessionLocal
+    from .seed import load_seed
+
+    session = SessionLocal()
+    try:
+        load_seed(session)
+    except Exception:  # a bad/missing seed must never stop the API from starting
+        logging.getLogger("uvicorn.error").exception("seed load failed; continuing without it")
+    finally:
+        session.close()
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    _load_seed()  # before any refresh, so live data lands on top of it
     live_scheduler.start()  # nightly build always; API-Football jobs only if enabled AND a key is set
     if settings.startup_catchup():
         catchup.start_background()  # serve immediately from the built DB; catch up in the background

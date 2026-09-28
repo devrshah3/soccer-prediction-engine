@@ -7,6 +7,7 @@ Steps (each timed; total printed at the end):
   1. fetch the open data       scripts/fetch_open_data.sh   (openfootball, martj42)
   2. fetch football-data.co.uk scripts/fetch_footballdata_uk.py
   3. ingest                    scripts/ingest.py            (also 1 football-data.org call for the Champions League if enabled)
+     seed snapshot             kickcast_api/seed.py         (open-licensed results/goals/stats committed in seed/)
   4. artifacts                 models (pickled), trophy odds, Golden Boot projections, match predictions
 
 The build fails loudly if any of the data steps fails (an empty site is worse than a failed deploy)
@@ -38,6 +39,7 @@ def main() -> None:
     run("fetch open data", ["bash", "scripts/fetch_open_data.sh"])
     run("fetch football-data.co.uk", [sys.executable, "scripts/fetch_footballdata_uk.py"])
     run("ingest", [sys.executable, "scripts/ingest.py"])
+    run("load seed snapshot", [sys.executable, "-m", "kickcast_api.seed"])
 
     print("\n=== build artifacts (models, trophy odds, Golden Boot, predictions) ===", flush=True)
     started = time.monotonic()
