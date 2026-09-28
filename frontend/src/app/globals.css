@@ -1,22 +1,46 @@
 @import "tailwindcss";
 
 :root {
-  --background: #05070d;
-  --surface: #0d1220;
-  --surface-hover: #131a2e;
-  --surface-raised: #111729;
-  --foreground: #e8eaf3;
-  --muted: #8991a8;
-  --muted-2: #5f6880;
-  --border: rgba(148, 163, 184, 0.14);
-  --border-strong: rgba(148, 163, 184, 0.26);
-  --accent: #3b82f6;
-  --accent-hover: #5b9bff;
-  --accent-foreground: #04101f;
-  --accent-soft: rgba(59, 130, 246, 0.14);
+  /* Base scene: deep navy gradient, applied to <body> as a fixed backdrop (see
+     SceneBackground.tsx for the drawn ball/pitch-lines/orbs layer on top of it). */
+  --scene-1: #04081a;
+  --scene-2: #081433;
+  --scene-3: #0b2255;
+
+  --background: #060a18;
+  --foreground: #eef1f8;
+  --muted: #9aa4bd;
+  --muted-2: #6b7594;
+
+  /* Glass surface - see the .glass utility below for the full recipe (gradient fill +
+     backdrop-filter + border + inset highlight + shadow). These tokens are the fill only,
+     used directly by components that build their own glass rule (Dock, Sheet, popovers). */
+  --glass-fill-1: rgba(255, 255, 255, 0.17);
+  --glass-fill-2: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-highlight: rgba(255, 255, 255, 0.35);
+  --glass-fallback: rgba(18, 26, 48, 0.92); /* solid fallback when backdrop-filter is unsupported */
+
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.22);
+
+  /* One blue accent, #3d7bff -> #7db2ff. */
+  --accent: #3d7bff;
+  --accent-2: #7db2ff;
+  --accent-hover: #5b91ff;
+  --accent-foreground: #041024;
+  --accent-soft: rgba(61, 123, 255, 0.16);
+  --accent-glow: rgba(61, 123, 255, 0.55);
+
   --success: #22c55e;
   --danger: #f0525c;
   --warning: #f5a524;
+
+  /* Kept for components not yet migrated off the old flat-surface naming. */
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-hover: rgba(255, 255, 255, 0.1);
+  --surface-raised: rgba(255, 255, 255, 0.08);
+  --muted-hex: #9aa4bd;
 }
 
 @theme inline {
@@ -30,6 +54,7 @@
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
   --color-accent-hover: var(--accent-hover);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent-soft: var(--accent-soft);
@@ -44,12 +69,18 @@
   border-color: var(--border);
 }
 
+html,
 body {
-  background: var(--background);
+  overflow-x: hidden;
+}
+
+body {
+  background: linear-gradient(160deg, var(--scene-1) 0%, var(--scene-2) 55%, var(--scene-3) 100%) fixed;
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
 }
 
 ::selection {
@@ -67,14 +98,67 @@ body {
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong);
   border-radius: 9999px;
-  border: 2px solid var(--background);
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-2);
 }
 
-/* Fixed 375px viewport check: no element should force horizontal scroll */
-html,
-body {
-  overflow-x: hidden;
+/* ---------------------------------------------------------------- glass recipe
+   Exact spec: gradient(.17 -> .05 white), blur(18px) saturate(150%) [+ -webkit-], 1px
+   border rgba(255,255,255,.16), inset top highlight, soft outer shadow, radius 22px, a
+   specular sheen top-left. A solid fallback fill covers browsers without
+   backdrop-filter support (@supports not (...)). Applied to CONTAINERS only (cards,
+   panels, the dock, sheets, popovers) - never per-row in a long list, where a flat
+   translucent fill is used instead so scrolling stays smooth (see .glass-row). */
+.glass {
+  position: relative;
+  background: linear-gradient(135deg, var(--glass-fill-1), var(--glass-fill-2));
+  border: 1px solid var(--glass-border);
+  border-radius: 22px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 20px 40px -20px rgba(0, 0, 20, 0.6);
+  isolation: isolate;
+}
+.glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(120% 80% at 12% 0%, var(--glass-highlight), transparent 55%);
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: -1;
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .glass {
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+  }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background: var(--glass-fallback);
+  }
+}
+
+/* Flat, cheap translucent fill for rows inside a long scrolling list - no blur. */
+.glass-row {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+@media (max-width: 640px) {
+  .glass {
+    border-radius: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-drift {
+    animation: none !important;
+  }
 }

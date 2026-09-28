@@ -38,7 +38,7 @@ export default async function LeaguePage({
         <SeasonSelect code={code} season={standings.season} seasons={standings.available_seasons} />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+      <div className="overflow-x-auto glass">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="text-left text-[11px] uppercase tracking-wide text-muted-2">
             <tr>
@@ -93,7 +93,7 @@ export default async function LeaguePage({
               <Link
                 key={t.team_id}
                 href={`/teams/${encodeURIComponent(t.team_id)}`}
-                className="rounded-xl border border-border bg-surface p-4 transition-colors hover:border-border-strong hover:bg-surface-hover"
+                className="glass p-4 transition-colors hover:border-white/25 hover:bg-white/[0.08]"
               >
                 <p className="mb-3 truncate text-sm font-medium text-foreground">{t.team_name}</p>
                 <div className="grid grid-cols-3 gap-2 text-center">

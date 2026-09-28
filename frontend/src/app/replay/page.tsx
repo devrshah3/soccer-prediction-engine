@@ -12,7 +12,7 @@ export default async function ReplayListPage() {
           Real event data from {source}. This is a REPLAY of a past match, not a live feed.
         </p>
       </div>
-      <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+      <ul className="divide-y divide-border glass">
         {matches.map((m) => (
           <li key={m.id}>
             <Link

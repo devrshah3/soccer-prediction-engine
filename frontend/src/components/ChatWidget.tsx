@@ -62,7 +62,7 @@ export function ChatWidget() {
       <button
         onClick={() => setOpen(true)}
         aria-label="Open KickCast assistant"
-        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg shadow-accent/30 transition-transform hover:scale-105 hover:bg-accent-hover"
+        className="glass fixed bottom-24 right-5 z-50 flex h-14 w-14 items-center justify-center !rounded-full text-accent-2 shadow-[0_0_20px_var(--accent-glow)] transition-transform hover:scale-105 sm:bottom-6"
       >
         <ChatBubbleIcon className="h-6 w-6" />
       </button>
@@ -70,8 +70,8 @@ export function ChatWidget() {
   }
 
   const panelClasses = expanded
-    ? "fixed inset-0 z-50 flex flex-col bg-background"
-    : "fixed bottom-5 right-5 z-50 flex h-[min(600px,calc(100vh-2.5rem))] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-border-strong bg-surface shadow-2xl shadow-black/40";
+    ? "glass fixed inset-2 z-50 flex flex-col !rounded-3xl sm:inset-6"
+    : "glass fixed bottom-24 right-5 z-50 flex h-[min(600px,calc(100vh-8rem))] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden sm:bottom-6";
 
   return (
     <div className={panelClasses}>

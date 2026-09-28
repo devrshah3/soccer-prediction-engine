@@ -16,7 +16,7 @@ export default async function AwardsPage() {
           {Object.entries(awards.golden_boot.by_league).map(([code, entry]) => {
             const league = leagueInfo[code];
             return (
-              <div key={code} className="rounded-xl border border-border bg-surface p-4">
+              <div key={code} className="glass p-4">
                 <div className="mb-3 flex items-center gap-2">
                   {league && <LeagueChip name={league.name} country={league.country} />}
                 </div>
@@ -49,7 +49,7 @@ export default async function AwardsPage() {
         </div>
 
         {intl.international_top_scorers.length > 0 && (
-          <div className="mt-4 rounded-xl border border-border bg-surface p-4">
+          <div className="mt-4 glass p-4">
             <h3 className="mb-1 text-sm font-medium text-foreground">
               International top scorers (last {intl.lookback_days} days)
             </h3>
@@ -72,11 +72,11 @@ export default async function AwardsPage() {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="glass p-4">
           <h2 className="mb-1 text-sm font-semibold text-foreground">Ballon d&apos;Or / The Best</h2>
           <p className="text-sm text-muted">{awards.ballon_dor.reason}</p>
         </div>
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="glass p-4">
           <h2 className="mb-1 text-sm font-semibold text-foreground">Puskás Award</h2>
           <p className="text-sm text-muted">{awards.puskas.reason}</p>
         </div>

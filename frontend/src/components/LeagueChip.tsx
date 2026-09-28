@@ -1,20 +1,12 @@
-// Flag emoji by country, not by league code: this is what actually disambiguates "Ligue 1"
-// vs "Serie B" for a skimming user. No icon-asset pipeline exists yet, so an emoji flag is
-// the pragmatic choice (England uses the UK flag - the dedicated England tag-sequence emoji
-// doesn't render everywhere).
-const FLAGS: Record<string, string> = {
-  England: "\u{1F1EC}\u{1F1E7}",
-  Spain: "\u{1F1EA}\u{1F1F8}",
-  Italy: "\u{1F1EE}\u{1F1F9}",
-  Germany: "\u{1F1E9}\u{1F1EA}",
-  France: "\u{1F1EB}\u{1F1F7}",
-};
+import { Flag } from "./Flag";
 
+// Real drawn flag (never emoji - see Flag.tsx) for the country that disambiguates
+// "Ligue 1" vs "Serie A" for a skimming user; a neutral icon (Flag's own fallback) for a
+// continental competition with no single country.
 export function LeagueChip({ name, country }: { name: string; country: string | null }) {
-  const flag = country ? FLAGS[country] : "\u{1F310}"; // globe for international
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-raised px-2.5 py-1 text-xs font-medium text-muted">
-      <span className="text-[13px] leading-none">{flag}</span>
+    <span className="glass-row inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-muted">
+      <Flag country={country} className="h-[13px] w-[18px] shrink-0 rounded-[2px]" />
       {name}
     </span>
   );

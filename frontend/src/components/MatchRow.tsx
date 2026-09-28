@@ -28,7 +28,9 @@ export function MatchRow({
   return (
     <Link
       href={`/matches/${match.id}`}
-      className="group block rounded-xl border border-border bg-surface p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-border-strong hover:bg-surface-hover hover:shadow-lg hover:shadow-black/20"
+      // A card in a (potentially long) list gets the cheap flat translucent fill
+      // (.glass-row, no blur) rather than the full blurred .glass recipe - see globals.css.
+      className="group glass-row block p-4 transition-all hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.08]"
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         {league ? <LeagueChip name={league.name} country={league.country} /> : <span />}

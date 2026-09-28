@@ -51,7 +51,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
         {teamOdds && (
-          <div className="flex gap-4 rounded-xl border border-border bg-surface px-4 py-3 text-center">
+          <div className="flex gap-4 glass px-4 py-3 text-center">
             <MiniStat label="Title" value={teamOdds.title_pct} />
             <MiniStat label="Top 4" value={teamOdds.top4_pct} />
             <MiniStat label="Releg." value={teamOdds.relegation_pct} tone="danger" />
@@ -62,7 +62,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
       {team.next_match && (
         <section>
           <h2 className="mb-3 text-lg font-semibold text-foreground">Next match</h2>
-          <div className="rounded-xl border border-border bg-surface p-5">
+          <div className="glass p-5">
             <p className="mb-3 text-sm text-muted">
               {team.next_match.round} &middot;{" "}
               <KickoffTime date={team.next_match.date} kickoff={team.next_match.kickoff} />
@@ -113,7 +113,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
               upcoming.length === 0 ? (
                 <p className="text-sm text-muted-2">No scheduled fixtures found.</p>
               ) : (
-                <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+                <ul className="divide-y divide-border glass">
                   {upcoming.map((m) => (
                     <li key={m.id}>
                       <Link
@@ -138,7 +138,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
               recent.length === 0 ? (
                 <p className="text-sm text-muted-2">No finished matches found.</p>
               ) : (
-                <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+                <ul className="divide-y divide-border glass">
                   {recent.map((m) => (
                     <li key={m.id}>
                       <Link
@@ -160,7 +160,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                 {
                   label: "Trophy odds",
                   content: (
-                    <div className="grid grid-cols-3 gap-3 rounded-xl border border-border bg-surface p-5 text-center sm:w-80">
+                    <div className="grid grid-cols-3 gap-3 glass p-5 text-center sm:w-80">
                       <MiniStat label="Title" value={teamOdds.title_pct} big />
                       <MiniStat label="Top 4" value={teamOdds.top4_pct} big />
                       <MiniStat label="Relegation" value={teamOdds.relegation_pct} tone="danger" big />

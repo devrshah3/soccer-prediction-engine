@@ -60,7 +60,7 @@ async function SelectedDatePage({ date, leagues }: { date: string; leagues: Map<
 async function EmptyDate({ date }: { date: string }) {
   const nearby = await api.nearbyMatchDate(date, "nearest").catch(() => ({ date: null }));
   return (
-    <div className="rounded-xl border border-dashed border-border-strong bg-surface/50 p-8 text-center">
+    <div className="glass border-dashed p-8 text-center">
       <p className="text-sm text-muted">No matches on this date.</p>
       {nearby.date && (
         <Link href={`/?date=${nearby.date}`} className="mt-2 inline-block text-sm text-accent hover:underline">
@@ -161,7 +161,7 @@ async function DefaultHomePage({ today, leagues }: { today: string; leagues: Map
           )}
         </div>
         {upcoming.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border-strong bg-surface/50 p-8 text-center">
+          <div className="glass border-dashed p-8 text-center">
             <p className="text-sm text-muted">
               No upcoming fixtures found. Has{" "}
               <code className="rounded bg-surface-raised px-1.5 py-0.5 text-muted-2">python scripts/ingest.py</code>{" "}

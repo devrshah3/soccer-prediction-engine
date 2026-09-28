@@ -1,3 +1,6 @@
+// Glass spec: the LEADING outcome (whichever of home/draw/away is highest) is bright blue
+// with a soft glow; the other two segments are neutral glass fills - not a fixed
+// home=blue/away=grey scheme, since "leading" can be any of the three.
 export function ProbabilityBar({
   home,
   draw,
@@ -15,6 +18,12 @@ export function ProbabilityBar({
 }) {
   const pct = (v: number) => `${Math.round(v * 100)}%`;
   const barHeight = size === "lg" ? "h-4" : "h-2";
+  const leader = home >= draw && home >= away ? "home" : draw >= away ? "draw" : "away";
+
+  const segmentClass = (segment: "home" | "draw" | "away") =>
+    segment === leader
+      ? "bg-gradient-to-r from-accent to-accent-2 shadow-[0_0_12px_var(--accent-glow)]"
+      : "bg-white/[0.14]";
 
   return (
     <div className="w-full">
@@ -24,23 +33,15 @@ export function ProbabilityBar({
           <span className="truncate text-right">{awayLabel}</span>
         </div>
       )}
-      <div className={`flex w-full overflow-hidden rounded-full bg-surface-raised ring-1 ring-inset ring-border ${barHeight}`}>
-        <div
-          className="bg-gradient-to-r from-accent to-accent-hover transition-[width]"
-          style={{ width: pct(home) }}
-          title={`${homeLabel} win ${pct(home)}`}
-        />
-        <div className="bg-muted-2/70 transition-[width]" style={{ width: pct(draw) }} title={`Draw ${pct(draw)}`} />
-        <div
-          className="bg-gradient-to-r from-zinc-400 to-zinc-300 transition-[width]"
-          style={{ width: pct(away) }}
-          title={`${awayLabel} win ${pct(away)}`}
-        />
+      <div className={`flex w-full overflow-hidden rounded-full border border-white/10 bg-white/[0.05] ${barHeight}`}>
+        <div className={`transition-[width] ${segmentClass("home")}`} style={{ width: pct(home) }} title={`${homeLabel} win ${pct(home)}`} />
+        <div className={`transition-[width] ${segmentClass("draw")}`} style={{ width: pct(draw) }} title={`Draw ${pct(draw)}`} />
+        <div className={`transition-[width] ${segmentClass("away")}`} style={{ width: pct(away) }} title={`${awayLabel} win ${pct(away)}`} />
       </div>
       <div className={`mt-1.5 flex justify-between ${size === "lg" ? "text-sm" : "text-xs"} text-muted`}>
-        <span className="font-semibold text-accent">{pct(home)}</span>
-        <span>{pct(draw)}</span>
-        <span className="font-semibold text-zinc-300">{pct(away)}</span>
+        <span className={leader === "home" ? "font-semibold text-accent-2" : ""}>{pct(home)}</span>
+        <span className={leader === "draw" ? "font-semibold text-accent-2" : ""}>{pct(draw)}</span>
+        <span className={leader === "away" ? "font-semibold text-accent-2" : ""}>{pct(away)}</span>
       </div>
     </div>
   );

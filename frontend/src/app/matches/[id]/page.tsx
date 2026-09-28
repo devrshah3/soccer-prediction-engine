@@ -43,7 +43,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         {state.kind === "pending_result" && <span className="ml-2 text-muted-2">Full time, score pending</span>}
       </p>
 
-      <div className="flex flex-wrap items-center justify-center gap-4 rounded-xl border border-border bg-surface px-4 py-8 sm:gap-6">
+      <div className="flex flex-wrap items-center justify-center gap-4 glass px-4 py-8 sm:gap-6">
         <TeamLink id={match.home_team.id} name={match.home_team.name} />
         {state.kind === "finished" ? (
           <span className="shrink-0 text-3xl font-bold tabular-nums text-foreground">
@@ -56,7 +56,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {state.kind === "upcoming" && (
-        <section className="rounded-xl border border-border bg-surface p-5 sm:p-6">
+        <section className="glass p-5 sm:p-6">
           <h2 className="mb-4 text-lg font-semibold text-foreground">Prediction</h2>
           {prediction ? (
             <>
@@ -70,7 +70,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                   awayLabel={match.away_team.name}
                 />
               </div>
-              <div className="mt-6 grid grid-cols-2 gap-4 rounded-lg border border-border bg-surface-raised p-4 text-sm sm:grid-cols-4">
+              <div className="mt-6 grid grid-cols-2 gap-4 glass-row p-4 text-sm sm:grid-cols-4">
                 <Stat label="Expected goals" value={`${prediction.expected_goals.home.toFixed(2)} - ${prediction.expected_goals.away.toFixed(2)}`} />
                 <Stat label="Both teams to score" value={`${Math.round(prediction.btts * 100)}%`} />
                 <Stat label="Over 2.5 goals" value={`${Math.round((prediction.totals["over_2.5"] ?? 0) * 100)}%`} />
@@ -119,11 +119,11 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                 <div className="mt-5">
                   <h3 className="mb-2 text-sm font-medium text-muted">Expected cards</h3>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="rounded-lg border border-border bg-surface-raised p-3 text-xs text-foreground">
+                    <div className="glass-row p-3 text-xs text-foreground">
                       {match.home_team.name}: {prediction.cards.home.expected_yellow.toFixed(2)} yellow,{" "}
                       {prediction.cards.home.expected_red.toFixed(3)} red
                     </div>
-                    <div className="rounded-lg border border-border bg-surface-raised p-3 text-xs text-foreground">
+                    <div className="glass-row p-3 text-xs text-foreground">
                       {match.away_team.name}: {prediction.cards.away.expected_yellow.toFixed(2)} yellow,{" "}
                       {prediction.cards.away.expected_red.toFixed(3)} red
                     </div>
@@ -133,7 +133,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                 <p className="mt-5 text-xs text-muted-2">Expected cards: not available &mdash; {prediction.cards.reason}</p>
               )}
 
-              <details className="mt-5 rounded-lg border border-border bg-surface-raised p-3 text-xs text-muted-2">
+              <details className="mt-5 glass-row p-3 text-xs text-muted-2">
                 <summary className="cursor-pointer select-none font-medium text-muted">Prediction details</summary>
                 <p className="mt-2">
                   {prediction.computed_at ? `${timeAgo(prediction.computed_at)} · ` : ""}
@@ -152,7 +152,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
       )}
 
       {state.kind === "finished" && (
-        <section className="rounded-xl border border-border bg-surface p-5">
+        <section className="glass p-5">
           <h2 className="mb-2 text-lg font-semibold text-foreground">Result</h2>
           <p className="text-sm text-muted">
             Full time {match.home_goals} &ndash; {match.away_goals}.
@@ -208,7 +208,7 @@ function ScorerList({
   scorers: { player: string; prob_scores: number }[];
 }) {
   return (
-    <div className="rounded-lg border border-border bg-surface-raised p-3">
+    <div className="glass-row p-3">
       <p className="mb-2 text-xs font-medium text-muted">{label}</p>
       {scorers.length === 0 ? (
         <p className="text-xs text-muted-2">no scoring history in the lookback window</p>
