@@ -61,7 +61,7 @@ def test_update_todays_results_is_a_noop_outside_match_window(session, monkeypat
     called = {"n": 0}
     monkeypatch.setattr(results_updater.api_football, "fetch_fixtures_by_date", lambda s, d: called.__setitem__("n", called["n"] + 1) or [])
     now = datetime.now(timezone.utc)
-    _add_match(session, now - timedelta(hours=14))  # beyond even the 12h catch-up horizon
+    _add_match(session, now - timedelta(hours=100))  # beyond even the 72h catch-up horizon
     assert results_updater.update_todays_results(session, now) == 0
     assert called["n"] == 0  # never even made the call
 
@@ -178,7 +178,7 @@ def test_national_teams_outside_the_club_crosswalk_are_matched_by_exact_name(tmp
 
 def test_unfinished_match_is_caught_up_after_the_normal_window_but_rate_limited(tmp_path, monkeypatch):
     monkeypatch.setenv("API_FOOTBALL_KEY", "fake-key")
-    monkeypatch.setattr(results_updater, "_last_date_call", None)
+    monkeypatch.setattr(results_updater, "_last_date_call", {})
     s = _national_session(tmp_path)
     now = datetime.now(timezone.utc)
     _national_match(s, now - timedelta(hours=4))  # past the 150-min window, still 'scheduled'
@@ -195,7 +195,7 @@ def test_yesterdays_unfinished_match_is_caught_up_after_midnight(tmp_path, monke
     """The three Sep 28 Nations League games were still unresolved when the clock rolled to
     Sep 29 (and the daily quota reset) - the updater must ask for YESTERDAY's fixtures too."""
     monkeypatch.setenv("API_FOOTBALL_KEY", "fake-key")
-    monkeypatch.setattr(results_updater, "_last_date_call", None)
+    monkeypatch.setattr(results_updater, "_last_date_call", {})
     s = _national_session(tmp_path)
     now = datetime(2026, 9, 29, 0, 5, tzinfo=timezone.utc)
     _national_match(s, datetime(2026, 9, 28, 16, 0, tzinfo=timezone.utc))
@@ -203,3 +203,43 @@ def test_yesterdays_unfinished_match_is_caught_up_after_midnight(tmp_path, monke
     monkeypatch.setattr(results_updater.api_football, "fetch_fixtures_by_date", lambda sess, d: calls.append(d) or [])
     results_updater.update_todays_results(s, now)
     assert calls == ["2026-09-28"]
+
+
+def test_not_played_rows_from_the_last_days_are_revived_when_a_result_arrives(tmp_path, monkeypatch):
+    """Sep 27's Nations League rows were relabelled 'not_played' by ingest with no score - a
+    later final status from the source must turn them back into finished results."""
+    monkeypatch.setenv("API_FOOTBALL_KEY", "fake-key")
+    monkeypatch.setattr(results_updater, "_last_date_call", {})
+    monkeypatch.setattr(matching, "_crosswalk", {})
+    s = _national_session(tmp_path)
+    now = datetime(2026, 9, 29, 0, 5, tzinfo=timezone.utc)
+    m = _national_match(s, datetime(2026, 9, 27, 16, 0, tzinfo=timezone.utc))
+    m.status = "not_played"
+    s.commit()
+    monkeypatch.setattr(
+        results_updater.api_football, "fetch_fixtures_by_date",
+        lambda sess, d: [{
+            "fixture_id": 5, "minute": 90, "match_status": "FT", "home_team_id": 1, "away_team_id": 2,
+            "home_team_name": "Georgia", "away_team_name": "Ukraine", "home_score": 0, "away_score": 3, "events": [],
+        }] if d == "2026-09-27" else [],
+    )
+    monkeypatch.setattr(results_updater.api_football, "fetch_events", lambda sess, fid: [])
+    assert results_updater.update_todays_results(s, now) == 1
+    s.refresh(m)
+    assert (m.status, m.home_goals, m.away_goals) == ("finished", 0, 3)
+
+
+def test_old_unresolved_dates_are_only_rechecked_every_six_hours(tmp_path, monkeypatch):
+    monkeypatch.setenv("API_FOOTBALL_KEY", "fake-key")
+    monkeypatch.setattr(results_updater, "_last_date_call", {})
+    s = _national_session(tmp_path)
+    now = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
+    _national_match(s, datetime(2026, 9, 27, 16, 0, tzinfo=timezone.utc))
+    calls = []
+    monkeypatch.setattr(results_updater.api_football, "fetch_fixtures_by_date", lambda sess, d: calls.append(d) or [])
+    results_updater.update_todays_results(s, now)
+    results_updater.update_todays_results(s, now + timedelta(hours=1))
+    results_updater.update_todays_results(s, now + timedelta(hours=5))
+    assert calls == ["2026-09-27"]
+    results_updater.update_todays_results(s, now + timedelta(hours=6, minutes=1))
+    assert len(calls) == 2

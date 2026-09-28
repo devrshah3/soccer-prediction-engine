@@ -249,3 +249,21 @@ def test_champions_league_ingest_never_overwrites_an_existing_teams_name_or_coun
     assert real_madrid_after.name == "Real Madrid" and real_madrid_after.country == "Spain"
     brugge = session.get(Team, "brugge kv")  # canonical_id() strips the "club " prefix
     assert brugge is not None  # a genuinely new CL-only club still gets created
+
+
+def test_fixture_list_reingest_does_not_wipe_a_recorded_result(tmp_path):
+    """results_updater.py records a final score on a fixture-list row; the next ingest of the
+    same list (status 'scheduled', no goals) must leave that result alone - and a later real
+    result source can still overwrite it."""
+    session = _session(tmp_path)
+    existing, by_round = {}, {}
+    key = ("test.1", (datetime.now(UTC) - timedelta(days=1)).date(), "home", "away")
+    m = ingest.upsert_match(session, existing, by_round, key, {"season": "2026-27", "kickoff": "16:00", "status": "scheduled", "home_goals": None, "away_goals": None, "source": "t", "source_id": "t:1"})
+    m.status, m.home_goals, m.away_goals = "finished", 2, 1  # what the live results updater does
+    session.commit()
+
+    again = ingest.upsert_match(session, existing, by_round, key, {"season": "2026-27", "kickoff": "16:00", "status": "scheduled", "home_goals": None, "away_goals": None, "source": "t", "source_id": "t:1"})
+    assert (again.status, again.home_goals, again.away_goals) == ("finished", 2, 1)
+
+    final = ingest.upsert_match(session, existing, by_round, key, {"season": "2026-27", "kickoff": "16:00", "status": "finished", "home_goals": 2, "away_goals": 1, "source": "t", "source_id": "t:1"})
+    assert (final.status, final.home_goals, final.away_goals) == ("finished", 2, 1)

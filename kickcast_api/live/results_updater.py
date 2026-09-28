@@ -34,19 +34,20 @@ WINDOW_AFTER_KICKOFF_MINUTES = 150
 # ran out, source lag) keeps being checked up to this long after kickoff - but at most one
 # date call per LATE_CHECK_GAP_MINUTES once it's past the normal window, so an
 # unresolvable match (postponed, unmapped) can't drain the shared 100/day budget.
-CATCHUP_AFTER_KICKOFF_MINUTES = 12 * 60
-LATE_CHECK_GAP_MINUTES = 30
+CATCHUP_AFTER_KICKOFF_MINUTES = 72 * 60
+LATE_CHECK_GAP_MINUTES = 30  # per date, while the match is < 12h past kickoff
+OLD_LATE_CHECK_GAP_MINUTES = 6 * 60  # per date, once it's older than that
 # Keep this many calls in reserve for live polling when fetching per-match events.
 EVENTS_QUOTA_RESERVE = 15
 
-_last_date_call: datetime | None = None
+_last_date_call: dict[str, datetime] = {}  # date -> when we last asked API-Football for it
 
 _FINISHED_CODES = {"FT", "AET", "PEN"}
 
 def _todays_candidate_matches(session: Session, today: str) -> list[Match]:
     return (
         session.query(Match)
-        .filter(Match.date == today, or_(Match.status == "scheduled", Match.status == "finished"))
+        .filter(Match.date == today, or_(Match.status == "scheduled", Match.status == "finished", Match.status == "not_played"))
         .all()
     )
 
@@ -61,26 +62,36 @@ def _minutes_since_kickoff(m: Match, now: datetime) -> float | None:
     return (now - kickoff_dt).total_seconds() / 60
 
 
+UNRESOLVED_STATUSES = ("scheduled", "not_played")  # ingest relabels a stale 'scheduled' row 'not_played'
+
+
 def dates_needing_check(session: Session, now: datetime) -> list[str]:
-    """Dates worth one date-scoped API call right now. Today, if a match of ours is in its
-    normal window; plus today AND yesterday when a match is past kickoff but never got its
-    final status (catch-up, spaced LATE_CHECK_GAP_MINUTES apart) - yesterday matters for
-    anything that finished or was missed around midnight UTC, or before the daily quota reset."""
+    """Dates worth one date-scoped API call right now: today if a match of ours is in its
+    normal window; plus any of the last few days that still hold a match past kickoff that
+    never got its final status (catch-up - covers a server that was down, an exhausted
+    quota, or matches around midnight UTC). Catch-up asks are spaced per date so an
+    unresolvable match (postponed, unmapped) can't drain the shared 100/day budget."""
     dates: list[str] = []
     today = now.date().isoformat()
     if in_match_window(session, now):
         dates.append(today)
-    gap_ok = _last_date_call is None or (now - _last_date_call).total_seconds() / 60 >= LATE_CHECK_GAP_MINUTES
-    if gap_ok:
-        for day in (today, (now - timedelta(days=1)).date().isoformat()):
-            if day in dates:
-                continue
-            if any(
-                m.status == "scheduled" and (mins := _minutes_since_kickoff(m, now)) is not None
-                and WINDOW_AFTER_KICKOFF_MINUTES < mins <= CATCHUP_AFTER_KICKOFF_MINUTES
-                for m in _todays_candidate_matches(session, day)
-            ):
-                dates.append(day)
+    for back in range(4):
+        day = (now - timedelta(days=back)).date().isoformat()
+        if day in dates:
+            continue
+        ages = [
+            mins
+            for m in _todays_candidate_matches(session, day)
+            if m.status in UNRESOLVED_STATUSES
+            and (mins := _minutes_since_kickoff(m, now)) is not None
+            and WINDOW_AFTER_KICKOFF_MINUTES < mins <= CATCHUP_AFTER_KICKOFF_MINUTES
+        ]
+        if not ages:
+            continue
+        gap = LATE_CHECK_GAP_MINUTES if min(ages) < 12 * 60 else OLD_LATE_CHECK_GAP_MINUTES
+        last = _last_date_call.get(day)
+        if last is None or (now - last).total_seconds() / 60 >= gap:
+            dates.append(day)
     return dates
 
 
@@ -112,13 +123,12 @@ def update_todays_results(session: Session, now: datetime | None = None) -> int:
     """Returns how many of our Match rows were updated (0 if outside a match window,
     no key/quota, or a network error - all genuine no-ops, never an exception)."""
     now = now or datetime.now(timezone.utc)
-    global _last_date_call
     updated = 0
     for day in dates_needing_check(session, now):
         fixtures = api_football.fetch_fixtures_by_date(session, day)
         if fixtures is None:
             continue
-        _last_date_call = now
+        _last_date_call[day] = now
         updated += _apply_fixtures(session, day, fixtures, now)
     return updated
 

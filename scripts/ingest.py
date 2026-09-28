@@ -102,6 +102,11 @@ def upsert_match(session, existing: dict, by_round: dict, key: tuple, fields: di
         m = Match(league_code=key[0], date=key[1], home_team_id=key[2], away_team_id=key[3])
         session.add(m)
         existing[key] = m
+    if m.status == "finished" and m.home_goals is not None and fields.get("status") != "finished":
+        # A fixture LIST (UEFA's Nations League file, openfootball's unplayed rows) carries
+        # no result. If a live source (results_updater.py) already recorded a final score,
+        # re-ingesting the list must not wipe it back to "scheduled"/None.
+        fields = {k: v for k, v in fields.items() if k not in ("status", "home_goals", "away_goals")}
     for k, v in fields.items():
         setattr(m, k, v)
     if round_key is not None:
