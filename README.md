@@ -1,8 +1,36 @@
 # Soccer Prediction Engine
 
-Pre-match prediction engine for soccer: win/draw/loss probabilities, likely scorelines,
-expected goals, totals and BTTS. It's built to power a free public soccer website.
-The live match center, goalscorer model, API and assistant come next.
+**Live site:** _URL to be added_
+
+A free soccer prediction site: for every upcoming match in the Premier League, La Liga, Serie A,
+Bundesliga, Ligue 1 and international football (World Cup, Nations League and more) it shows
+win/draw/loss probabilities, likely scorelines, expected goals, both-teams-to-score and over/under,
+each labelled with how much evidence sits behind it. Champions League fixtures and results are
+shown too, without predictions (no validated model for that competition yet). Predictions come from a Dixon-Coles model blended with expected
+goals and backtested walk-forward with no lookahead (results below); results, scorers and cards
+update through the day, and past match days can be replayed. A FastAPI backend serves the model and a
+Next.js frontend displays it.
+
+## Run it locally
+
+Needs Python 3.10+ and Node 22.
+
+```bash
+# 1. Backend: fetch the free open data, ingest it, fit the models, precompute predictions
+pip install -e ".[dev]"
+python scripts/build_deploy.py            # several minutes the first time; safe to re-run
+cp .env.example .env                      # optional: every key in it unlocks something extra
+uvicorn kickcast_api.main:app --port 8000 # http://localhost:8000/health
+
+# 2. Frontend (second terminal)
+cd frontend
+cp .env.example .env.local                # NEXT_PUBLIC_API_URL=http://localhost:8000
+npm install
+npm run dev                               # http://localhost:3000
+```
+
+The site works with no API keys at all. Deploying (API on Render, frontend on Vercel) is in
+[DEPLOY.md](DEPLOY.md).
 
 ## Results (real data, no peeking)
 
@@ -47,6 +75,8 @@ Full per-league tables and calibration are in `reports/backtest_2015_16.json`.
 ## Layout
 
 ```
+kickcast_api/                           FastAPI backend: routes, precompute, live results jobs
+frontend/                               Next.js site
 kickcast_engine/models/dixon_coles.py   pre-match model (analytic gradient, xG blend, leakage guard)
 kickcast_engine/evaluation.py           walk-forward backtest, RPS / log loss / Brier / calibration
 kickcast_engine/data/statsbomb.py       StatsBomb open-data loader with cache
@@ -83,9 +113,10 @@ is running, no extra setup:
 - **Prediction precompute**: every scheduled match in the next 90 days gets a stored
   prediction nightly at 03:00 UTC, and again right after any `scripts/ingest.py` run (see
   `kickcast_api/precompute.py`). This doesn't touch fixtures/results, only predictions.
-- **Live results** (only if `API_FOOTBALL_KEY` is set): a date-scoped API-Football poll
-  every 10 minutes, but only during an actual match window - see
-  `kickcast_api/live/results_updater.py`.
+- **Live results**: a poll every 10 minutes, but only during an actual match window and with a
+  short catch-up for missed ones - see `kickcast_api/live/results_updater.py`. Sources are
+  API-Football (needs `API_FOOTBALL_KEY`, 100 calls/day) and ESPN's public scoreboard (keyless);
+  both are off by default in production - see [DEPLOY.md](DEPLOY.md).
 
 Fixtures and results themselves (openfootball, martj42, football-data.org) need a real
 re-ingest, which needs network access this project doesn't run for you automatically.
@@ -124,6 +155,14 @@ Historical data: [StatsBomb Open Data](https://github.com/statsbomb/open-data),
 [martj42/international_results](https://github.com/martj42/international_results) (CC0 - same
 script, `results.csv`/`goalscorers.csv` into `data/`).
 Comparison model: [penaltyblog](https://github.com/martineastwood/penaltyblog) (MIT).
+
+Fixtures and results for the Champions League: [football-data.org](https://www.football-data.org/)
+(free tier, needs `FOOTBALL_DATA_ORG_API_KEY`; fetched by `scripts/ingest.py` within its 10
+calls/minute limit and used as a source for scores in the leagues it covers).
+
+Live scores, scorers and cards, both optional: [API-Football](https://www.api-football.com/) (free
+plan, key required) and ESPN's public scoreboard (undocumented, keyless, no published terms).
+Neither is enabled in a production deploy unless you turn it on.
 
 Match stats, cards and historical closing odds: [football-data.co.uk](https://www.football-data.co.uk/).
 No formal license/terms-of-use text restricting research or personal use was found on the site

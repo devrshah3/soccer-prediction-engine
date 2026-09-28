@@ -1,6 +1,7 @@
 [project]
 name = "kickcast"
 version = "0.1.0"
+license = { text = "MIT" }
 description = "Soccer match prediction engine: xG-informed Dixon-Coles with walk-forward evaluation"
 requires-python = ">=3.10"
 dependencies = [
