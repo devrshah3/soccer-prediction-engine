@@ -62,7 +62,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             Predictions are our own model, backtested out-of-sample - not a promise of accuracy.
             {meta.ingested_at && <> &middot; fixtures {timeAgo(meta.ingested_at)}</>}
             {" "}&middot;{" "}
-            <Link href="/about" className="text-accent hover:underline">
+            <Link href="/about" className="text-accent-text hover:underline">
               Data sources &amp; credits
             </Link>
           </div>

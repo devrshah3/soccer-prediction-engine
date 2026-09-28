@@ -10,7 +10,7 @@ export default async function AwardsMethodPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/awards" className="text-sm text-accent hover:underline">
+        <Link href="/awards" className="text-sm text-accent-text hover:underline">
           &larr; Awards
         </Link>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-foreground">Golden Boot projection: method</h1>

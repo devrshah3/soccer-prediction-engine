@@ -81,7 +81,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                 <div className="flex flex-wrap gap-2">
                   {prediction.likely_scorelines.map((s) => (
                     <span key={s.score} className="rounded-md border border-border bg-surface-raised px-2.5 py-1 text-xs text-foreground">
-                      {s.score} <span className="text-muted-2">({Math.round(s.prob * 100)}%)</span>
+                      {s.score} <span className="text-muted">({Math.round(s.prob * 100)}%)</span>
                     </span>
                   ))}
                 </div>
@@ -195,7 +195,7 @@ function TeamLink({ id, name }: { id: string; name: string }) {
   return (
     <Link href={`/teams/${encodeURIComponent(id)}`} className="flex w-28 flex-col items-center gap-2 text-center sm:w-36">
       <TeamCrest name={name} size="lg" />
-      <span className="text-sm font-semibold text-foreground hover:text-accent sm:text-base">{name}</span>
+      <span className="text-sm font-semibold text-foreground hover:text-accent-text sm:text-base">{name}</span>
     </Link>
   );
 }

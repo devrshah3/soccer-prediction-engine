@@ -40,7 +40,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
               <>
                 {" "}
                 &middot;{" "}
-                <Link href={`/leagues/${slugForCode(team.league_code)}`} className="hover:text-accent">
+                <Link href={`/leagues/${slugForCode(team.league_code)}`} className="hover:text-accent-text">
                   {nameForCode(team.league_code)}
                 </Link>
                 {team.position && ` — ${team.position}${ordinal(team.position)} (${team.season})`}
@@ -52,7 +52,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
         {teamOdds && (
-          <div className="flex gap-4 glass px-4 py-3 text-center">
+          <div className="glass glass-float flex gap-4 px-4 py-3 text-center">
             <MiniStat label="Title" value={teamOdds.title_pct} />
             <MiniStat label="Top 4" value={teamOdds.top4_pct} />
             <MiniStat label="Releg." value={teamOdds.relegation_pct} tone="danger" />
@@ -98,7 +98,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
             )}
             <Link
               href={`/matches/${team.next_match.id}`}
-              className="mt-4 inline-block text-sm font-medium text-accent hover:underline"
+              className="mt-4 inline-block text-sm font-medium text-accent-text hover:underline"
             >
               Full match page &rarr;
             </Link>
@@ -193,7 +193,7 @@ function MiniStat({
 }) {
   return (
     <div>
-      <p className={`${big ? "text-xl" : "text-sm"} font-bold tabular-nums ${tone === "danger" ? "text-danger" : "text-accent"}`}>
+      <p className={`${big ? "text-xl" : "text-sm"} font-bold tabular-nums ${tone === "danger" ? "text-danger-text" : "text-accent-text"}`}>
         {(value * 100).toFixed(1)}%
       </p>
       <p className="text-[10px] uppercase tracking-wide text-muted-2">{label}</p>

@@ -31,9 +31,9 @@ export function LeagueTableSheet({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="glass-row flex items-center gap-2 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.08]"
+        className="glass-float flex items-center gap-2 rounded-2xl border border-white/15 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.08]"
       >
-        <TableIcon className="h-4 w-4 text-accent" />
+        <TableIcon className="h-4 w-4 text-accent-text" />
         Points table
       </button>
       <Sheet open={open} onClose={() => setOpen(false)} title={`${leagueName} · ${standings.season}`}>
@@ -83,7 +83,7 @@ export function LeagueTableSheet({
                       <Link
                         href={`/teams/${encodeURIComponent(row.team_id)}`}
                         onClick={() => setOpen(false)}
-                        className="font-medium text-foreground hover:text-accent"
+                        className="font-medium text-foreground hover:text-accent-text"
                       >
                         {row.team_name}
                       </Link>
@@ -121,7 +121,7 @@ export function LeagueTableSheet({
                 <span className="flex shrink-0 gap-3 text-xs tabular-nums text-muted-2">
                   <span>Title {(t.title_pct * 100).toFixed(1)}%</span>
                   <span>Top 4 {(t.top4_pct * 100).toFixed(1)}%</span>
-                  <span className="text-danger">Rel. {(t.relegation_pct * 100).toFixed(1)}%</span>
+                  <span className="text-danger-text">Rel. {(t.relegation_pct * 100).toFixed(1)}%</span>
                 </span>
               </Link>
             ))}

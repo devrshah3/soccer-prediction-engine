@@ -63,7 +63,7 @@ async function EmptyDate({ date }: { date: string }) {
     <div className="glass border-dashed p-8 text-center">
       <p className="text-sm text-muted">No matches on this date.</p>
       {nearby.date && (
-        <Link href={`/?date=${nearby.date}`} className="mt-2 inline-block text-sm text-accent hover:underline">
+        <Link href={`/?date=${nearby.date}`} className="mt-2 inline-block text-sm text-accent-text hover:underline">
           Go to {formatShortDate(nearby.date)}, the nearest date with matches &rarr;
         </Link>
       )}

@@ -82,7 +82,7 @@ export function DatePicker({ selected, basePath = "/" }: { selected: string; bas
             onClick={() => go(c.date)}
             className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
               selected === c.date
-                ? "border-accent/50 bg-accent-soft text-accent"
+                ? "border-accent/50 bg-accent-soft text-accent-text"
                 : "border-border-strong bg-surface-raised text-muted hover:text-foreground"
             }`}
           >

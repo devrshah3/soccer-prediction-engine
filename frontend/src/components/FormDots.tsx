@@ -1,7 +1,7 @@
 const COLOR: Record<string, string> = {
   W: "bg-success/20 text-success ring-1 ring-inset ring-success/40",
   D: "bg-muted-2/20 text-muted ring-1 ring-inset ring-border-strong",
-  L: "bg-danger/20 text-danger ring-1 ring-inset ring-danger/40",
+  L: "bg-danger/20 text-danger-text ring-1 ring-inset ring-danger/40",
 };
 
 export function FormDots({ form }: { form: ("W" | "D" | "L")[] | null | undefined }) {

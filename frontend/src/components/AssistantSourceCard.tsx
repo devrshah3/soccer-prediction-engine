@@ -70,7 +70,7 @@ export function AssistantSourceCard({ source }: { source: Source }) {
         href={`/leagues/${slugForCode(s.league_code)}`}
         className="block rounded-lg border border-border bg-surface-raised p-3 text-sm transition-colors hover:border-border-strong hover:bg-surface-hover"
       >
-        <span className="font-semibold text-accent">#{s.position}</span>{" "}
+        <span className="font-semibold text-accent-text">#{s.position}</span>{" "}
         <span className="font-medium text-foreground">{s.team_name}</span>
         <span className="text-muted-2"> &middot; {nameForCode(s.league_code)} &middot; {s.pts} pts</span>
       </Link>

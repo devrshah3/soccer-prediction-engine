@@ -19,7 +19,7 @@ export function ReplayTimezone({ date }: { date?: string }) {
     <div className="glass p-8 text-center">
       <p className="text-sm text-muted">Finding yesterday&apos;s matches for your timezone&hellip;</p>
       <noscript>
-        <Link href="/replay?tz=0" className="mt-2 inline-block text-sm text-accent hover:underline">
+        <Link href="/replay?tz=0" className="mt-2 inline-block text-sm text-accent-text hover:underline">
           Continue with UTC dates
         </Link>
       </noscript>

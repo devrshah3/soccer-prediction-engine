@@ -26,7 +26,7 @@ export function TeamCrest({ name, size = "md" }: { name: string; size?: keyof ty
     <span
       className={`inline-flex shrink-0 items-center justify-center rounded-full border font-bold text-foreground ${SIZES[size]}`}
       style={{
-        background: "linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.04))",
+        background: "linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.04)), rgba(7,14,36,0.7)",
         borderColor: `${tint}55`,
         boxShadow: `inset 0 1px 0 rgba(255,255,255,0.25), 0 0 10px ${tint}33`,
       }}

@@ -55,7 +55,7 @@ export function ReplayMatchCard({ match, noEventsNote }: { match: ReplayMatch; n
       {pr && (
         <p
           className={`mt-3 inline-flex flex-wrap items-center gap-x-2 rounded-full px-3 py-1 text-xs font-medium ${
-            pr.correct ? "bg-accent-soft text-accent" : "bg-white/10 text-muted"
+            pr.correct ? "bg-accent-soft text-accent-text" : "bg-white/10 text-muted"
           }`}
         >
           <span>{pr.correct ? "Prediction called it" : "Prediction missed"}</span>
@@ -105,7 +105,7 @@ export function ReplayMatchCard({ match, noEventsNote }: { match: ReplayMatch; n
         </div>
       )}
 
-      <Link href={`/matches/${match.id}`} className="mt-3 inline-block text-xs font-medium text-accent hover:underline">
+      <Link href={`/matches/${match.id}`} className="mt-3 inline-block text-xs font-medium text-accent-text hover:underline">
         Full match page &rarr;
       </Link>
     </article>

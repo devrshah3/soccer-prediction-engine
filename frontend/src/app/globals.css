@@ -9,8 +9,8 @@
 
   --background: #060a18;
   --foreground: #eef1f8;
-  --muted: #9aa4bd;
-  --muted-2: #6b7594;
+  --muted: #b3bcd2;
+  --muted-2: #a0abc5;
 
   /* Glass surface - see the .glass utility below for the full recipe (gradient fill +
      backdrop-filter + border + inset highlight + shadow). These tokens are the fill only,
@@ -38,6 +38,8 @@
   /* One blue accent, #3d7bff -> #7db2ff. */
   --accent: #3d7bff;
   --accent-2: #7db2ff;
+  --accent-text: #a5c8ff; /* accent for TEXT on dark glass (>= 4.5:1); --accent stays for fills */
+  --danger-text: #ff9aa3; /* danger for TEXT on dark glass */
   --accent-hover: #5b91ff;
   --accent-foreground: #041024;
   --accent-soft: rgba(61, 123, 255, 0.16);
@@ -62,6 +64,8 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-muted-2: var(--muted-2);
+  --color-accent-text: var(--accent-text);
+  --color-danger-text: var(--danger-text);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-accent: var(--accent);
@@ -86,12 +90,13 @@ body {
   overflow-x: clip;
 }
 
+/* The gradient lives on html (not body): if body painted its own background it would cover
+   the fixed -z-10 scene layer (ball, orbs, pitch lines). */
 html {
-  background-color: var(--background);
+  background: var(--background) linear-gradient(160deg, var(--scene-1) 0%, var(--scene-2) 55%, var(--scene-3) 100%) fixed;
 }
 
 body {
-  background: linear-gradient(160deg, var(--scene-1) 0%, var(--scene-2) 55%, var(--scene-3) 100%) fixed;
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: "cv11", "ss01";
@@ -132,7 +137,8 @@ body {
 @layer components {
   .glass {
     position: relative;
-    background: linear-gradient(135deg, var(--glass-fill-1), var(--glass-fill-2));
+    background-color: rgba(7, 14, 36, 0.55);
+    background-image: linear-gradient(135deg, var(--glass-fill-1), var(--glass-fill-2));
     border: 1px solid var(--glass-border);
     border-radius: 22px;
     box-shadow:
@@ -172,7 +178,9 @@ body {
 
   /* Flat, cheap translucent fill for rows inside a long scrolling list - no blur. */
   .glass-row {
-    background: rgba(255, 255, 255, 0.05);
+    /* a dark base under the faint white sheen keeps text readable over any scene, incl. the ball */
+    background-color: rgba(7, 14, 36, 0.6);
+    background-image: linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05));
     border: 1px solid var(--border);
     border-radius: 16px;
   }

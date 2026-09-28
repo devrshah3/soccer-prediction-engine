@@ -26,7 +26,7 @@ export function DateMatchList({ matches, leagues }: { matches: MatchOnDate[]; le
             onClick={() => setFilter(null)}
             className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
               filter === null
-                ? "border-accent/50 bg-accent-soft text-accent"
+                ? "border-accent/50 bg-accent-soft text-accent-text"
                 : "border-border-strong bg-surface-raised text-muted hover:text-foreground"
             }`}
           >
@@ -38,7 +38,7 @@ export function DateMatchList({ matches, leagues }: { matches: MatchOnDate[]; le
               onClick={() => setFilter(code)}
               className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                 filter === code
-                  ? "border-accent/50 bg-accent-soft text-accent"
+                  ? "border-accent/50 bg-accent-soft text-accent-text"
                   : "border-border-strong bg-surface-raised text-muted hover:text-foreground"
               }`}
             >

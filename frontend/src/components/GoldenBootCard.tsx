@@ -37,7 +37,7 @@ export function GoldenBootCard({ league, code, entry }: { league?: League; code:
                     {s.player} <span className="text-muted-2">({s.team_name})</span>
                   </span>
                 </span>
-                <span className="shrink-0 font-bold tabular-nums text-accent">{s.goals}</span>
+                <span className="shrink-0 font-bold tabular-nums text-accent-text">{s.goals}</span>
               </li>
             ))}
           </ol>
@@ -55,7 +55,7 @@ export function GoldenBootCard({ league, code, entry }: { league?: League; code:
                       {s.player} <span className="text-muted-2">({s.team_name})</span>
                     </span>
                   </span>
-                  <span className="shrink-0 font-bold tabular-nums text-accent">{s.goals_so_far}</span>
+                  <span className="shrink-0 font-bold tabular-nums text-accent-text">{s.goals_so_far}</span>
                 </div>
                 <p className="mt-1 pl-7 text-[11px] text-muted-2">
                   Projected {s.projected_final} ({s.projected_range[0]}&ndash;{s.projected_range[1]}) &middot;{" "}
@@ -74,7 +74,7 @@ function Tag({ tone, children }: { tone: "accent" | "neutral"; children: React.R
   return (
     <span
       className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-        tone === "accent" ? "bg-accent-soft text-accent" : "glass-row text-muted-2"
+        tone === "accent" ? "bg-accent-soft text-accent-text" : "glass-row text-muted-2"
       }`}
     >
       {children}
@@ -87,7 +87,7 @@ function RankBadge({ rank }: { rank: number }) {
   return (
     <span
       className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-        isTop3 ? "bg-accent-soft text-accent" : "bg-white/10 text-muted-2"
+        isTop3 ? "bg-accent-soft text-accent-text" : "bg-white/10 text-muted-2"
       }`}
     >
       {rank}

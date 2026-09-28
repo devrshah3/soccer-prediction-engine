@@ -28,7 +28,7 @@ export default async function ReplayPage({ searchParams }: { searchParams: Promi
     return (
       <div className="glass border-dashed p-8 text-center">
         <p className="text-sm text-muted">Replay only covers days before today.</p>
-        <Link href={`/replay?tz=${safeOffset}`} className="mt-2 inline-block text-sm text-accent hover:underline">
+        <Link href={`/replay?tz=${safeOffset}`} className="mt-2 inline-block text-sm text-accent-text hover:underline">
           Go to yesterday &rarr;
         </Link>
       </div>
@@ -48,7 +48,7 @@ export default async function ReplayPage({ searchParams }: { searchParams: Promi
             <>
               {" "}
               &middot;{" "}
-              <Link href={`/replay?tz=${safeOffset}`} className="text-accent hover:underline">
+              <Link href={`/replay?tz=${safeOffset}`} className="text-accent-text hover:underline">
                 Back to yesterday
               </Link>
             </>
@@ -62,7 +62,7 @@ export default async function ReplayPage({ searchParams }: { searchParams: Promi
             No matches were played {isYesterday ? "yesterday" : "on this day"} ({formatShortDate(day.date)}).
           </p>
           {day.most_recent_day_with_matches && (
-            <Link href={link(day.most_recent_day_with_matches)} className="mt-2 inline-block text-sm text-accent hover:underline">
+            <Link href={link(day.most_recent_day_with_matches)} className="mt-2 inline-block text-sm text-accent-text hover:underline">
               See {formatShortDate(day.most_recent_day_with_matches)}, the most recent day with matches &rarr;
             </Link>
           )}
@@ -72,7 +72,7 @@ export default async function ReplayPage({ searchParams }: { searchParams: Promi
           {day.most_recent_day_with_results && (
             <div className="glass border-dashed p-4 text-sm text-muted">
               None of these matches have a recorded result yet.{" "}
-              <Link href={link(day.most_recent_day_with_results)} className="text-accent hover:underline">
+              <Link href={link(day.most_recent_day_with_results)} className="text-accent-text hover:underline">
                 See {formatShortDate(day.most_recent_day_with_results)}, the most recent day with results &rarr;
               </Link>
             </div>

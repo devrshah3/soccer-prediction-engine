@@ -47,3 +47,56 @@ names.forEach((n, k) => worst[k].length && console.log(`${n.padEnd(13)} min ${Ma
 const mm = (a) => (a.length ? `${Math.min(...a).toFixed(2)}:1` : "n/a");
 console.log(`leader segments min ${mm(leaderVsDim.leader)} | dimmed segments min ${mm(leaderVsDim.dim)}  (WCAG non-text UI target: 3:1)`);
 await browser.close();
+
+// ---- Text contrast over the scene (incl. the ball): hide all text, screenshot the real
+// backdrop, sample the pixels behind every text run, compare with the text's own colour.
+{
+  const b2 = await chromium.launch({ args: ["--use-angle=metal", "--ignore-gpu-blocklist"] });
+  const p2 = await b2.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+  await p2.goto(BASE + PATH, { waitUntil: "networkidle" });
+  await p2.waitForTimeout(2500);
+  const runs = await p2.evaluate(() => {
+    const out = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.textContent.trim() || !n.parentElement || n.parentElement.closest("nextjs-portal, script, style")) continue;
+      const range = document.createRange(); range.selectNodeContents(n);
+      const r = range.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4 || r.bottom < 0 || r.top > 890) continue;
+      const cs = getComputedStyle(n.parentElement);
+      const m = cs.color.match(/[\d.]+/g).map(Number);
+      const size = parseFloat(cs.fontSize), bold = parseInt(cs.fontWeight) >= 700;
+      out.push({ text: n.textContent.trim().slice(0, 28), x: r.x, y: r.y, w: r.width, h: r.height, color: m.slice(0, 3), alpha: m[3] ?? 1, large: size >= 24 || (size >= 18.66 && bold) });
+    }
+    return out;
+  });
+  await p2.addStyleTag({ content: "* { color: transparent !important; -webkit-text-fill-color: transparent !important; text-shadow: none !important; } nextjs-portal { display: none !important; }" });
+  await p2.waitForTimeout(300);
+  const shot = await p2.screenshot({ type: "png" });
+  const samples = await p2.evaluate(async ({ b64, runs }) => {
+    const img = new Image(); img.src = "data:image/png;base64," + b64; await img.decode();
+    const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+    const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0);
+    const at = (x, y) => Array.from(ctx.getImageData(Math.max(0, Math.min(img.width - 1, Math.round(x))), Math.max(0, Math.min(img.height - 1, Math.round(y))), 1, 1).data.slice(0, 3));
+    return runs.map((r) => [[.1, .5], [.5, .5], [.9, .5], [.5, .15], [.5, .85]].map(([fx, fy]) => at(r.x + r.w * fx, r.y + r.h * fy)));
+  }, { b64: shot.toString("base64"), runs });
+  const results = runs.map((r, i) => {
+    let worst = Infinity;
+    for (const bg of samples[i]) {
+      const fg = r.color.map((c, k) => c * r.alpha + bg[k] * (1 - r.alpha)); // composite text alpha over its backdrop
+      worst = Math.min(worst, ratio(fg, bg));
+    }
+    return { ...r, worst };
+  });
+  const over = results.filter((r) => r.x + r.w > 850 && r.y < 800); // the region the ball can sit behind
+  const need = (r) => (r.large ? 3 : 4.5);
+  const report = (label, arr) => {
+    const bad = arr.filter((r) => r.worst < need(r));
+    const min = arr.reduce((a, r) => (r.worst < a.worst ? r : a), arr[0]);
+    console.log(`${label}: ${arr.length} text runs, min ${min.worst.toFixed(2)}:1 ("${min.text}"), ${bad.length} below WCAG AA (4.5:1 normal / 3:1 large)`);
+    bad.slice(0, 40).forEach((r) => console.log(`   ${r.worst.toFixed(2)}:1  "${r.text}" at (${Math.round(r.x)},${Math.round(r.y)}) rgb(${r.color.join(",")})`));
+  };
+  report("all visible text     ", results);
+  report("text over ball region", over);
+  await b2.close();
+}

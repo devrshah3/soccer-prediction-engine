@@ -17,7 +17,7 @@ export default async function AwardsPage({ searchParams }: { searchParams: Promi
           {awards.available_seasons.length > 1 && (
             <SeasonSelect basePath="/awards" season={awards.season} seasons={awards.available_seasons} />
           )}
-          <Link href="/awards/method" className="glass-row px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground">
+          <Link href="/awards/method" className="glass-float rounded-2xl border border-white/15 px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground">
             Method
           </Link>
         </div>
@@ -48,7 +48,7 @@ export default async function AwardsPage({ searchParams }: { searchParams: Promi
                       {s.player} <span className="text-muted-2">({s.team_name})</span>
                     </span>
                   </span>
-                  <span className="shrink-0 font-bold tabular-nums text-accent">{s.goals}</span>
+                  <span className="shrink-0 font-bold tabular-nums text-accent-text">{s.goals}</span>
                 </li>
               ))}
             </ol>

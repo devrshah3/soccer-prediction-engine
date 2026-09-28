@@ -66,7 +66,7 @@ export default function AboutPage() {
           out-of-sample &mdash; not a promise of accuracy. We don&apos;t use any club, league or federation logos or
           crests.
         </p>
-        <Link href="/awards/method" className="mt-2 inline-block text-sm text-accent hover:underline">
+        <Link href="/awards/method" className="mt-2 inline-block text-sm text-accent-text hover:underline">
           How the Golden Boot projection was tested &rarr;
         </Link>
       </div>
@@ -75,7 +75,7 @@ export default function AboutPage() {
           <li key={s.name} className="glass p-4">
             <h2 className="text-sm font-semibold text-foreground">
               {s.href ? (
-                <a href={s.href} target="_blank" rel="noreferrer" className="hover:text-accent">
+                <a href={s.href} target="_blank" rel="noreferrer" className="hover:text-accent-text">
                   {s.name}
                 </a>
               ) : (
