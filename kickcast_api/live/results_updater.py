@@ -15,16 +15,14 @@ plausibly need updating right now - not on every scheduler tick.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from kickcast_engine.data.api_football_crosswalk import load_team_crosswalk
-
 from ..models import LiveMatchState, Match
-from . import api_football
+from . import api_football, quota
+from .matching import find_match, sync_events
 
 POLL_INTERVAL_MINUTES = 10
 # A match "could need updating" from just before its earliest realistic kickoff to well
@@ -32,19 +30,18 @@ POLL_INTERVAL_MINUTES = 10
 # min, see matchState.ts on the frontend) plus a margin either side.
 WINDOW_BEFORE_KICKOFF_MINUTES = 15
 WINDOW_AFTER_KICKOFF_MINUTES = 150
+# Finalization catch-up: a match that never got its final status (server was down, quota
+# ran out, source lag) keeps being checked up to this long after kickoff - but at most one
+# date call per LATE_CHECK_GAP_MINUTES once it's past the normal window, so an
+# unresolvable match (postponed, unmapped) can't drain the shared 100/day budget.
+CATCHUP_AFTER_KICKOFF_MINUTES = 12 * 60
+LATE_CHECK_GAP_MINUTES = 30
+# Keep this many calls in reserve for live polling when fetching per-match events.
+EVENTS_QUOTA_RESERVE = 15
+
+_last_date_call: datetime | None = None
 
 _FINISHED_CODES = {"FT", "AET", "PEN"}
-CROSSWALK_CACHE_DIR = Path(__file__).resolve().parents[2] / "data" / "api_football_cache"
-
-_crosswalk: dict[int, str] | None = None
-
-
-def _team_crosswalk() -> dict[int, str]:
-    global _crosswalk
-    if _crosswalk is None:
-        _crosswalk = load_team_crosswalk(CROSSWALK_CACHE_DIR) if CROSSWALK_CACHE_DIR.exists() else {}
-    return _crosswalk
-
 
 def _todays_candidate_matches(session: Session, today: str) -> list[Match]:
     return (
@@ -52,6 +49,43 @@ def _todays_candidate_matches(session: Session, today: str) -> list[Match]:
         .filter(Match.date == today, or_(Match.status == "scheduled", Match.status == "finished"))
         .all()
     )
+
+
+def _minutes_since_kickoff(m: Match, now: datetime) -> float | None:
+    if not m.kickoff:
+        return None
+    try:
+        kickoff_dt = datetime.strptime(f"{m.date} {m.kickoff}", "%Y-%m-%d %H:%M").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    return (now - kickoff_dt).total_seconds() / 60
+
+
+def dates_needing_check(session: Session, now: datetime) -> list[str]:
+    """Dates worth one date-scoped API call right now. Today, if a match of ours is in its
+    normal window; plus today AND yesterday when a match is past kickoff but never got its
+    final status (catch-up, spaced LATE_CHECK_GAP_MINUTES apart) - yesterday matters for
+    anything that finished or was missed around midnight UTC, or before the daily quota reset."""
+    dates: list[str] = []
+    today = now.date().isoformat()
+    if in_match_window(session, now):
+        dates.append(today)
+    gap_ok = _last_date_call is None or (now - _last_date_call).total_seconds() / 60 >= LATE_CHECK_GAP_MINUTES
+    if gap_ok:
+        for day in (today, (now - timedelta(days=1)).date().isoformat()):
+            if day in dates:
+                continue
+            if any(
+                m.status == "scheduled" and (mins := _minutes_since_kickoff(m, now)) is not None
+                and WINDOW_AFTER_KICKOFF_MINUTES < mins <= CATCHUP_AFTER_KICKOFF_MINUTES
+                for m in _todays_candidate_matches(session, day)
+            ):
+                dates.append(day)
+    return dates
+
+
+def needs_result_check(session: Session, now: datetime) -> bool:
+    return bool(dates_needing_check(session, now))
 
 
 def in_match_window(session: Session, now: datetime | None = None) -> bool:
@@ -74,35 +108,27 @@ def in_match_window(session: Session, now: datetime | None = None) -> bool:
     return False
 
 
-def _find_match(session: Session, candidates: list[Match], fx: dict) -> Match | None:
-    crosswalk = _team_crosswalk()
-    home_af_id, away_af_id = fx.get("home_team_id"), fx.get("away_team_id")
-    home_kc_id = crosswalk.get(home_af_id) if isinstance(home_af_id, int) else None
-    away_kc_id = crosswalk.get(away_af_id) if isinstance(away_af_id, int) else None
-    if home_kc_id and away_kc_id:
-        for m in candidates:
-            if m.home_team_id == home_kc_id and m.away_team_id == away_kc_id:
-                return m
-        return None  # crosswalk resolved both teams but no matching fixture today - don't fuzzy-match, that risks a wrong pairing
-    return None  # no fallback name matching here - a wrong match would silently corrupt a real score
-
-
 def update_todays_results(session: Session, now: datetime | None = None) -> int:
     """Returns how many of our Match rows were updated (0 if outside a match window,
     no key/quota, or a network error - all genuine no-ops, never an exception)."""
     now = now or datetime.now(timezone.utc)
-    if not in_match_window(session, now):
-        return 0
-    today = now.date().isoformat()
-    fixtures = api_football.fetch_fixtures_by_date(session, today)
-    if fixtures is None:
-        return 0
+    global _last_date_call
+    updated = 0
+    for day in dates_needing_check(session, now):
+        fixtures = api_football.fetch_fixtures_by_date(session, day)
+        if fixtures is None:
+            continue
+        _last_date_call = now
+        updated += _apply_fixtures(session, day, fixtures, now)
+    return updated
 
-    candidates = _todays_candidate_matches(session, today)
+
+def _apply_fixtures(session: Session, day: str, fixtures: list[dict], now: datetime) -> int:
+    candidates = _todays_candidate_matches(session, day)
     now_iso = now.isoformat()
     updated = 0
     for fx in fixtures:
-        m = _find_match(session, candidates, fx)
+        m = find_match(candidates, fx)
         if m is None:
             continue
         status = fx.get("match_status")
@@ -113,6 +139,7 @@ def update_todays_results(session: Session, now: datetime | None = None) -> int:
             m.home_goals = home_score
             m.away_goals = away_score
             changed = True
+            _fetch_final_events(session, m, fx)
         elif status not in _FINISHED_CODES and (m.home_goals != home_score or m.away_goals != away_score) and home_score is not None:
             # still in progress, but a live score is available and differs - update the
             # score without marking finished yet.
@@ -137,4 +164,14 @@ def update_todays_results(session: Session, now: datetime | None = None) -> int:
     return updated
 
 
-__all__ = ["POLL_INTERVAL_MINUTES", "in_match_window", "update_todays_results"]
+def _fetch_final_events(session: Session, m: Match, fx: dict) -> None:
+    """A match just went final: capture its complete goal/card list once (1 call), unless the
+    date response already embedded events or the shared budget is nearly spent."""
+    events = fx.get("events") or []
+    if not events and fx.get("fixture_id") and quota.api_football_quota_remaining(session) > EVENTS_QUOTA_RESERVE:
+        events = api_football.fetch_events(session, fx["fixture_id"]) or []
+    if events:
+        sync_events(session, m, events)
+
+
+__all__ = ["POLL_INTERVAL_MINUTES", "dates_needing_check", "in_match_window", "needs_result_check", "update_todays_results"]

@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from kickcast_api.live import api_football, poller, quota
+from kickcast_api.live import api_football, matching, poller, quota
 from kickcast_api.models import Base, League, LiveEvent, LiveMatchState, Match, Team
 
 
@@ -17,11 +17,12 @@ def session(tmp_path):
     Session = sessionmaker(bind=engine)
     s = Session()
     s.add(League(code="test.1", name="Test League", country="Testland", kind="domestic_league"))
-    s.add_all([Team(id="team-a", name="Alpha FC", country="Testland"), Team(id="team-b", name="Beta United", country="Testland")])
+    s.add_all([Team(id="alpha", name="Alpha FC", country="Testland"), Team(id="beta united", name="Beta United", country="Testland")])
     s.add(
         Match(
-            league_code="test.1", season="2024-25", date=datetime.now(timezone.utc).date(), kickoff=None,
-            home_team_id="team-a", away_team_id="team-b", home_goals=None, away_goals=None,
+            league_code="test.1", season="2024-25", date=datetime.now(timezone.utc).date(), kickoff=datetime.now(timezone.utc).strftime("%H:%M"),  # in-window: poller is gated on it
+           
+            home_team_id="alpha", away_team_id="beta united", home_goals=None, away_goals=None,
             status="scheduled", round="Matchday 1", neutral=False, source="synthetic", source_id="s:1",
         )
     )
@@ -129,7 +130,7 @@ def test_poller_prefers_real_crosswalk_over_name_matching(session, monkeypatch):
     (wouldn't fuzzy-match "Alpha FC"/"Beta United" at all) to prove the id path, not the
     name fallback, is what matched."""
     monkeypatch.setenv("API_FOOTBALL_KEY", "fake-key")
-    monkeypatch.setattr(poller, "_crosswalk", {9001: "team-a", 9002: "team-b"})
+    monkeypatch.setattr(matching, "_crosswalk", {9001: "alpha", 9002: "beta united"})
     monkeypatch.setattr(
         poller.api_football, "fetch_live_fixtures",
         lambda s: [{"fixture_id": 1, "minute": 10, "match_status": "1H",
@@ -150,12 +151,12 @@ def test_poller_does_not_fall_back_to_fuzzy_matching_when_crosswalk_ids_are_know
     case - must NOT then guess via name substring matching (risk of matching the wrong
     game entirely)."""
     monkeypatch.setenv("API_FOOTBALL_KEY", "fake-key")
-    monkeypatch.setattr(poller, "_crosswalk", {9001: "team-a", 9003: "team-c-not-playing-today"})
+    monkeypatch.setattr(matching, "_crosswalk", {9001: "alpha", 9003: "team-c-not-playing-today"})
     monkeypatch.setattr(
         poller.api_football, "fetch_live_fixtures",
         lambda s: [{"fixture_id": 1, "minute": 10, "match_status": "1H",
                     "home_team_id": 9001, "away_team_id": 9003,
-                    "home_team_name": "Alpha FC", "away_team_name": "Beta United",  # would fuzzy-match team-a/team-b if tried
+                    "home_team_name": "Alpha FC", "away_team_name": "Beta United",  # would fuzzy-match alpha/beta united if tried
                     "home_score": 0, "away_score": 0, "events": []}],
     )
     assert poller.poll_live_matches(session) == 0
@@ -193,8 +194,8 @@ def test_poller_writes_events_from_embedded_events(session, monkeypatch):
     poller.poll_live_matches(session)
     events = session.query(LiveEvent).order_by(LiveEvent.minute).all()
     assert len(events) == 2
-    assert events[0].minute == 23 and events[0].event_type == "goal" and events[0].team_id == "team-a"
-    assert events[1].minute == 58 and events[1].event_type == "card" and events[1].team_id == "team-b"
+    assert events[0].minute == 23 and events[0].event_type == "goal" and events[0].team_id == "alpha"
+    assert events[1].minute == 58 and events[1].event_type == "card" and events[1].team_id == "beta united"
 
 
 def test_poller_replaces_events_on_next_poll_not_appends(session, monkeypatch):
@@ -279,3 +280,17 @@ def test_live_route_reports_staleness_when_data_exists(session, monkeypatch):
         assert body["updated_minutes_ago"] >= 3.9
     finally:
         app.dependency_overrides.clear()
+
+
+def test_poller_is_a_noop_outside_a_match_window(session, monkeypatch):
+    """Regression: the poller used to hit API-Football every 3 minutes around the clock and
+    burn the 100/day budget by mid-morning."""
+    monkeypatch.setenv("API_FOOTBALL_KEY", "fake-key")
+    m = session.query(Match).one()
+    m.kickoff = "03:00"
+    m.date = (datetime.now(timezone.utc) - timedelta(days=1)).date()
+    session.commit()
+    calls = []
+    monkeypatch.setattr(poller.api_football, "fetch_live_fixtures", lambda s: calls.append(1) or [])
+    assert poller.poll_live_matches(session) == 0
+    assert calls == []
