@@ -3,6 +3,7 @@ import { DateMatchList } from "@/components/DateMatchList";
 import { DatePicker } from "@/components/DatePicker";
 import { MatchRow } from "@/components/MatchRow";
 import { api, type League, type Match, type MatchOnDate, type PredictionSummary } from "@/lib/api";
+import { LiveAutoRefresh } from "@/components/LiveAutoRefresh";
 import { matchState } from "@/lib/matchState";
 import { isTodaySettled } from "@/lib/rollover";
 import { formatShortDate } from "@/lib/time";
@@ -126,6 +127,7 @@ async function DefaultHomePage({ today, leagues }: { today: string; leagues: Map
 
   return (
     <div className="space-y-10">
+      <LiveAutoRefresh active={todaysMatches.some((m) => matchState(m).kind === "live")} />
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Soccer Prediction Engine</h1>
         <div className="mt-3">

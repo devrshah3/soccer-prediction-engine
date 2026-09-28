@@ -52,7 +52,7 @@ describe("MatchRow live/finished display", () => {
   });
 
   it("shows a live score next to the still-visible bar when a provider gives one", () => {
-    const live = { match_status: "2H", minute: 63, home_score: 1, away_score: 0 };
+    const live = { match_status: "2H", minute: 63, home_score: 1, away_score: 0, updated_at: "2026-09-28T14:55:00Z" };
     render(<MatchRow match={matchKickedOff(70, { live })} prediction={prediction} />);
     expect(screen.getByText("1 – 0")).toBeTruthy();
     expect(screen.getByText("Live · 63'")).toBeTruthy();

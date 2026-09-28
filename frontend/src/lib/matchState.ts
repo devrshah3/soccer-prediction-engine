@@ -22,6 +22,7 @@ export type MatchState =
       providerLive: boolean;
       providerMinute: number | null; // the provider's match clock, when it gave one
       score: MatchScore | null; // null = no live score source; never faked
+      updatedAt: string | null; // when the provider data was last polled (ISO), for "updated X min ago"
     }
   | { kind: "finished"; explicit: boolean; score: MatchScore | null };
 
@@ -72,5 +73,6 @@ export function matchState(match: StateInput, now: Date = new Date()): MatchStat
     providerLive: live != null,
     providerMinute: live?.minute ?? null,
     score: scoreOf(live?.home_score ?? match.home_goals, live?.away_score ?? match.away_goals),
+    updatedAt: live?.updated_at ?? null,
   };
 }

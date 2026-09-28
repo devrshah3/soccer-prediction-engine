@@ -29,6 +29,7 @@ def _live_info(session: Session, m: Match) -> dict | None:
         "minute": state.minute,
         "home_score": state.home_score,
         "away_score": state.away_score,
+        "updated_at": state.last_updated_at,
     }
 
 

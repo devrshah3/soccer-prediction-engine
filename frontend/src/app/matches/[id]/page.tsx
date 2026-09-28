@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { CardList } from "@/components/CardList";
 import { GoalTimeline } from "@/components/GoalList";
 import { KickoffTime } from "@/components/KickoffTime";
+import { LiveAutoRefresh } from "@/components/LiveAutoRefresh";
 import { MatchStatusLine } from "@/components/MatchStatusLine";
 import { ProbabilityBar } from "@/components/ProbabilityBar";
 import { TeamCrest } from "@/components/TeamCrest";
@@ -33,6 +34,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="space-y-6">
+      <LiveAutoRefresh active={state.kind === "live"} />
       <div className="text-sm text-muted">
         <p>
           {match.round} &middot; <KickoffTime date={match.date} kickoff={match.kickoff} />
@@ -55,6 +57,13 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         )}
         <TeamLink id={match.away_team.id} name={match.away_team.name} />
       </div>
+
+      {state.kind === "live" && match.goal_events && match.goal_events.length > 0 && (
+        <section className="glass p-5">
+          <h2 className="text-lg font-semibold text-foreground">Goals</h2>
+          <GoalTimeline goals={match.goal_events} home={match.home_team} away={match.away_team} />
+        </section>
+      )}
 
       {state.kind !== "finished" && (
         <section className="glass p-5 sm:p-6">

@@ -17,7 +17,7 @@ describe("matchState", () => {
   });
 
   it("is finished (explicit) when the provider reports a full-time code", () => {
-    const live = { match_status: "FT", minute: 90, home_score: 1, away_score: 0 };
+    const live = { match_status: "FT", minute: 90, home_score: 1, away_score: 0, updated_at: "2026-09-28T14:55:00Z" };
     const s = matchState({ status: "scheduled", ...ago(110), live }, NOW);
     expect(s).toMatchObject({ kind: "finished", explicit: true, score: { home: 1, away: 0 } });
   });
@@ -36,7 +36,7 @@ describe("matchState", () => {
   });
 
   it("is live with the provider's flag, minute and score when available", () => {
-    const live = { match_status: "2H", minute: 63, home_score: 1, away_score: 0 };
+    const live = { match_status: "2H", minute: 63, home_score: 1, away_score: 0, updated_at: "2026-09-28T14:55:00Z" };
     const s = matchState({ status: "scheduled", ...ago(70), live }, NOW);
     expect(s).toMatchObject({ kind: "live", providerLive: true, providerMinute: 63, score: { home: 1, away: 0 } });
   });

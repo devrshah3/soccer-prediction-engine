@@ -99,3 +99,20 @@ def test_prefers_the_source_that_is_complete_against_the_final_score(session):
 def test_no_events_gives_empty_lists_not_an_error(session):
     m = _match(session, 3, 1, day=25)
     assert events_for_matches(session, [m])[m.id] == {"goals": [], "cards": []}
+
+
+def test_a_live_matchs_goal_list_grows_as_polls_bring_in_new_events(session):
+    """The poller REPLACES a match's events with the provider's full list each poll, so a goal
+    scored between polls appears in the next read - and the served list never shows stale goals."""
+    from kickcast_api.live.matching import sync_events
+
+    m = _match(session, None, None, status="scheduled", day=24)
+    goal = lambda minute, team, player: {"minute": minute, "event_type": "goal", "team_name": team, "player": player, "detail": "Normal Goal"}
+    sync_events(session, m, [goal(12, "Home", "First")])
+    session.commit()
+    assert [g["scorer"] for g in events_for_matches(session, [m])[m.id]["goals"]] == ["First"]
+
+    sync_events(session, m, [goal(12, "Home", "First"), goal(44, "Away", "Second")])
+    session.commit()
+    goals = events_for_matches(session, [m])[m.id]["goals"]
+    assert [(g["minute"], g["scorer"], g["team_id"]) for g in goals] == [(12, "First", "home"), (44, "Second", "away")]

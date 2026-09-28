@@ -8,6 +8,7 @@ import { SeasonSelect } from "@/components/SeasonSelect";
 import { api, ApiError, type League, type MatchOnDate } from "@/lib/api";
 import { legacyCodeRedirect, SLUG_TO_CODE } from "@/lib/leagueSlugs";
 import { isTodaySettled } from "@/lib/rollover";
+import { LiveAutoRefresh } from "@/components/LiveAutoRefresh";
 import { matchState } from "@/lib/matchState";
 import { formatShortDate } from "@/lib/time";
 
@@ -155,6 +156,7 @@ async function CurrentSeasonView({
 
   return (
     <div className="space-y-8">
+      <LiveAutoRefresh active={todaysMatches.some((m) => matchState(m).kind === "live")} />
       <DatePicker selected={today} basePath={basePath} />
       <section>
         <h2 className="mb-4 text-xl font-bold tracking-tight text-foreground">

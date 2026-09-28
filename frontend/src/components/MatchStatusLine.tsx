@@ -1,3 +1,4 @@
+import { timeAgo } from "@/lib/time";
 import type { MatchState } from "@/lib/matchState";
 
 // Caption shown under a prediction bar during a live match, so it's clear the odds are the
@@ -28,6 +29,17 @@ export function MatchStatusLine({ state, className = "" }: { state: MatchState; 
         {label}
       </p>
       {!state.score && <p className="mt-0.5 text-xs text-muted-2">No live score available</p>}
+      {state.score && state.updatedAt && (
+        // Relative to the render clock, so it may differ by a minute between server and client.
+        <p className="mt-0.5 text-[11px] text-muted-2" suppressHydrationWarning>
+          {scoreUpdatedLabel(state.updatedAt)}
+        </p>
+      )}
     </div>
   );
+}
+
+function scoreUpdatedLabel(iso: string): string {
+  const ago = timeAgo(iso); // "just now" | "updated 3m ago" | ...
+  return ago === "just now" ? "score updated just now" : `score ${ago}`;
 }

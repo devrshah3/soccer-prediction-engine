@@ -36,6 +36,7 @@ export type LiveInfo = {
   minute: number | null;
   home_score: number | null;
   away_score: number | null;
+  updated_at: string | null; // when the poller last refreshed this (ISO, UTC)
 };
 
 // team_id is the team CREDITED with the goal (null if the source's team couldn't be resolved).
