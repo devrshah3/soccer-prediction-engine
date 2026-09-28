@@ -36,7 +36,15 @@ OPENFOOTBALL_DIR = REPO_ROOT / "data" / "openfootball_raw"
 FOOTBALLDATA_DIR = REPO_ROOT / "data" / "footballdata_uk"
 RESULTS_CSV = REPO_ROOT / "data" / "results.csv"
 GOALSCORERS_CSV = REPO_ROOT / "data" / "goalscorers.csv"
-NATIONS_LEAGUE_JSON = REPO_ROOT / "data" / "nations_league_2026_27_md1_4.json"
+# C.10: one file per hand-transcribed batch of matchdays (each free-tier API blocks the
+# real current season - see ingest_champions_league's docstring for the same limitation
+# on football-data.org, and README.md's item 10 notes for the real check done against
+# both providers). Every file here uses the exact same format; a future matchday batch
+# just needs a new file added to this list, no code change beyond that.
+NATIONS_LEAGUE_JSON_FILES = [
+    REPO_ROOT / "data" / "nations_league_2026_27_md1_4.json",
+    REPO_ROOT / "data" / "nations_league_2026_27_md5_6.json",
+]
 
 INTERNATIONAL_SINCE = date(2000, 1, 1)  # DB keeps 2000+ for size/relevance; results.csv has full history to 1872
 
@@ -233,8 +241,10 @@ def ingest_international(session) -> int:
         )
         n += 1
 
-    if NATIONS_LEAGUE_JSON.exists():
-        payload = json.loads(NATIONS_LEAGUE_JSON.read_text())
+    for nations_league_json in NATIONS_LEAGUE_JSON_FILES:
+        if not nations_league_json.exists():
+            continue
+        payload = json.loads(nations_league_json.read_text())
         for fx in payload["fixtures"]:
             d = date.fromisoformat(fx["date"])
             home_id = _intl_team_id(slug(international.canonical(fx["home"])), domestic_ids)
