@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { League, Match, PredictionSummary } from "@/lib/api";
 import { matchState } from "@/lib/matchState";
-import { timeAgo } from "@/lib/time";
+import { isPredictionStale } from "@/lib/predictionFreshness";
 import { KickoffTime } from "./KickoffTime";
 import { LeagueChip } from "./LeagueChip";
+import { PredictionInfoPopover } from "./PredictionInfoPopover";
 import { ProbabilityBar } from "./ProbabilityBar";
 import { TeamCrest } from "./TeamCrest";
 
@@ -70,23 +71,29 @@ export function MatchRow({
 
       {showPrediction && prediction && (
         <div className="mt-4 border-t border-border pt-3">
-          <ProbabilityBar
-            home={prediction.probabilities.home}
-            draw={prediction.probabilities.draw}
-            away={prediction.probabilities.away}
-            homeLabel={match.home_team.name}
-            awayLabel={match.away_team.name}
-          />
-          <p className="mt-2 text-[11px] text-muted-2">
-            {timeAgo(prediction.computed_at ?? prediction.as_of)} &middot; evidence {prediction.evidence} &middot;{" "}
-            {prediction.model_version}
-          </p>
+          <div className="flex items-start gap-2">
+            <div className="flex-1">
+              <ProbabilityBar
+                home={prediction.probabilities.home}
+                draw={prediction.probabilities.draw}
+                away={prediction.probabilities.away}
+                homeLabel={match.home_team.name}
+                awayLabel={match.away_team.name}
+              />
+            </div>
+            <PredictionInfoPopover prediction={prediction} />
+          </div>
+          {/* D.11: cards otherwise show nothing about provenance/staleness - a warning
+              only appears when it's actually justified (see isPredictionStale). */}
+          {isPredictionStale(prediction.computed_at, match.date) && (
+            <p className="mt-2 text-[11px] font-medium text-warning">Prediction may be outdated</p>
+          )}
+          {dateMayChange && <p className="mt-1 text-[11px] text-warning">Date may change</p>}
           {longRange && (
             <p className="mt-1 text-[11px] text-muted-2">
               Long-range: based on results up to {prediction.as_of}; team news and form can change.
             </p>
           )}
-          {dateMayChange && <p className="mt-1 text-[11px] text-warning">Date may change</p>}
         </div>
       )}
       {showPrediction && !prediction && (

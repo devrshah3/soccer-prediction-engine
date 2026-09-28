@@ -133,12 +133,15 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                 <p className="mt-5 text-xs text-muted-2">Expected cards: not available &mdash; {prediction.cards.reason}</p>
               )}
 
-              <p className="mt-5 text-xs text-muted-2">
-                {prediction.computed_at ? `${timeAgo(prediction.computed_at)} · ` : ""}
-                data cutoff {prediction.as_of} &middot; {prediction.model_version} &middot; trained on{" "}
-                {prediction.train_matches.total} matches ({prediction.train_matches.home} for{" "}
-                {match.home_team.name}, {prediction.train_matches.away} for {match.away_team.name})
-              </p>
+              <details className="mt-5 rounded-lg border border-border bg-surface-raised p-3 text-xs text-muted-2">
+                <summary className="cursor-pointer select-none font-medium text-muted">Prediction details</summary>
+                <p className="mt-2">
+                  {prediction.computed_at ? `${timeAgo(prediction.computed_at)} · ` : ""}
+                  data cutoff {prediction.as_of} &middot; {prediction.model_version} &middot; trained on{" "}
+                  {prediction.train_matches.total} matches ({prediction.train_matches.home} for{" "}
+                  {match.home_team.name}, {prediction.train_matches.away} for {match.away_team.name})
+                </p>
+              </details>
             </>
           ) : (
             <p className="text-sm text-muted">
