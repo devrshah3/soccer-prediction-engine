@@ -559,3 +559,83 @@ bug dropped), in correct kickoff order, each in the correct real state.
 Checks at the end of this session: `pytest` 174 passed / 1 skipped, `ruff` and `mypy`
 clean, frontend `lint`, `test` (vitest, 22 passed), and `build` all clean. Nothing was
 deployed, no money was spent, no `.env` values were printed or committed.
+
+---
+
+## Session 5 — 2026-09-28: dark-blue liquid-glass redesign + leagues/awards/replay rework (items 1-7)
+
+All seven items are committed separately (`git log --oneline` at the bottom). Everything
+below was checked against the running stack or the real APIs, not assumed.
+
+### What shipped
+1. **Design system + scene** - CSS tokens, `.glass` (blurred containers) vs `.glass-row` (flat rows in
+   long lists), fixed non-interactive scene (ball, pitch lines, orbs; motion off under
+   `prefers-reduced-motion`), real per-country SVG flags (England = St George's Cross), no logos or
+   emoji anywhere, initials circles instead of crests.
+2. **Navigation** - floating 4-item Dock (Matches / Leagues / Awards / Replay); top bar is logo + search.
+3. **Leagues** - hub of real competitions with "Next: <date> · n matches" from the DB; clean URLs
+   (`/leagues/premier-league`), old code URLs 308-redirect; date-driven league view; season selector;
+   "Points table" glass sheet (also `?view=table`; "Title odds" tab when available; the button is absent
+   when no table can be computed). Found + fixed a real backend gap: `/leagues/{code}/fixtures` ignored
+   `season`, so a past season silently showed the current one.
+4. **Names, not codes** - central map; fixed the team page, the assistant source card and, found *live*,
+   the Gemini assistant answering "...in en.1" (tool results are now scrubbed of `league_code` before the
+   model sees them; the DB-only fallback had the same bug). Regression tests on both sides.
+5. **Awards** - season selector; current season = live football-data.org leaderboard + projection;
+   the one past season with real data (2024-25, domestic) = "Final"; anything else = "No scorer data for
+   <season> from our free sources."; (i) popover for source/method; Ballon d'Or / The Best / Puskas
+   remain "not available" with reasons. Method page shows aggregate backtest results only.
+6. **Replay = yesterday** - viewer-local yesterday only, all competitions; StatsBomb list/routes/data
+   file/builder script removed; `/replay/<id>` redirects; credits live on `/about` only.
+7. **Polish/QA** - Playwright screenshots (20 JPEGs, 1.8 MB) in `reports/screenshots/`, real bugs fixed.
+
+### Exact data each source returned
+**football-data.org `/competitions/{code}/scorers` (one real call each, 2026-09-28):** all 200, real 2026-27
+in-progress data. PL: Haaland 5 (5 played) - PD: Raphinha 12 (7), Camello 7, Mbappe 7 - SA: Malen 6 (5) -
+BL1: Olise 4, Ebnoutalib 4, Schick 4 - FL1: Gouiri 4, Doumbia 4, Ferran Torres 4 - CL: Demirovic 3,
+Ferran Torres 3, Haaland 2. **Past seasons: `?season=2015` -> HTTP 403 "restricted... check your
+subscription"** - this plan has no historical scorers at all.
+**Awards by season (what the site returns):** 2026-27 -> live projection for all 5 leagues + CL;
+2024-25 -> API-Football "Final" tallies for the 5 domestic leagues (Salah 29, Mbappe 31, ...), **CL
+unavailable**; every other season, e.g. 2015-16 -> "No scorer data for 2015-16 from our free sources."
+**Replay event sources (one real call/read each):**
+- martj42 `results.csv`/`goalscorers.csv` (freshly re-downloaded): results end **2026-08-26**, goalscorers
+  **2026-07-19** - nothing for the 2026-09-26/27 Nations League days, so yesterday's 8 matches show no
+  result yet. Goals-only for internationals when it has caught up; no cards/subs.
+- API-Football `/fixtures?date=2026-09-27`: HTTP 200 but `errors.requests: "You have reached the request
+  limit for the day"` - **blocked by the daily budget, so current-season access could not be re-tested
+  today** (a 2026-09-23 real call already showed the free plan has no current-season access).
+- football-data.org `/v4/matches/560583` (Fulham 1-1 Man United): full/half-time score + referee, **no
+  goals/bookings/substitutions arrays** - no club-match event timeline exists on our free sources.
+
+### Golden Boot projection - honest numbers
+Backtest (internal, real 2015/16 data from 4 full leagues, matchday 5/10/20, 12 test points):
+model MAE **7.82** vs naive current-pace **7.81** goals (a tie; naive wins by 0.01); hit rate 33% vs 33%.
+By cutoff: MD5 11.48 vs 11.62, MD10 7.90 vs 7.77, MD20 4.08 vs 4.05. **Correction:** the item-5 commit
+message says both methods hit the real top scorer at matchday 20 "in all 4 leagues" - wrong; it was 3 of 4
+(the Premier League missed: Kane finished ahead of Vardy). Known limitation: a hot start still projects very
+high (Raphinha 12 in 7 -> ~52) because observed data dominates the shrinkage once players have played more
+than the 5 pseudo-matches of prior; the wide range and title-chance number show the uncertainty, and the
+Method page says the method does not clearly beat naive.
+
+### Blocked / not done / caveats
+- **API-Football daily quota exhausted**, **Gemini free quota (20/day) used up** by live testing (one live
+  test skips because of it; recaps fall back to the labelled template when quota is at the reserve).
+- **No pre-match predictions are stored for past dates** in this DB (624 rows, all dated 2026-09-28 or
+  later; nothing deletes them), so today's real "yesterday" shows "No pre-match prediction on record".
+  The chip is unit-tested; tomorrow's Replay will show it for real for the 2026-09-28 matches.
+- Nations League is not a separate competition in our data (it is part of "International"), so there is no
+  separate Nations League tile.
+- mypy: 5 pre-existing missing-stub errors (scipy, apscheduler), none in new code.
+- Dev-only "1 Issue" badge: root cause was opening the dev server on 127.0.0.1 (HMR WebSocket blocked);
+  fixed with `allowedDevOrigins`.
+
+### Bugs found by actually looking (Playwright + screenshots)
+`/leagues/international` redirect loop (broken since item 3); Dock and assistant bubble not floating
+(`.glass` overrode `fixed`); backdrop blur never applied (compiler kept only the `-webkit-` property);
+375px card/awards overflow; white page below the fold. All fixed and covered by checks/tests.
+
+### Checks at the end
+pytest 196 passed / 1 skipped; ruff clean; mypy only the 5 stub errors; frontend lint + build clean;
+vitest 47/47. Both dev servers restarted (API :8000, frontend :3000).
+Re-run the screenshots: `cd frontend && node scripts/screenshots.mjs`.
