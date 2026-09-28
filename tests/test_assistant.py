@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from kickcast_api.assistant import cache, fallback, quota, service, text_format
+from kickcast_api.assistant import cache, conversation, fallback, quota, service, text_format
 from kickcast_api.assistant import tools as assistant_tools
 from kickcast_api.assistant.entities import find_entities
 from kickcast_api.models import Base, League, Match, Team
@@ -642,6 +642,88 @@ def test_first_sentences_handles_initials_abbreviations_and_short_text():
     assert text_format.first_sentences("A. B. Smith scored. He won. He left.", 2) == "A. B. Smith scored. He won."
     assert text_format.first_sentences("Only one sentence without a full stop", 2) == "Only one sentence without a full stop"
     assert text_format.first_sentences("First para. Second sentence. Third.\n\nNext paragraph.", 2) == "First para. Second sentence."
+
+
+# ---------------------------------------------------------------- conversation context
+
+CID = "conv-test-0001"
+
+
+@pytest.fixture(autouse=True)
+def _fresh_conversations():
+    conversation.clear()
+    yield
+    conversation.clear()
+
+
+def test_context_store_expires_after_30_minutes_and_ignores_bad_ids(monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr(conversation, "_now", lambda: clock[0])
+    conversation.remember(CID, teams=[{"id": "team-0", "name": "Ridgeway United"}])
+    assert conversation.get(CID).teams[0]["id"] == "team-0"
+    clock[0] += conversation.TTL_SECONDS - 1
+    assert conversation.get(CID) is not None  # still alive just before 30 minutes
+    clock[0] += 2
+    assert conversation.get(CID) is None  # gone after 30 minutes
+    conversation.remember("bad id!", teams=[{"id": "x", "name": "x"}])
+    assert conversation.get("bad id!") is None and conversation.get(None) is None
+
+
+def test_context_stores_no_question_text_or_identity():
+    conversation.remember(CID, teams=[{"id": "team-0", "name": "Ridgeway United"}], player="A Striker")
+    assert set(vars(conversation.get(CID))) == {"teams", "match", "player", "expires_at"}
+
+
+def test_followups_resolve_to_the_last_discussed_match(session, monkeypatch):
+    seen = _video_env(monkeypatch, "found", VIDEO)
+    first = service.ask(session, "Predict Rovers 1 vs Ridgeway United", CID)
+    assert "Ridgeway United (home) vs Rovers 1" in first["text"]
+
+    # "a video link" names no team -> the match just discussed (head-to-head, not just one team)
+    video = service.ask(session, "A video link I wanna watch the highlights", CID)
+    assert {seen[-1].home_team_id, seen[-1].away_team_id} == {"team-0", "team-1"}
+    assert "youtube.com/watch?v=xyz" in video["text"]
+
+    # "who scored" -> the latest finished meeting of those two, with the scorers sentence
+    scored = service.ask(session, "who scored", CID)
+    assert scored["found" if "found" in scored else "mode"] and "Ridgeway United" in scored["text"] and "Rovers 1" in scored["text"]
+    assert "Goal scorers aren't on record" in scored["text"]
+
+    # "and the table?" -> the table of that match's league
+    table = service.ask(session, "and the table?", CID)
+    assert table["text"].startswith("Test League ") and "top of the table" in table["text"]
+
+
+def test_without_context_a_followup_asks_which_match(session, monkeypatch):
+    seen = _video_env(monkeypatch, "found", VIDEO)
+    for q in ("A video link I wanna watch the highlights", "who scored", "highlights"):
+        assert "Which match do you mean?" in service.ask(session, q, None)["text"]
+        assert "Which match do you mean?" in service.ask(session, q, "never-seen-conv")["text"]
+    assert seen == []
+
+
+def test_an_expired_context_is_forgotten(session, monkeypatch):
+    clock = [5000.0]
+    monkeypatch.setattr(conversation, "_now", lambda: clock[0])
+    _video_env(monkeypatch, "found", VIDEO)
+    service.ask(session, "Predict Rovers 1 vs Ridgeway United", CID)
+    clock[0] += conversation.TTL_SECONDS + 1
+    assert "Which match do you mean?" in service.ask(session, "highlights", CID)["text"]
+
+
+def test_naming_a_new_team_starts_a_new_topic(session, monkeypatch):
+    seen = _video_env(monkeypatch, "found", VIDEO)
+    service.ask(session, "Predict Rovers 1 vs Ridgeway United", CID)
+    service.ask(session, "When does Rovers 2 play next?", CID)
+    service.ask(session, "highlights", CID)
+    assert "team-2" in {seen[-1].home_team_id, seen[-1].away_team_id}  # Rovers 2, not the earlier match
+    assert conversation.get(CID).match is None or "Rovers 1" not in conversation.get(CID).match["home_team"]["name"]
+
+
+def test_conversations_are_isolated_from_each_other(session, monkeypatch):
+    _video_env(monkeypatch, "found", VIDEO)
+    service.ask(session, "Predict Rovers 1 vs Ridgeway United", "conv-aaaaaaaa")
+    assert "Which match do you mean?" in service.ask(session, "highlights", "conv-bbbbbbbb")["text"]
 
 
 def test_db_intents_never_touch_wikipedia(session, monkeypatch):

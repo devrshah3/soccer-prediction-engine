@@ -13,6 +13,8 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from ..models import League
+from ..serialize import match_dict
 from . import tools
 from .entities import COMPETITION_NAMES, find_competitions, find_teams
 from .intent import Intent, classify, references_other_season
@@ -140,7 +142,10 @@ def _scorers_sentence(session: Session, m: dict) -> str:
     return "Scorers: " + ", ".join(parts) + "."
 
 
-def answer(session: Session, question: str, intent: Intent | None = None, teams: list[dict] | None = None) -> dict:
+def answer(
+    session: Session, question: str, intent: Intent | None = None, teams: list[dict] | None = None,
+    context_league: str | None = None,
+) -> dict:
     """Returns {"text", "sources", "found", "facts"}. "facts" is a plain-language,
     complete write-up of everything actually retrieved (never more than that) - safe to
     hand an LLM as strict grounding: it must never state anything beyond what's written here.
@@ -178,10 +183,11 @@ def answer(session: Session, question: str, intent: Intent | None = None, teams:
     if intent is Intent.RESULT:
         if not teams:
             return _nf(ASK_WHICH_MATCH)
-        r = tools.team_recent_results(session, teams[0]["id"], limit=1)
-        if not r["found"]:
-            return _nf(f"I don't have a finished match on record for {teams[0]['name']}.")
-        m = r["matches"][0]
+        latest = tools.latest_finished_match(session, [t["id"] for t in teams])
+        if latest is None:
+            names = " and ".join(t["name"] for t in teams)
+            return _nf(f"I don't have a finished match on record for {names}.")
+        m = match_dict(session, latest)
         text = f"{m['home_team']['name']} {m['home_goals']} - {m['away_goals']} {m['away_team']['name']} ({m['date']})."
         if "scor" in question.lower():
             text += " " + _scorers_sentence(session, m)
@@ -201,11 +207,15 @@ def answer(session: Session, question: str, intent: Intent | None = None, teams:
                 )
                 return {"text": text, "sources": [{"type": "kickcast_standings", "data": r}], "found": True, "facts": facts}
         comps = [c for c in find_competitions(question) if c not in ("CL", "international")]
+        if not comps and context_league and context_league not in ("CL", "international"):
+            comps = [context_league]  # "and the table?" after discussing a match: that match's league
         if comps:
             r = tools.league_standings_top(session, comps[0], n=5)
             if r["found"]:
                 rows = ", ".join(f"{t['position']}. {t['team_name']} {t['pts']}" for t in r["table"])
-                text = f"{COMPETITION_NAMES[comps[0]]} {r['season']} top of the table: {rows}."
+                league = session.get(League, comps[0])
+                name = COMPETITION_NAMES.get(comps[0]) or (league.name if league else comps[0])
+                text = f"{name} {r['season']} top of the table: {rows}."
                 return {"text": text, "sources": [], "found": True, "facts": text}
         return _nf("Which team or league table do you mean? Name a team, or a league such as \"Premier League\".")
 

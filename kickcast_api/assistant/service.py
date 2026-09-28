@@ -16,14 +16,22 @@ shown as-is because Gemini couldn't phrase it).
 from __future__ import annotations
 
 import hashlib
+import re
 
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from ..models import League, Match
+from ..models import League
 from ..serialize import match_dict
-from . import cache, fallback, gemini_client, quota, text_format, wikipedia, youtube
-from .entities import find_entities, find_teams, mentions_entity
+from . import cache, conversation, fallback, gemini_client, quota, text_format, tools, wikipedia, youtube
+from .entities import (
+    Entity,
+    find_entities,
+    find_players,
+    find_teams,
+    mentions_entity,
+    normalize,
+    team_title_variants,
+)
 from .intent import DB_INTENTS, Intent, classify
 
 AI_PAUSED_NOTE = " (AI phrasing paused for today.)"
@@ -134,30 +142,13 @@ def _plain(text: str, sources: list[dict] | None = None, mode: str = "db") -> di
     return {"text": text_format.strip_markdown(text), "sources": sources or [], "mode": mode, "cached": False}
 
 
-def _latest_finished_match(session: Session, team_ids: list[str]) -> Match | None:
-    """The most recent finished match between the two teams (or, given one team, that team's)."""
-    q = session.query(Match).filter(Match.status == "finished")
-    if len(team_ids) >= 2:
-        a, b = team_ids[0], team_ids[1]
-        q = q.filter(
-            or_(
-                (Match.home_team_id == a) & (Match.away_team_id == b),
-                (Match.home_team_id == b) & (Match.away_team_id == a),
-            )
-        )
-    else:
-        q = q.filter(or_(Match.home_team_id == team_ids[0], Match.away_team_id == team_ids[0]))
-    return q.order_by(Match.date.desc(), Match.kickoff.desc()).first()
-
-
-def _video_answer(session: Session, question: str) -> dict:
+def _video_answer(session: Session, question: str, teams: list[dict]) -> dict:
     """Video/highlights questions never touch Wikipedia or Gemini. The match comes from OUR
     records (the latest finished one for the named teams), the search is built from that record,
     and only a validated official-channel video is ever offered."""
-    teams = find_teams(session, question)
     if not teams:
         return _plain(fallback.ASK_WHICH_MATCH)
-    match = _latest_finished_match(session, [t["id"] for t in teams])
+    match = tools.latest_finished_match(session, [t["id"] for t in teams])
     if match is None:
         names = " and ".join(t["name"] for t in teams)
         return _plain(f"I don't have a finished match on record for {names}, so there are no highlights to look for.")
@@ -187,12 +178,43 @@ def _video_answer(session: Session, question: str) -> dict:
     return _plain(f"{head} {NO_VERIFIED_LINK}", sources)  # no verified channel / no API key
 
 
-def _gated_wikipedia(session: Session, question: str) -> dict | None:
+_PRONOUN = re.compile(r"\b(he|his|him|she|her|they|their|them|the club|the team|that player|that team)\b", re.IGNORECASE)
+
+
+def _context_entities(session: Session, ctx: conversation.Context) -> list[Entity]:
+    out = [Entity("player", ctx.player, (normalize(ctx.player),))] if ctx.player else []
+    for t in ctx.teams:
+        out.append(Entity("team", t["name"], tuple(team_title_variants(session, t["id"])) or (normalize(t["name"]),)))
+    return out
+
+
+def _remember(conversation_id: str | None, named: list[dict], teams: list[dict], players: list[str], sources: list[dict]) -> None:
+    """Record what was just discussed. Naming a team/player starts a new topic (reset); a pure
+    follow-up keeps the topic and only updates what the answer adds."""
+    match = None
+    for src in sources:
+        data = src.get("data") if isinstance(src, dict) else None
+        if src.get("type") == "kickcast_match" and data:
+            match = data
+        elif src.get("type") == "kickcast_prediction" and data and data.get("match"):
+            match = data["match"]
+    if match and not named:
+        teams = [match["home_team"], match["away_team"]]
+    conversation.remember(
+        conversation_id, teams=teams, match=match, player=players[0] if players else None,
+        reset=bool(named or players),
+    )
+
+
+def _gated_wikipedia(session: Session, question: str, ctx: conversation.Context | None = None) -> dict | None:
     """Wikipedia for general history/context only, and only with a relevance gate: the search is
     built from RECOGNISED entities (team, player, competition, year) - never the raw sentence, so
     filler like "give em" or "I wanna" can't steer it - and the article is accepted only if its
     title or lead mentions one of them. Anything else is treated as unknown."""
     entities = find_entities(session, question)
+    if not any(e.kind != "year" for e in entities) and ctx and _PRONOUN.search(question):
+        # "tell me about his history": the entity is whoever was last discussed
+        entities = _context_entities(session, ctx) + entities
     if not any(e.kind != "year" for e in entities):
         return None  # nothing football-shaped recognised: don't search at all
     wiki = wikipedia.lookup(session, " ".join(e.display for e in entities))
@@ -204,21 +226,35 @@ def _gated_wikipedia(session: Session, question: str) -> dict | None:
     return wiki
 
 
-def ask(session: Session, question: str) -> dict:
+def ask(session: Session, question: str, conversation_id: str | None = None) -> dict:
     question = question.strip()
     if not question:
         return {"text": "Ask me something about a team, fixture, table, or prediction.", "sources": [], "mode": "invalid", "cached": False}
 
     intent = classify(question)
+    ctx = conversation.get(conversation_id)
+    named = find_teams(session, question)
+    # A follow-up ("a video link", "who scored", "and the table?") names no team: it means whatever
+    # was last discussed in this conversation. Naming a team starts a new topic.
+    teams = named or (ctx.teams if ctx else [])
+    players = find_players(session, question)
 
     # 1. Video/highlights: its own path, decided before any lookup.
     if intent is Intent.VIDEO:
-        return _video_answer(session, question)
+        result = _video_answer(session, question, teams)
+        if named or players or result["sources"]:
+            _remember(conversation_id, named, teams, players, result["sources"])
+        return result
 
     # 2. A DB question (prediction, table, top scorers, result, next match): facts from our own
     # tools first, always; Gemini only rephrases those facts when it is usable.
     if intent in DB_INTENTS:
-        fb = fallback.answer(session, question, intent)
+        # "and the table?" after a match means that match's LEAGUE table, not one team's position:
+        # only a team named in THIS question gets a team-position answer.
+        asked = named if intent is Intent.TABLE else teams
+        fb = fallback.answer(session, question, intent, asked, ctx.league_code if ctx and not named else None)
+        if fb["found"] or named or players:
+            _remember(conversation_id, named, teams, players, fb["sources"])
         if not fb["found"]:
             # Nothing to phrase - an honest "not on record" is already the whole answer.
             return _plain(fb["text"], fb["sources"])
@@ -226,7 +262,7 @@ def ask(session: Session, question: str) -> dict:
 
     # 3. General history/context: Wikipedia (free, no quota) before any Gemini call.
     if intent is Intent.HISTORY:
-        wiki = _gated_wikipedia(session, question)
+        wiki = _gated_wikipedia(session, question, ctx)
         if wiki is not None:
             wiki_answer = _wikipedia_answer(session, question, wiki)
             if wiki_answer is not None:

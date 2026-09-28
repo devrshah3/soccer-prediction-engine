@@ -24,6 +24,9 @@ export function ChatWidget() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // One random id per widget lifetime. The server keeps the last match/team discussed under it
+  // (30 minutes, nothing personal) so follow-ups like "a video link" or "who scored" make sense.
+  const conversationId = useRef<string | null>(null);
 
   function scrollToBottom() {
     requestAnimationFrame(() => {
@@ -42,7 +45,7 @@ export function ChatWidget() {
       const res = await fetch(`${API_BASE}/assistant/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q }),
+        body: JSON.stringify({ question: q, conversation_id: (conversationId.current ??= crypto.randomUUID()) }),
       });
       const body = await res.json();
       setMessages((m) => [...m, { role: "assistant", text: body.text, sources: body.sources, mode: body.mode }]);

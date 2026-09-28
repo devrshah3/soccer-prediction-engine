@@ -61,6 +61,22 @@ def league_standings_top(session: Session, league_code: str, n: int = 6) -> dict
     return {"found": True, "season": season, "table": table}
 
 
+def latest_finished_match(session: Session, team_ids: list[str]) -> Match | None:
+    """The most recent finished match between two teams (or, given one, that team's latest)."""
+    q = session.query(Match).filter(Match.status == "finished")
+    if len(team_ids) >= 2:
+        a, b = team_ids[0], team_ids[1]
+        q = q.filter(
+            or_(
+                (Match.home_team_id == a) & (Match.away_team_id == b),
+                (Match.home_team_id == b) & (Match.away_team_id == a),
+            )
+        )
+    else:
+        q = q.filter(or_(Match.home_team_id == team_ids[0], Match.away_team_id == team_ids[0]))
+    return q.order_by(Match.date.desc(), Match.kickoff.desc()).first()
+
+
 def match_goal_events(session: Session, match_id: int) -> list[dict]:
     """Recorded goals for a match (internationals only - see routes/matches.py); [] otherwise."""
     rows = (
