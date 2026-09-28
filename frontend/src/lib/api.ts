@@ -157,21 +157,41 @@ async function apiFetch<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export type DomesticGoldenBootLeague =
+export type GoldenBootLeague =
   | { available: false; reason: string }
   | {
       available: true;
+      tag: "Final";
       season: string;
       source: string;
-      note: string;
       top_scorers: { player: string; team_id: string; team_name: string; goals: number; appearances: number }[];
+    }
+  | {
+      available: true;
+      tag: "Current season";
+      season: string;
+      source: string;
+      method: string;
+      scorers: {
+        player: string;
+        team_id: string;
+        team_name: string;
+        goals_so_far: number;
+        played_matches: number;
+        remaining_matches: number;
+        projected_final: number;
+        projected_range: [number, number];
+        top_scorer_chance: number;
+      }[];
     };
 
 export type Awards = {
+  season: string;
+  available_seasons: string[];
   golden_boot: {
     available: boolean;
-    by_league: Record<string, DomesticGoldenBootLeague>;
-    international_top_scorers_also_available: {
+    by_league: Record<string, GoldenBootLeague>;
+    international_top_scorers_also_available?: {
       reason: string;
       international_top_scorers: { player: string; team_id: string; team_name: string; goals: number }[];
       lookback_days: number;
@@ -179,6 +199,31 @@ export type Awards = {
   };
   ballon_dor: { available: boolean; reason: string };
   puskas: { available: boolean; reason: string };
+};
+
+export type GoldenBootBacktest = {
+  source: string;
+  method: string;
+  n_test_points: number;
+  results: {
+    league: string;
+    cutoff_matchday: number;
+    candidates: number;
+    model_mae: number;
+    naive_mae: number;
+    model_hit: boolean;
+    naive_hit: boolean;
+    actual_top_scorer: string;
+    model_picked: string;
+    naive_picked: string;
+  }[];
+  summary: {
+    model_avg_mae_goals: number;
+    naive_avg_mae_goals: number;
+    model_hit_rate: number;
+    naive_hit_rate: number;
+    winner: "model" | "naive";
+  };
 };
 
 export type ReplayMatchSummary = {
@@ -228,7 +273,8 @@ export const api = {
         throw e;
       }
     ),
-  awards: () => apiFetch<Awards>("/awards"),
+  awards: (season?: string) => apiFetch<Awards>(`/awards${season ? `?season=${encodeURIComponent(season)}` : ""}`),
+  awardsMethod: () => apiFetch<GoldenBootBacktest>("/awards/method"),
   replayMatches: () => apiFetch<{ source: string; matches: ReplayMatchSummary[] }>("/replay/matches"),
   replayMatch: (id: string) => apiFetch<ReplayMatch>(`/replay/matches/${encodeURIComponent(id)}`),
   match: (id: number) => apiFetch<MatchDetail>(`/matches/${id}`),

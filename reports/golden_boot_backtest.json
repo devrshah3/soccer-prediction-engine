@@ -1,0 +1,158 @@
+{
+  "source": "StatsBomb Open Data (CC0), 4 full 2015/16 league seasons - internal backtest only, never shown as live scorer data anywhere user-facing.",
+  "method": "See kickcast_api/golden_boot_projection.py - shrunken per-match rate x real remaining matches, vs a naive current-pace baseline.",
+  "n_test_points": 12,
+  "results": [
+    {
+      "league": "Premier League 2015/16",
+      "cutoff_matchday": 5,
+      "candidates": 15,
+      "model_mae": 11.11,
+      "naive_mae": 10.96,
+      "model_hit": false,
+      "naive_hit": false,
+      "actual_top_scorer": "Jamie Vardy",
+      "model_picked": "Baf\u00e9timbi Gomis",
+      "naive_picked": "Baf\u00e9timbi Gomis"
+    },
+    {
+      "league": "Premier League 2015/16",
+      "cutoff_matchday": 10,
+      "candidates": 15,
+      "model_mae": 7.71,
+      "naive_mae": 7.63,
+      "model_hit": true,
+      "naive_hit": true,
+      "actual_top_scorer": "Jamie Vardy",
+      "model_picked": "Jamie Vardy",
+      "naive_picked": "Jamie Vardy"
+    },
+    {
+      "league": "Premier League 2015/16",
+      "cutoff_matchday": 20,
+      "candidates": 15,
+      "model_mae": 4.07,
+      "naive_mae": 4.26,
+      "model_hit": false,
+      "naive_hit": false,
+      "actual_top_scorer": "Harry Kane",
+      "model_picked": "Jamie Vardy",
+      "naive_picked": "Jamie Vardy"
+    },
+    {
+      "league": "La Liga 2015/16",
+      "cutoff_matchday": 5,
+      "candidates": 15,
+      "model_mae": 7.59,
+      "naive_mae": 8.28,
+      "model_hit": false,
+      "naive_hit": false,
+      "actual_top_scorer": "Cristiano Ronaldo dos Santos Aveiro",
+      "model_picked": "Karim Benzema",
+      "naive_picked": "Karim Benzema"
+    },
+    {
+      "league": "La Liga 2015/16",
+      "cutoff_matchday": 10,
+      "candidates": 15,
+      "model_mae": 7.73,
+      "naive_mae": 7.68,
+      "model_hit": false,
+      "naive_hit": false,
+      "actual_top_scorer": "Luis Alberto Su\u00e1rez D\u00edaz",
+      "model_picked": "Neymar da Silva Santos Junior",
+      "naive_picked": "Neymar da Silva Santos Junior"
+    },
+    {
+      "league": "La Liga 2015/16",
+      "cutoff_matchday": 20,
+      "candidates": 15,
+      "model_mae": 5.11,
+      "naive_mae": 4.93,
+      "model_hit": true,
+      "naive_hit": true,
+      "actual_top_scorer": "Luis Alberto Su\u00e1rez D\u00edaz",
+      "model_picked": "Luis Alberto Su\u00e1rez D\u00edaz",
+      "naive_picked": "Luis Alberto Su\u00e1rez D\u00edaz"
+    },
+    {
+      "league": "Serie A 2015/16",
+      "cutoff_matchday": 5,
+      "candidates": 15,
+      "model_mae": 14.39,
+      "naive_mae": 14.39,
+      "model_hit": false,
+      "naive_hit": false,
+      "actual_top_scorer": "Gonzalo Gerardo Higua\u00edn",
+      "model_picked": "Eder Citadin Martins",
+      "naive_picked": "Eder Citadin Martins"
+    },
+    {
+      "league": "Serie A 2015/16",
+      "cutoff_matchday": 10,
+      "candidates": 15,
+      "model_mae": 8.7,
+      "naive_mae": 8.45,
+      "model_hit": false,
+      "naive_hit": false,
+      "actual_top_scorer": "Gonzalo Gerardo Higua\u00edn",
+      "model_picked": "Eder Citadin Martins",
+      "naive_picked": "Eder Citadin Martins"
+    },
+    {
+      "league": "Serie A 2015/16",
+      "cutoff_matchday": 20,
+      "candidates": 15,
+      "model_mae": 3.61,
+      "naive_mae": 3.65,
+      "model_hit": true,
+      "naive_hit": true,
+      "actual_top_scorer": "Gonzalo Gerardo Higua\u00edn",
+      "model_picked": "Gonzalo Gerardo Higua\u00edn",
+      "naive_picked": "Gonzalo Gerardo Higua\u00edn"
+    },
+    {
+      "league": "Ligue 1 2015/16",
+      "cutoff_matchday": 5,
+      "candidates": 15,
+      "model_mae": 12.83,
+      "naive_mae": 12.83,
+      "model_hit": false,
+      "naive_hit": false,
+      "actual_top_scorer": "Edinson Roberto Cavani G\u00f3mez",
+      "model_picked": "Nabil Fekir",
+      "naive_picked": "Nabil Fekir"
+    },
+    {
+      "league": "Ligue 1 2015/16",
+      "cutoff_matchday": 10,
+      "candidates": 15,
+      "model_mae": 7.47,
+      "naive_mae": 7.31,
+      "model_hit": false,
+      "naive_hit": false,
+      "actual_top_scorer": "Zlatan Ibrahimovi\u0107",
+      "model_picked": "Hatem Ben Arfa",
+      "naive_picked": "Hatem Ben Arfa"
+    },
+    {
+      "league": "Ligue 1 2015/16",
+      "cutoff_matchday": 20,
+      "candidates": 15,
+      "model_mae": 3.55,
+      "naive_mae": 3.38,
+      "model_hit": true,
+      "naive_hit": true,
+      "actual_top_scorer": "Zlatan Ibrahimovi\u0107",
+      "model_picked": "Zlatan Ibrahimovi\u0107",
+      "naive_picked": "Zlatan Ibrahimovi\u0107"
+    }
+  ],
+  "summary": {
+    "model_avg_mae_goals": 7.82,
+    "naive_avg_mae_goals": 7.81,
+    "model_hit_rate": 0.333,
+    "naive_hit_rate": 0.333,
+    "winner": "naive"
+  }
+}

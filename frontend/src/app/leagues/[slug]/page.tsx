@@ -69,7 +69,7 @@ export default async function LeaguePage({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {standings && standings.available_seasons.length > 1 && (
-            <SeasonSelect slug={slug} season={standings.season} seasons={standings.available_seasons} />
+            <SeasonSelect basePath={`/leagues/${slug}`} season={standings.season} seasons={standings.available_seasons} />
           )}
           {hasTable && standings && (
             <LeagueTableSheet

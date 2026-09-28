@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from kickcast_api.awards import get_awards, international_top_scorers
-from kickcast_api.models import Base, Goalscorer, Team
+from kickcast_api.models import Base, Goalscorer, League, Match, Team
 
 
 def seeded_session(tmp_path):
@@ -15,6 +15,20 @@ def seeded_session(tmp_path):
     Session = sessionmaker(bind=engine)
     s = Session()
     s.add_all([Team(id="team-a", name="Team A", country=None), Team(id="team-b", name="Team B", country=None)])
+    # A real current-season fixture per domestic league, so latest_season() resolves to
+    # something other than domestic_scorers.SEASON_LABEL ("2024-25") - the two are
+    # deliberately different seasons here, exactly like production, so a test asking for
+    # "2024-25" explicitly exercises the "not current, but the one cached past season we
+    # have" branch rather than the live-projection "current season" branch.
+    for code, name in (("en.1", "EN"), ("es.1", "ES"), ("it.1", "IT"), ("de.1", "DE"), ("fr.1", "FR")):
+        s.add(League(code=code, name=name, country=None, kind="domestic_league"))
+        s.add(Match(
+            league_code=code, season="2026-27", date=date(2026, 9, 1), kickoff=None,
+            home_team_id="team-a", away_team_id="team-b", home_goals=1, away_goals=0,
+            status="finished", round="Matchday 1", neutral=False,
+            source="synthetic", source_id=f"synthetic:{code}",
+        ))
+    s.commit()
     today = datetime.now(timezone.utc).date()
     recent = today - timedelta(days=10)
     old = today - timedelta(days=800)
@@ -43,13 +57,20 @@ def test_international_top_scorers_excludes_own_goals_and_old_data(tmp_path):
     assert top["goals"] == 2
 
 
-def test_get_awards_reports_international_scorers_and_honest_gaps(tmp_path):
+def test_get_awards_reports_international_scorers_and_honest_gaps(tmp_path, monkeypatch):
+    """The current-season branch calls out to football-data.org (golden_boot_projection);
+    a unit test must never hit the real network, so it's stubbed here - the real live
+    call is verified separately (see this session's proof in the commit message and
+    test_football_data_org.py)."""
+    from kickcast_api import awards as awards_module
+
+    monkeypatch.setattr(
+        awards_module.golden_boot_projection, "project",
+        lambda session, code: {"available": False, "reason": "stubbed for this unit test"},
+    )
     s = seeded_session(tmp_path)
     out = get_awards(s)
-    # golden_boot's availability now depends on whether data/api_football_cache/ exists in
-    # THIS environment (real cached data if scripts/fetch_api_football.py has run, absent
-    # on e.g. a bare clone) - both are legitimate, so don't assert a fixed value; just
-    # assert the shape is honest either way.
+    assert out["season"] == "2026-27"
     assert "by_league" in out["golden_boot"]
     for code in ("en.1", "es.1", "it.1", "de.1", "fr.1"):
         entry = out["golden_boot"]["by_league"][code]
@@ -74,11 +95,41 @@ def test_domestic_golden_boot_uses_real_cached_data_when_present(tmp_path):
     if not domestic_scorers.available("es.1"):
         return  # no cache in this environment (e.g. CI without it) - nothing to check here
     s = seeded_session(tmp_path)
-    out = get_awards(s)
+    # Explicit past season, not "2026-27" (the seeded current one) - exercises the "not
+    # current, but the one cached past season we have" branch, never touching the live
+    # football-data.org projection path (no network in this test).
+    out = get_awards(s, season=domestic_scorers.SEASON_LABEL)
     la_liga = out["golden_boot"]["by_league"]["es.1"]
     assert la_liga["available"] is True
     assert la_liga["season"] == domestic_scorers.SEASON_LABEL
+    assert la_liga["tag"] == "Final"
     assert la_liga["top_scorers"], "expected at least one real scorer"
     top = la_liga["top_scorers"][0]
     assert top["goals"] > 0
     assert top["appearances"] <= 38  # data-quality filter: a real single season, not cumulative
+
+
+def test_get_awards_never_silently_falls_back_for_an_unmapped_season(tmp_path):
+    """An explicit season that is neither the current one nor the one past season we have
+    real cached data for must say so honestly - never substitute a different season's
+    numbers. No network/projection call should happen for this season at all."""
+    s = seeded_session(tmp_path)
+    out = get_awards(s, season="2015-16")
+    assert out["season"] == "2015-16"
+    for code, entry in out["golden_boot"]["by_league"].items():
+        assert entry["available"] is False, code
+        assert "2015-16" in entry["reason"]
+    # The default-view-only international scorers block must not leak into a past-season view.
+    assert "international_top_scorers_also_available" not in out["golden_boot"]
+
+
+def test_champions_league_has_no_past_season_data_source(tmp_path):
+    """domestic_scorers only covers the 5 domestic leagues - CL must never fall through to
+    someone else's cached data for a past season, even if the season string matches."""
+    from kickcast_api import domestic_scorers
+
+    s = seeded_session(tmp_path)
+    out = get_awards(s, season=domestic_scorers.SEASON_LABEL)
+    cl = out["golden_boot"]["by_league"]["CL"]
+    assert cl["available"] is False
+    assert domestic_scorers.SEASON_LABEL in cl["reason"]
