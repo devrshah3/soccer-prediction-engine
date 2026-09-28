@@ -56,6 +56,26 @@ def fetch_live_fixtures(session: Session) -> list[dict] | None:
     return [_parse_fixture(f) for f in payload.get("response", [])]
 
 
+def fetch_fixtures_by_date(session: Session, date_iso: str) -> list[dict] | None:
+    """One call, every fixture worldwide on the given date (YYYY-MM-DD) - VERIFIED
+    against a real call (2026-09-28): unlike /teams?season=2026 (blocked on the free
+    tier - see fetch_api_football.py's module docstring), a date-scoped /fixtures call
+    works fine for the current date on the free plan (real response: HTTP 200, 871
+    fixtures worldwide for 2026-09-27). This is what results_updater.py polls during a
+    match window to update our own Match rows' status/score - a single call per poll,
+    same shared quota as fetch_live_fixtures."""
+    if not available() or quota.api_football_quota_remaining(session) <= 0:
+        return None
+    try:
+        resp = requests.get(f"{BASE_URL}/fixtures", params={"date": date_iso}, headers=_headers(), timeout=20)
+        quota.record_api_football_call(session)
+        resp.raise_for_status()
+        payload = resp.json()
+    except (requests.RequestException, ValueError):
+        return None
+    return [_parse_fixture(f) for f in payload.get("response", [])]
+
+
 def fetch_events(session: Session, fixture_id: int) -> list[dict] | None:
     """Per-match event detail - call sparingly (budget is shared with fetch_live_fixtures)."""
     if not available() or quota.api_football_quota_remaining(session) <= 0:
