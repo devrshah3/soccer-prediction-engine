@@ -4,8 +4,10 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv/
-/data/
-!/data/statsbomb_replays.json
+/data/*
+# Small hand-built inputs that ingest needs (everything else in data/ is fetched by the build step)
+!/data/nations_league_*.json
+!/data/uefa_teams.json
 *.jsonl
 .env
 *.egg-info/

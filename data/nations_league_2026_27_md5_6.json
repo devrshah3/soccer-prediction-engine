@@ -1,0 +1,525 @@
+{
+  "source": "UEFA.com league phase fixture list (https://www.uefa.com/uefanationsleague/news/02a2-1fea18abbcbc-456e846509e7-1000--2026-27-uefa-nations-league-all-the-league-phase-fixtures-a/, read 2026-09-28, page shown as last updated 2026-09-27)",
+  "fixtures": [
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "A1",
+      "date": "2026-11-12",
+      "kickoff_cet": "18:00",
+      "home": "T\u00fcrkiye",
+      "away": "Belgium",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "C2",
+      "date": "2026-11-12",
+      "kickoff_cet": "18:00",
+      "home": "Armenia",
+      "away": "Cyprus",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "A1",
+      "date": "2026-11-12",
+      "kickoff_cet": "20:45",
+      "home": "Italy",
+      "away": "France",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "A3",
+      "date": "2026-11-12",
+      "kickoff_cet": "20:45",
+      "home": "Czechia",
+      "away": "Spain",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "A3",
+      "date": "2026-11-12",
+      "kickoff_cet": "20:45",
+      "home": "England",
+      "away": "Croatia",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "C1",
+      "date": "2026-11-12",
+      "kickoff_cet": "20:45",
+      "home": "Albania",
+      "away": "Finland",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "C1",
+      "date": "2026-11-12",
+      "kickoff_cet": "20:45",
+      "home": "San Marino",
+      "away": "Belarus",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "C2",
+      "date": "2026-11-12",
+      "kickoff_cet": "20:45",
+      "home": "Montenegro",
+      "away": "Latvia",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "C3",
+      "date": "2026-11-13",
+      "kickoff_cet": "18:00",
+      "home": "Moldova",
+      "away": "Kazakhstan",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "A2",
+      "date": "2026-11-13",
+      "kickoff_cet": "20:45",
+      "home": "Netherlands",
+      "away": "Greece",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "A2",
+      "date": "2026-11-13",
+      "kickoff_cet": "20:45",
+      "home": "Serbia",
+      "away": "Germany",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "B1",
+      "date": "2026-11-13",
+      "kickoff_cet": "20:45",
+      "home": "Scotland",
+      "away": "North Macedonia",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "B1",
+      "date": "2026-11-13",
+      "kickoff_cet": "20:45",
+      "home": "Slovenia",
+      "away": "Switzerland",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "C3",
+      "date": "2026-11-13",
+      "kickoff_cet": "20:45",
+      "home": "Slovakia",
+      "away": "Faroe Islands",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "C4",
+      "date": "2026-11-13",
+      "kickoff_cet": "20:45",
+      "home": "Bulgaria",
+      "away": "Iceland",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "C4",
+      "date": "2026-11-13",
+      "kickoff_cet": "20:45",
+      "home": "Luxembourg",
+      "away": "Estonia",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "D1",
+      "date": "2026-11-13",
+      "kickoff_cet": "20:45",
+      "home": "Andorra",
+      "away": "Gibraltar",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "D2",
+      "date": "2026-11-13",
+      "kickoff_cet": "20:45",
+      "home": "Liechtenstein",
+      "away": "Azerbaijan",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "B3",
+      "date": "2026-11-14",
+      "kickoff_cet": "15:00",
+      "home": "Kosovo",
+      "away": "Israel",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "A4",
+      "date": "2026-11-14",
+      "kickoff_cet": "18:00",
+      "home": "Norway",
+      "away": "Wales",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "B2",
+      "date": "2026-11-14",
+      "kickoff_cet": "18:00",
+      "home": "Georgia",
+      "away": "Hungary",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "A4",
+      "date": "2026-11-14",
+      "kickoff_cet": "20:45",
+      "home": "Portugal",
+      "away": "Denmark",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "B2",
+      "date": "2026-11-14",
+      "kickoff_cet": "20:45",
+      "home": "Northern Ireland",
+      "away": "Ukraine",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "B3",
+      "date": "2026-11-14",
+      "kickoff_cet": "20:45",
+      "home": "Austria",
+      "away": "Republic of Ireland",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "B4",
+      "date": "2026-11-14",
+      "kickoff_cet": "20:45",
+      "home": "Romania",
+      "away": "Poland",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 5,
+      "group": "B4",
+      "date": "2026-11-14",
+      "kickoff_cet": "20:45",
+      "home": "Sweden",
+      "away": "Bosnia and Herzegovina",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "C2",
+      "date": "2026-11-15",
+      "kickoff_cet": "15:00",
+      "home": "Cyprus",
+      "away": "Montenegro",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "C2",
+      "date": "2026-11-15",
+      "kickoff_cet": "15:00",
+      "home": "Latvia",
+      "away": "Armenia",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "C1",
+      "date": "2026-11-15",
+      "kickoff_cet": "18:00",
+      "home": "Belarus",
+      "away": "Albania",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "C1",
+      "date": "2026-11-15",
+      "kickoff_cet": "18:00",
+      "home": "Finland",
+      "away": "San Marino",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "A1",
+      "date": "2026-11-15",
+      "kickoff_cet": "20:45",
+      "home": "Belgium",
+      "away": "Italy",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "A1",
+      "date": "2026-11-15",
+      "kickoff_cet": "20:45",
+      "home": "France",
+      "away": "T\u00fcrkiye",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "A3",
+      "date": "2026-11-15",
+      "kickoff_cet": "20:45",
+      "home": "Croatia",
+      "away": "Czechia",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "A3",
+      "date": "2026-11-15",
+      "kickoff_cet": "20:45",
+      "home": "Spain",
+      "away": "England",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "C3",
+      "date": "2026-11-16",
+      "kickoff_cet": "16:00",
+      "home": "Faroe Islands",
+      "away": "Moldova",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "C3",
+      "date": "2026-11-16",
+      "kickoff_cet": "16:00",
+      "home": "Kazakhstan",
+      "away": "Slovakia",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "C4",
+      "date": "2026-11-16",
+      "kickoff_cet": "18:00",
+      "home": "Estonia",
+      "away": "Bulgaria",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "C4",
+      "date": "2026-11-16",
+      "kickoff_cet": "18:00",
+      "home": "Iceland",
+      "away": "Luxembourg",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "D2",
+      "date": "2026-11-16",
+      "kickoff_cet": "18:00",
+      "home": "Lithuania",
+      "away": "Liechtenstein",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "A2",
+      "date": "2026-11-16",
+      "kickoff_cet": "20:45",
+      "home": "Germany",
+      "away": "Netherlands",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "A2",
+      "date": "2026-11-16",
+      "kickoff_cet": "20:45",
+      "home": "Greece",
+      "away": "Serbia",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "B1",
+      "date": "2026-11-16",
+      "kickoff_cet": "20:45",
+      "home": "North Macedonia",
+      "away": "Slovenia",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "B1",
+      "date": "2026-11-16",
+      "kickoff_cet": "20:45",
+      "home": "Switzerland",
+      "away": "Scotland",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "D1",
+      "date": "2026-11-16",
+      "kickoff_cet": "20:45",
+      "home": "Gibraltar",
+      "away": "Malta",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "A4",
+      "date": "2026-11-17",
+      "kickoff_cet": "20:45",
+      "home": "Denmark",
+      "away": "Norway",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "A4",
+      "date": "2026-11-17",
+      "kickoff_cet": "20:45",
+      "home": "Wales",
+      "away": "Portugal",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "B2",
+      "date": "2026-11-17",
+      "kickoff_cet": "20:45",
+      "home": "Hungary",
+      "away": "Northern Ireland",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "B2",
+      "date": "2026-11-17",
+      "kickoff_cet": "20:45",
+      "home": "Ukraine",
+      "away": "Georgia",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "B3",
+      "date": "2026-11-17",
+      "kickoff_cet": "20:45",
+      "home": "Israel",
+      "away": "Austria",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "B3",
+      "date": "2026-11-17",
+      "kickoff_cet": "20:45",
+      "home": "Republic of Ireland",
+      "away": "Kosovo",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "B4",
+      "date": "2026-11-17",
+      "kickoff_cet": "20:45",
+      "home": "Bosnia and Herzegovina",
+      "away": "Romania",
+      "status": "scheduled"
+    },
+    {
+      "competition": "UEFA Nations League 2026/27",
+      "matchday": 6,
+      "group": "B4",
+      "date": "2026-11-17",
+      "kickoff_cet": "20:45",
+      "home": "Poland",
+      "away": "Sweden",
+      "status": "scheduled"
+    }
+  ]
+}
