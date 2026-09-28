@@ -51,7 +51,7 @@ class Match(Base):
     away_team_id: Mapped[str] = mapped_column(ForeignKey("teams.id"), index=True)
     home_goals: Mapped[int | None] = mapped_column(Integer, nullable=True)
     away_goals: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    status: Mapped[str] = mapped_column(String)  # "scheduled" | "finished"
+    status: Mapped[str] = mapped_column(String)  # "scheduled" | "finished" | "not_played"
     round: Mapped[str | None] = mapped_column(String, nullable=True)  # "Matchday 3" or tournament name
     neutral: Mapped[bool] = mapped_column(Boolean, default=False)
     source: Mapped[str] = mapped_column(String)

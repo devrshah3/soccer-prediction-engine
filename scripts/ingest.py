@@ -71,6 +71,15 @@ def upsert_match(session, existing: dict, key: tuple, fields: dict) -> Match:
         existing[key] = m
     for k, v in fields.items():
         setattr(m, k, v)
+    if m.status == "scheduled" and m.date < datetime.now(timezone.utc).date():
+        # A source can report "no final score yet" for a match whose date has already
+        # passed (a postponed/abandoned fixture the source never updated, or a data gap
+        # in an old season) - that's not a real upcoming fixture, and every "next match"/
+        # "upcoming" query treating it as one was a real, reported bug (stale 2020-2025
+        # rows surfacing as "upcoming" on team/league/homepage - see A2 in MORNING_REPORT.md
+        # and scripts/mark_stale_fixtures_not_played.py, which cleaned up existing rows;
+        # this stops new ones from being created the same way on a future ingest).
+        m.status = "not_played"
     return m
 
 

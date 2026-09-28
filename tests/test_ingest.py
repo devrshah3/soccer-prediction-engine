@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import create_engine
@@ -27,6 +28,37 @@ def _session(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'test_ingest.db'}")
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine)()
+
+
+def test_upsert_match_relabels_a_past_dated_scheduled_row_as_not_played(tmp_path):
+    """A2: a source reporting "scheduled" (no final score) for a match whose date has
+    already passed - a postponed/abandoned fixture it never updated, or an old-season data
+    gap - must not be treated as a real upcoming fixture. This is what let stale rows
+    (fr.1 2019-20, es.1/it.1's 2024-25 finale) surface as "next match" on real pages."""
+    session = _session(tmp_path)
+    existing: dict = {}
+    key = ("test.1", (datetime.now(UTC) - timedelta(days=30)).date(), "home", "away")
+    m = ingest.upsert_match(session, existing, key, {"season": "2024-25", "kickoff": None, "status": "scheduled"})
+    assert m.status == "not_played"
+
+
+def test_upsert_match_keeps_a_future_scheduled_row_scheduled(tmp_path):
+    session = _session(tmp_path)
+    existing: dict = {}
+    key = ("test.1", (datetime.now(UTC) + timedelta(days=30)).date(), "home", "away")
+    m = ingest.upsert_match(session, existing, key, {"season": "2026-27", "kickoff": None, "status": "scheduled"})
+    assert m.status == "scheduled"
+
+
+def test_upsert_match_leaves_finished_rows_alone_regardless_of_date(tmp_path):
+    session = _session(tmp_path)
+    existing: dict = {}
+    key = ("test.1", (datetime.now(UTC) - timedelta(days=30)).date(), "home", "away")
+    m = ingest.upsert_match(
+        session, existing, key,
+        {"season": "2024-25", "kickoff": None, "status": "finished", "home_goals": 1, "away_goals": 0},
+    )
+    assert m.status == "finished"
 
 
 def test_domestic_ingest_is_idempotent(tmp_path):
