@@ -412,3 +412,150 @@ Checks at the end of this session: `pytest` 142 passed / 1 skipped (the live-quo
 skipping correctly on the real exhaustion above - not a regression), `ruff` and `mypy`
 clean, frontend `lint` and `build` clean. Nothing was deployed, no money was spent, no
 `.env` values were printed or committed.
+
+---
+
+## Session 4 — 2026-09-28: date/schedule rewrite (13 items), 3 more real bugs found
+
+12 commits, `ad83278`..`5101669` (`git log --oneline ad83278^..HEAD`). Every fix below was
+verified against the real running server/real database after restarting it, not just read
+from the code. Real wall-clock time crossed into 2026-09-28 UTC partway through this
+session (a long session) - noted wherever it affects how a specific verification reads
+"today".
+
+### A1: the actual root cause of the missing-matches bug
+
+Queried the DB directly first: all 8 real Nations League matches for 2026-09-27 WERE
+already in the DB, including Serbia-Netherlands and Norway-Portugal - so the bug was never
+ingest/team-mapping. Root cause: the fixtures query sorted only on `date`, never
+`kickoff` - ties on the same date fell back to whatever index SQLite used to satisfy the
+filter (in practice, alphabetically by home team via the natural-key unique index).
+Combined with a default limit of 6 (sized for a domestic matchday, not a Nations League
+matchday's 26 simultaneous fixtures), this silently dropped whichever teams sorted late
+alphabetically. Fixed: sort by `(date, kickoff)`, raised the default limit to 50 - the
+date window is the real bound now. Verified file-count vs DB-count vs endpoint-count
+matched for all 13 days from 2026-09-24 to 2026-10-06.
+
+### A2-A4: real match states, a real live-results gap, real prediction-freshness bug
+
+- **A2**: cards/match page now show a real computed state (`matchState.ts`) instead of
+  just scheduled/finished - finished shows the score with no probability bar; kickoff
+  passed with no score shows "In progress" (<135 min) then "Full time, score pending"
+  (beyond it). Match page shows real scorers/minutes when we have them (international
+  matches only - `Goalscorer.match_id` isn't populated for domestic) plus a small
+  "Pre-match prediction" line.
+- **A3**: re-ran `fetch_open_data.sh --force` - martj42's `results.csv` is genuinely stale
+  upstream (newest date unchanged, 2026-08-26, before AND after). Made one real
+  API-Football call to confirm `/fixtures?date=` (unlike `/teams?season=`) is NOT
+  season-restricted on the free tier - 871 real fixtures worldwide, HTTP 200. Built a real
+  scheduled results updater (`kickcast_api/live/results_updater.py`, 10-min interval, only
+  calls the API inside an actual match window) that updates the canonical `Match` row
+  directly - a real gap in the existing live poller, which only ever wrote to a separate
+  table and never touched `Match.status`. Real, honest limitation found: the API-Football
+  team-id crosswalk only covers the big-5 domestic leagues (98 real ids) - no national
+  teams, so this doesn't help Nations League matches yet.
+- **A4**: "updated 32d ago" was `as_of` (a data cutoff date), not a computation timestamp -
+  a freshly-refit model still showed it because the cutoff itself doesn't move when no new
+  results arrive. Added a real `computed_at` (wall-clock, tracked per model-cache entry),
+  verified live: `as_of` still 2026-08-27, `computed_at` 0.015 seconds old at request time.
+
+### B.5-B.8: date-aware homepage rewrite
+
+Built in dependency order (B.8 first, since 5-7 all need it): `PrecomputedPrediction`
+table + `precompute_predictions()` (every scheduled match in the next 90 days, after every
+ingest and nightly at 03:00 UTC) + `GET /matches?date=YYYY-MM-DD` serving from it (falls
+back to a live compute for a fixture added after the last precompute run). Real run after
+ingest: "572 prediction(s) stored". `isTodaySettled()` (B.5) decides, from an injectable
+clock, whether to roll over to the next matchday - unit tested for all 4 specified clock
+scenarios. `DatePicker`/`DateMatchList` (B.6) - prev/next arrows, a native date input as
+the calendar popover, quick chips, ±90 day range, empty-date recovery via
+`GET /matches/nearby-date`. Homepage reorganized (B.7) into Today / Next 7 days / Recent
+results. Honest limitation: date grouping is by the backend's stored UTC date; true
+per-viewer local-date re-bucketing across a UTC day boundary isn't wired into the live
+page (the conversion utility, `localDate.ts`, is real and tested, just not yet consumed by
+the page itself - would need a per-viewer timezone signal this server-rendered page
+doesn't have without a client round trip).
+
+Set up vitest (the frontend had no test runner at all) - needed for B.5's rollover test
+and D.11's component test. Required bumping `@types/node` from a stale `^20` pin to `^22`
+to match the Node version actually running here.
+
+### C.9-C.10: scheduled refresh, moved-fixture history, real Nations League MD5-6
+
+- **C.9**: `scripts/daily_refresh.py` is the one command - re-fetch, re-ingest, recompute
+  predictions, log what changed (new/moved/newly-finished, by snapshotting the DB before
+  and after). Documented with a real crontab line in README.md. Added
+  `Match.previous_date`/`previous_kickoff` + a `(league, season, round, teams)` fallback
+  match in `upsert_match` so a fixture whose date/time moves updates in place instead of
+  duplicating - needs a real `round` value to work, a documented limitation for
+  competitions without one. Real migration needed and applied: `create_all()` doesn't
+  alter an existing table, so `data/kickcast.db`'s real `matches` table needed an explicit
+  `ALTER TABLE` for the two new columns - added a small idempotent migration step to
+  `init_db()`, confirmed via `PRAGMA table_info` before/after.
+- **C.10**: checked football-data.org (13 competitions, no Nations League) and
+  API-Football (`UEFA Nations League Cup` exists, but `season=2026` hits the same
+  free-tier block as domestic leagues) for real, both real calls. One real web search +
+  one real WebFetch of UEFA.com's own fixtures page, transcribed 52 real MD5-6 fixtures
+  into `data/nations_league_2026_27_md5_6.json` (not committed - matches its sibling
+  MD1-4 file's existing convention; `data/` is gitignored except one explicit exception).
+  Cross-checked every team name against `results.csv`/MD1-4 first: "Czechia" and
+  "Türkiye" both already have real `ALIASES` entries. Verified: international row count
+  went 25589 -> 25641 (+52 exactly), a real MD5 fixture (Armenia vs Cyprus) has a real
+  precomputed prediction.
+
+### D.11 & E.12-13: card decluttering, coverage report, closing the test gaps
+
+Cards no longer show "updated Xd ago · evidence A · dixon-coles-v1" - that's now behind a
+new (i) popover (`PredictionInfoPopover`), with a "Prediction may be outdated" tag only
+when actually justified (near-term match, prediction >48h stale). `scripts/
+coverage_report.py` prints a real 90-day per-league table (30 of the next 91 days have
+zero matches across every league, visible not hidden) plus the specific numbers the brief
+asked to confirm (Nations League 25666 rows/122 scheduled, CL's real football-data.org
+range 2026-09-08..2027-01-27, all 5 domestic leagues' 2026-27 season range). Audited the
+5 specific tests the brief asked for: 4 were already covered by earlier commits in this
+session; added the one missing one (precompute produces exactly one row per scheduled
+match across a set of several, not just one).
+
+### Final proof: the actual homepage output for 2026-09-27
+
+Real wall-clock time had moved to 2026-09-28 by the end of this session, so all 8 of
+2026-09-27's matches have now genuinely kicked off and finished (or gone unreported) in
+real time - `GET /matches?date=2026-09-27` correctly shows every one of them as
+`status: "not_played"` (A2's ingest-time rule: date passed, no score arrived) rather than
+inventing a result, and the frontend correctly renders all 8 as "Full time, score
+pending", not as upcoming predictions. This is the honest, correct state given real time
+has passed and this project has no live-score source that covers Nations League matches
+(A3's crosswalk gap) - not a bug. Real output, `GET /matches?date=2026-09-27`:
+
+```
+13:00 UTC  Lithuania            vs Azerbaijan             (not_played)
+16:00 UTC  Serbia               vs Netherlands            (not_played)
+16:00 UTC  Denmark              vs Wales                  (not_played)
+16:00 UTC  Austria              vs Kosovo                 (not_played)
+16:00 UTC  Gibraltar            vs Andorra                (not_played)
+18:45 UTC  Germany              vs Greece                 (not_played)
+18:45 UTC  Norway               vs Portugal               (not_played)
+18:45 UTC  Israel               vs Republic of Ireland    (not_played)
+```
+
+All 8 real matches, including Norway-Portugal and Serbia-Netherlands (the two the original
+bug dropped), in correct kickoff order, each in the correct real state.
+
+### What's blocked / needs testing later
+
+- **International live scores**: the new results updater can't help Nations League
+  matches until the API-Football team-id crosswalk is extended to national teams (a
+  real, separate task - needs its own real `/teams` calls per confederation, same
+  treatment as the existing big-5 crosswalk).
+- **True per-viewer local-date grouping** across the UTC day boundary: the conversion
+  utility exists and is tested, but the live page still groups by the backend's UTC date.
+- **Gemini quota** (carried over from Session 3): still real-exhausted as of this session;
+  the `gemini+db`/`wikipedia+gemini` success+cache-hit paths are only verified via mocks,
+  not a live call yet.
+- **Real crontab**: `scripts/daily_refresh.py` is documented with a crontab line in
+  README.md but was not actually installed into this machine's crontab (that would be a
+  standing change to the user's system - not made without being asked).
+
+Checks at the end of this session: `pytest` 174 passed / 1 skipped, `ruff` and `mypy`
+clean, frontend `lint`, `test` (vitest, 22 passed), and `build` all clean. Nothing was
+deployed, no money was spent, no `.env` values were printed or committed.
