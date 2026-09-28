@@ -111,7 +111,7 @@ def project(session: Session, league_code: str) -> dict:
             f"Live goals-so-far, per-match rate shrunk ({SHRINKAGE_MATCHES:.0f}-match prior "
             f"weight) toward a prior from {prior_source}, x each player's team's real "
             f"remaining scheduled matches, {N_SIMS} Poisson-noise simulations for the range "
-            "and title chance. Backtested against real 2015-16 data - see /awards/method."
+            "and title chance. Backtested on past seasons - see the Method page."
         ),
         "scorers": out,
     }

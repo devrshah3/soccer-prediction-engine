@@ -1,7 +1,33 @@
 {
   "source": "StatsBomb Open Data (CC0), 4 full 2015/16 league seasons - internal backtest only, never shown as live scorer data anywhere user-facing.",
-  "method": "See kickcast_api/golden_boot_projection.py - shrunken per-match rate x real remaining matches, vs a naive current-pace baseline.",
+  "method": "Each contender's goals-per-match is pulled toward a typical top-scorer rate, multiplied by their team's remaining matches, then simulated many times for a range and a chance of finishing top. Compared here against a naive baseline that simply extends current goals-per-match to a full season.",
   "n_test_points": 12,
+  "by_cutoff": [
+    {
+      "cutoff_matchday": 5,
+      "tests": 4,
+      "model_avg_mae": 11.48,
+      "naive_avg_mae": 11.62,
+      "model_hits": 0,
+      "naive_hits": 0
+    },
+    {
+      "cutoff_matchday": 10,
+      "tests": 4,
+      "model_avg_mae": 7.9,
+      "naive_avg_mae": 7.77,
+      "model_hits": 1,
+      "naive_hits": 1
+    },
+    {
+      "cutoff_matchday": 20,
+      "tests": 4,
+      "model_avg_mae": 4.08,
+      "naive_avg_mae": 4.05,
+      "model_hits": 3,
+      "naive_hits": 3
+    }
+  ],
   "results": [
     {
       "league": "Premier League 2015/16",

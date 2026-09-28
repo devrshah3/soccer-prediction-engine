@@ -202,20 +202,16 @@ export type Awards = {
 };
 
 export type GoldenBootBacktest = {
-  source: string;
   method: string;
+  data_note: string;
   n_test_points: number;
-  results: {
-    league: string;
+  by_cutoff: {
     cutoff_matchday: number;
-    candidates: number;
-    model_mae: number;
-    naive_mae: number;
-    model_hit: boolean;
-    naive_hit: boolean;
-    actual_top_scorer: string;
-    model_picked: string;
-    naive_picked: string;
+    tests: number;
+    model_avg_mae: number;
+    naive_avg_mae: number;
+    model_hits: number;
+    naive_hits: number;
   }[];
   summary: {
     model_avg_mae_goals: number;
@@ -226,19 +222,48 @@ export type GoldenBootBacktest = {
   };
 };
 
-export type ReplayMatchSummary = {
-  id: string;
-  competition: string;
-  season: string;
-  date: string;
-  home: string;
-  away: string;
-  home_goals: number;
-  away_goals: number;
+export type ReplayEvent = {
+  minute: number | null;
+  player: string;
+  team_id: string;
+  team_name: string;
+  own_goal: boolean;
+  penalty: boolean;
 };
 
-export type ReplayMatch = ReplayMatchSummary & {
-  timeline: { type: string; minute: number; team: string | null; player?: string | null; detail?: string | null; player_off?: string | null; player_on?: string | null; card?: string }[];
+export type ReplayMatch = {
+  id: number;
+  league_code: string;
+  league_name: string;
+  league_country: string | null;
+  round: string | null;
+  date: string;
+  kickoff: string | null;
+  status: string;
+  home_team: TeamRef;
+  away_team: TeamRef;
+  home_goals: number | null;
+  away_goals: number | null;
+  has_result: boolean;
+  events: ReplayEvent[];
+  events_status: "complete" | "partial" | "none" | null;
+  prediction: { probabilities: { home: number; draw: number; away: number }; as_of: string; computed_at: string | null; model_version: string; evidence: string | null } | null;
+  prediction_result: {
+    predicted: "home" | "draw" | "away";
+    predicted_probability: number;
+    actual: "home" | "draw" | "away";
+    actual_probability: number;
+    correct: boolean;
+  } | null;
+  recap: { text: string; mode: "template" | "gemini"; label: string };
+};
+
+export type ReplayDay = {
+  date: string;
+  matches: ReplayMatch[];
+  no_events_note: string;
+  most_recent_day_with_matches: string | null;
+  most_recent_day_with_results: string | null;
 };
 
 export const api = {
@@ -275,8 +300,10 @@ export const api = {
     ),
   awards: (season?: string) => apiFetch<Awards>(`/awards${season ? `?season=${encodeURIComponent(season)}` : ""}`),
   awardsMethod: () => apiFetch<GoldenBootBacktest>("/awards/method"),
-  replayMatches: () => apiFetch<{ source: string; matches: ReplayMatchSummary[] }>("/replay/matches"),
-  replayMatch: (id: string) => apiFetch<ReplayMatch>(`/replay/matches/${encodeURIComponent(id)}`),
+  // Item 6: the viewer's local "yesterday" (tz = minutes east of UTC) - or an earlier day
+  // reached only via the "most recent day" link. The server never serves today or later.
+  replayDay: (tzOffsetMinutes: number, date?: string) =>
+    apiFetch<ReplayDay>(`/replay/day?tz=${tzOffsetMinutes}${date ? `&date=${encodeURIComponent(date)}` : ""}`),
   match: (id: number) => apiFetch<MatchDetail>(`/matches/${id}`),
   // B.8: every match on a given local date, each scheduled one carrying its (precomputed
   // where possible) prediction plus long_range/date_may_change flags.

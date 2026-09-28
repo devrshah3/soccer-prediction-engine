@@ -58,10 +58,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <Dock />
         <footer className="relative z-0 px-4 pb-8 pt-4 text-center text-xs text-muted-2 sm:px-6">
           <div className="glass mx-auto max-w-3xl !rounded-2xl px-4 py-3">
-            Data: openfootball (CC0), football-data.co.uk, StatsBomb Open Data, martj42/international_results (CC0),
-            football-data.org (Champions League), API-Football (domestic scorer data), Wikipedia (CC BY-SA).
             Predictions are our own model, backtested out-of-sample - not a promise of accuracy.
             {meta.ingested_at && <> &middot; fixtures {timeAgo(meta.ingested_at)}</>}
+            {" "}&middot;{" "}
+            <Link href="/about" className="text-accent hover:underline">
+              Data sources &amp; credits
+            </Link>
           </div>
         </footer>
         <ChatWidget />

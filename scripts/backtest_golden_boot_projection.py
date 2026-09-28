@@ -137,12 +137,27 @@ def main() -> None:
     avg_model_mae = sum(model_maes) / len(model_maes)
     avg_naive_mae = sum(naive_maes) / len(naive_maes)
 
+    by_cutoff = []
+    for cutoff in CUTOFFS:
+        rows = [r for r in all_results if r["cutoff_matchday"] == cutoff]
+        by_cutoff.append({
+            "cutoff_matchday": cutoff,
+            "tests": len(rows),
+            "model_avg_mae": round(sum(r["model_mae"] for r in rows) / len(rows), 2),
+            "naive_avg_mae": round(sum(r["naive_mae"] for r in rows) / len(rows), 2),
+            "model_hits": sum(r["model_hit"] for r in rows),
+            "naive_hits": sum(r["naive_hit"] for r in rows),
+        })
+
     report = {
         "source": "StatsBomb Open Data (CC0), 4 full 2015/16 league seasons - internal "
                    "backtest only, never shown as live scorer data anywhere user-facing.",
-        "method": "See kickcast_api/golden_boot_projection.py - shrunken per-match rate x "
-                  "real remaining matches, vs a naive current-pace baseline.",
+        "method": "Each contender's goals-per-match is pulled toward a typical top-scorer rate, "
+                  "multiplied by their team's remaining matches, then simulated many times for a "
+                  "range and a chance of finishing top. Compared here against a naive baseline "
+                  "that simply extends current goals-per-match to a full season.",
         "n_test_points": len(all_results),
+        "by_cutoff": by_cutoff,
         "results": all_results,
         "summary": {
             "model_avg_mae_goals": round(avg_model_mae, 2),
