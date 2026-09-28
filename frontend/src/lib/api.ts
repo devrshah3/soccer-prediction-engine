@@ -4,7 +4,7 @@ export type League = {
   code: string;
   name: string;
   country: string | null;
-  kind: "domestic_league" | "international";
+  kind: "domestic_league" | "international" | "continental_cup";
 };
 
 export type TeamRef = { id: string; name: string };
@@ -186,13 +186,19 @@ export const api = {
   leagueFixtures: (code: string, status: "scheduled" | "finished" | "all" = "scheduled", limit = 20) =>
     apiFetch<Match[]>(`/leagues/${encodeURIComponent(code)}/fixtures?status=${status}&limit=${limit}`),
   // Fixtures for several leagues in one request (see kickcast_api/routes/batch.py) - used by
-  // the homepage instead of one /leagues/{code}/fixtures call per league.
-  fixturesByLeagues: (codes: string[], status: "scheduled" | "finished" | "all" = "scheduled", limit = 6) =>
+  // the homepage instead of one /leagues/{code}/fixtures call per league. `days` bounds
+  // "scheduled" results to [now, now + days] - the homepage tries 7 first, then widens to
+  // 14 if that comes back thin (e.g. during an international break).
+  fixturesByLeagues: (codes: string[], status: "scheduled" | "finished" | "all" = "scheduled", limit = 6, days = 7) =>
     codes.length === 0
       ? Promise.resolve({} as Record<string, Match[]>)
       : apiFetch<Record<string, Match[]>>(
-          `/fixtures?leagues=${codes.map(encodeURIComponent).join(",")}&status=${status}&limit=${limit}`
+          `/fixtures?leagues=${codes.map(encodeURIComponent).join(",")}&status=${status}&limit=${limit}&days=${days}`
         ),
+  // The earliest upcoming domestic-league fixture date, regardless of window - used to
+  // show "International break: club football resumes <date>" when nothing domestic falls
+  // within the homepage's current window.
+  nextDomesticFixtureDate: () => apiFetch<{ date: string | null }>("/fixtures/next-domestic-date"),
   team: (id: string) => apiFetch<TeamDetail>(`/teams/${encodeURIComponent(id)}`),
   teamFixtures: (id: string, status: "scheduled" | "finished" | "all" = "all", limit = 100) =>
     apiFetch<Match[]>(`/teams/${encodeURIComponent(id)}/fixtures?status=${status}&limit=${limit}`),

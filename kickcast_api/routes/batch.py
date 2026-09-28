@@ -16,30 +16,40 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_session
-from ..models import Match
+from ..models import League, Match
 from ..predictions import get_model
 from ..serialize import match_dict
 
 router = APIRouter(tags=["batch"])
 
-UPCOMING_WINDOW_DAYS = 7
+DEFAULT_UPCOMING_WINDOW_DAYS = 7
 
 
 @router.get("/fixtures")
 def fixtures_by_league(
-    leagues: str, status: str = "scheduled", limit: int = 6, session: Session = Depends(get_session)
+    leagues: str,
+    status: str = "scheduled",
+    limit: int = 6,
+    days: int = DEFAULT_UPCOMING_WINDOW_DAYS,
+    session: Session = Depends(get_session),
 ) -> dict[str, list[dict]]:
     """Fixtures for several leagues in one request. `leagues` is a comma-separated list of
     league codes; unknown codes just come back with an empty list rather than erroring the
     whole batch.
 
     For status="scheduled" (what the homepage asks for), fixtures are hard-bounded to
-    [now, now + 7 days], no exceptions, regardless of league/competition. Without this,
+    [now, now + `days`], no exceptions, regardless of league/competition. Without this,
     a league whose most recent "scheduled" row is stale (e.g. a postponed match from years
     ago that was never marked finished, or the final matchday of a season not yet ingested
     as finished) surfaces as the "next" fixture - which is how the homepage ended up
     showing La Liga/Serie A "Matchday 38" games from over a year ago alongside Nations
     League games days in the past, all labeled "upcoming" in the same list.
+
+    `days` is a parameter (not hardcoded) so the homepage can widen the window (7 -> 14)
+    when the default window comes back thin - e.g. during an international break, when
+    domestic leagues pause and 7 days of pure Nations League fixtures isn't much of a
+    homepage. See also GET /fixtures/next-domestic-date for the note the homepage shows
+    when even the widened window has nothing domestic in it.
     """
     if status not in ("scheduled", "finished", "all"):
         raise HTTPException(400, "status must be 'scheduled', 'finished', or 'all'")
@@ -47,7 +57,7 @@ def fixtures_by_league(
     order = Match.date.asc() if status != "finished" else Match.date.desc()
     out: dict[str, list[dict]] = {}
     now = datetime.now(UTC).date()
-    horizon = now + timedelta(days=UPCOMING_WINDOW_DAYS)
+    horizon = now + timedelta(days=days)
     for code in codes:
         q = session.query(Match).filter(Match.league_code == code)
         if status != "all":
@@ -57,6 +67,23 @@ def fixtures_by_league(
         matches = q.order_by(order).limit(limit).all()
         out[code] = [match_dict(session, m) for m in matches]
     return out
+
+
+@router.get("/fixtures/next-domestic-date")
+def next_domestic_fixture_date(session: Session = Depends(get_session)) -> dict:
+    """The earliest scheduled date across domestic leagues (not international/continental
+    competitions) from today onward. Used for the homepage's "International break: club
+    football resumes <date>" note, which needs to look further ahead than whatever window
+    the fixtures list itself is currently using."""
+    now = datetime.now(UTC).date()
+    row = (
+        session.query(Match.date)
+        .join(League, League.code == Match.league_code)
+        .filter(League.kind == "domestic_league", Match.status == "scheduled", Match.date >= now)
+        .order_by(Match.date.asc())
+        .first()
+    )
+    return {"date": row[0].isoformat() if row else None}
 
 
 @router.get("/predictions/summary")

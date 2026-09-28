@@ -12,3 +12,10 @@ export function timeAgo(iso: string): string {
   const diffDay = Math.round(diffHr / 24);
   return `updated ${diffDay}d ago`;
 }
+
+// "2026-10-10" -> "Oct 10", for the homepage's "club football resumes <date>" note.
+export function formatShortDate(isoDate: string): string {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return isoDate;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+}
