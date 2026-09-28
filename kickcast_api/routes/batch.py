@@ -29,7 +29,7 @@ DEFAULT_UPCOMING_WINDOW_DAYS = 7
 def fixtures_by_league(
     leagues: str,
     status: str = "scheduled",
-    limit: int = 6,
+    limit: int = 50,
     days: int = DEFAULT_UPCOMING_WINDOW_DAYS,
     session: Session = Depends(get_session),
 ) -> dict[str, list[dict]]:
@@ -45,6 +45,18 @@ def fixtures_by_league(
     showing La Liga/Serie A "Matchday 38" games from over a year ago alongside Nations
     League games days in the past, all labeled "upcoming" in the same list.
 
+    Real bug fixed here: the query had no ORDER BY on kickoff time, only on `date` - ties
+    on the same date were then ordered incidentally by whatever index SQLite chose to
+    satisfy the query (in practice: the `uq_match_natural_key` unique index on (league_code,
+    date, home_team_id, away_team_id), i.e. alphabetically by home team). Combined with a
+    default limit of 6 (fine for a domestic matchday, nowhere near enough for a Nations
+    League matchday with up to 26 simultaneous fixtures), this silently dropped whichever
+    matches happened to sort late alphabetically - e.g. Norway-Portugal and Serbia-
+    Netherlands on 2026-09-27, while Austria/Denmark/Germany/Gibraltar/Israel/Lithuania
+    (alphabetically earlier home teams, same kickoff times) were kept. Fixed by sorting on
+    (date, kickoff) and raising the default limit well past any real single-day fixture
+    count; the date window above is the real bound now, not this limit.
+
     `days` is a parameter (not hardcoded) so the homepage can widen the window (7 -> 14)
     when the default window comes back thin - e.g. during an international break, when
     domestic leagues pause and 7 days of pure Nations League fixtures isn't much of a
@@ -54,7 +66,7 @@ def fixtures_by_league(
     if status not in ("scheduled", "finished", "all"):
         raise HTTPException(400, "status must be 'scheduled', 'finished', or 'all'")
     codes = [c for c in leagues.split(",") if c]
-    order = Match.date.asc() if status != "finished" else Match.date.desc()
+    order = (Match.date.asc(), Match.kickoff.asc()) if status != "finished" else (Match.date.desc(), Match.kickoff.desc())
     out: dict[str, list[dict]] = {}
     now = datetime.now(UTC).date()
     horizon = now + timedelta(days=days)
@@ -64,7 +76,7 @@ def fixtures_by_league(
             q = q.filter(Match.status == status)
         if status == "scheduled":
             q = q.filter(Match.date >= now, Match.date <= horizon)
-        matches = q.order_by(order).limit(limit).all()
+        matches = q.order_by(*order).limit(limit).all()
         out[code] = [match_dict(session, m) for m in matches]
     return out
 

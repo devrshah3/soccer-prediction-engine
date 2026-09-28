@@ -48,8 +48,10 @@ def league_fixtures(
     q = session.query(Match).filter(Match.league_code == code)
     if status != "all":
         q = q.filter(Match.status == status)
-    order = Match.date.asc() if status != "finished" else Match.date.desc()
-    matches = q.order_by(order).limit(limit).all()
+    # Sort on (date, kickoff), not date alone - see kickcast_api/routes/batch.py's
+    # fixtures_by_league docstring for the real bug a date-only sort caused there.
+    order = (Match.date.asc(), Match.kickoff.asc()) if status != "finished" else (Match.date.desc(), Match.kickoff.desc())
+    matches = q.order_by(*order).limit(limit).all()
     return [match_dict(session, m) for m in matches]
 
 

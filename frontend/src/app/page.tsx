@@ -21,14 +21,14 @@ export default async function HomePage() {
   // kickcast_api/routes/batch.py) rather than one call per league / one call per candidate
   // match - the earlier fan-out (~28 concurrent requests for one page load) was exhausting
   // the backend's connection pool.
-  let fixturesByLeague = await api.fixturesByLeagues(codes, "scheduled", 6, 7).catch(() => ({}) as Record<string, Match[]>);
+  let fixturesByLeague = await api.fixturesByLeagues(codes, "scheduled", 50, 7).catch(() => ({}) as Record<string, Match[]>);
   let upcoming = collectUpcoming(fixturesByLeague);
 
   // A plain 7-day window goes thin during an international break (domestic leagues pause,
   // so the only thing left is Nations League/friendlies) - widen to 14 days rather than
   // show a near-empty homepage.
   if (upcoming.length < MIN_MATCHES_BEFORE_WIDENING) {
-    fixturesByLeague = await api.fixturesByLeagues(codes, "scheduled", 6, WIDE_WINDOW_DAYS).catch(() => fixturesByLeague);
+    fixturesByLeague = await api.fixturesByLeagues(codes, "scheduled", 50, WIDE_WINDOW_DAYS).catch(() => fixturesByLeague);
     upcoming = collectUpcoming(fixturesByLeague);
   }
 

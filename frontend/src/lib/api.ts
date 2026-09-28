@@ -189,7 +189,7 @@ export const api = {
   // the homepage instead of one /leagues/{code}/fixtures call per league. `days` bounds
   // "scheduled" results to [now, now + days] - the homepage tries 7 first, then widens to
   // 14 if that comes back thin (e.g. during an international break).
-  fixturesByLeagues: (codes: string[], status: "scheduled" | "finished" | "all" = "scheduled", limit = 6, days = 7) =>
+  fixturesByLeagues: (codes: string[], status: "scheduled" | "finished" | "all" = "scheduled", limit = 50, days = 7) =>
     codes.length === 0
       ? Promise.resolve({} as Record<string, Match[]>)
       : apiFetch<Record<string, Match[]>>(
