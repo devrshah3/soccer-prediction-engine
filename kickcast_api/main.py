@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from . import catchup, settings
 from .db import get_session
+from .live import api_football, espn, results_updater
 from .live import scheduler as live_scheduler
 from .models import Meta
 from .routes import assistant, awards, batch, leagues, live, matches, replay, teams
@@ -91,4 +92,12 @@ def meta(session: Session = Depends(get_session)) -> dict:
     return {
         "ingested_at": ingested_at.value if ingested_at else None,
         "data_version": data_version.value if data_version else None,
+        # Live-results sources: enabled flags, and the last outcome (no secrets) so a deployment can be
+        # diagnosed from outside - e.g. "enabled but blocked" vs "disabled by config".
+        "live_sources": {
+            "espn_enabled": espn.available(),
+            "espn": dict(espn.status),
+            "api_football_enabled": api_football.available(),
+            "last_backfill": dict(results_updater.last_backfill),
+        },
     }

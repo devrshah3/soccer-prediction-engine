@@ -20,6 +20,7 @@ treat both identically; teams are matched by NAME (find_match), never by an ESPN
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 
 import requests
 
@@ -43,6 +44,11 @@ _STATUS = {
     "STATUS_FINAL_AET": "AET", "STATUS_FINAL_PEN": "PEN",
 }
 _CLOCK = re.compile(r"(\d+)'(?:\s*\+\s*(\d+)')?")
+
+
+# Last outcome per request, for /meta - so a deployment can say WHY it has no live results
+# (disabled, blocked, network) without anyone needing its logs.
+status: dict = {"last_attempt": None, "last_ok": None, "last_error": None}
 
 
 def available() -> bool:
@@ -108,6 +114,7 @@ def fetch_fixtures(day_iso: str, league_codes: set[str]) -> list[dict] | None:
     None if disabled or NO slug could be fetched (so the caller doesn't record a check)."""
     if not available():
         return None
+    status["last_attempt"] = datetime.now(timezone.utc).isoformat()
     slugs = [s for code in sorted(league_codes) for s in SLUGS.get(code, [])]
     out: list[dict] = []
     ok = False
@@ -120,8 +127,11 @@ def fetch_fixtures(day_iso: str, league_codes: set[str]) -> list[dict] | None:
             )
             resp.raise_for_status()
             payload = resp.json()
-        except (requests.RequestException, ValueError):
+        except (requests.RequestException, ValueError) as exc:
+            status["last_error"] = f"{slug}: {type(exc).__name__}: {str(exc)[:120]}"
             continue
         ok = True
         out.extend(f for e in payload.get("events", []) if (f := parse_event(e)) is not None)
+    if ok:
+        status["last_ok"] = status["last_attempt"]
     return out if ok else None

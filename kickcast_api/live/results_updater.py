@@ -160,6 +160,7 @@ def update_results_from_espn(session: Session, now: datetime | None = None) -> i
 
 
 BACKFILL_DAYS = 7
+last_backfill: dict = {"at": None, "report": None}  # for /meta
 
 
 def backfill_from_espn(session: Session, days: int = BACKFILL_DAYS, now: datetime | None = None) -> dict:
@@ -184,6 +185,7 @@ def backfill_from_espn(session: Session, days: int = BACKFILL_DAYS, now: datetim
         report["days"] += 1
         report["fixtures"] += len(fixtures)
         report["changed"] += _apply_fixtures(session, day, fixtures, now)
+    last_backfill.update(at=now.isoformat(), report=dict(report))
     log.info("results/espn backfill: %s", report)
     return report
 
