@@ -10,12 +10,37 @@ nothing matches, it says so rather than guessing, per the "never invent a fact" 
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy.orm import Session
 
 from ..models import Team
 from . import tools
+
+
+def prediction_sentence(session: Session, r: dict, asked: list[dict]) -> str:
+    """One sentence for a head-to-head prediction. Home/away order, names and date come from
+    the fixture record in `r["match"]` - never from the order the teams appear in the
+    question (asked = the two teams as the user named them, only used when NO fixture exists,
+    where the model was run with asked[0] as the home side)."""
+    p = r["prediction"]["probabilities"]
+    tail = f"(as of {r['prediction']['as_of']}, evidence tier {r['prediction']['evidence']}). Not a promise of accuracy."
+    m = r.get("match")
+    if m is None:
+        a, b = asked[0]["name"], asked[1]["name"]
+        return (
+            f"There is no scheduled fixture between {a} and {b} in our data, so this is a hypothetical with "
+            f"{a} as the home side: our model gives {a} {p['home']:.0%}, a draw {p['draw']:.0%}, and {b} {p['away']:.0%} {tail}"
+        )
+    home, away = m["home_team"]["name"], m["away_team"]["name"]
+    when = date.fromisoformat(m["date"]).strftime("%a %b %d, %Y").replace(" 0", " ")
+    venue = "neutral venue" if m.get("neutral") else "home"
+    n = r.get("fixtures_upcoming", 1)
+    which = f", the next of {n} scheduled fixtures between them" if n > 1 else ""
+    return (
+        f"{home} ({venue}) vs {away} on {when}{which}: our model gives {home} {p['home']:.0%}, "
+        f"a draw {p['draw']:.0%}, and {away} {p['away']:.0%} {tail}"
+    )
 
 _NEXT_WORDS = ("next", "when", "upcoming", "fixture", "play next", "playing next")
 _RESULT_WORDS = ("score", "result", "beat", "lost", "won", "lose", "win against", "draw")
@@ -134,17 +159,8 @@ def answer(session: Session, question: str) -> dict:
     if any(w in q for w in _PREDICT_WORDS) and len(teams) == 2:
         r = tools.match_prediction_lookup(session, teams[0]["id"], teams[1]["id"])
         if r["found"]:
-            p = r["prediction"]["probabilities"]
-            text = (
-                f"Our model gives {teams[0]['name']} {p['home']:.0%}, a draw {p['draw']:.0%}, "
-                f"and {teams[1]['name']} {p['away']:.0%} (as of {r['prediction']['as_of']}, "
-                f"evidence tier {r['prediction']['evidence']}). Not a promise of accuracy."
-            )
-            facts = (
-                f"Matchup: {teams[0]['name']} vs {teams[1]['name']}. Our model's prediction: "
-                f"{teams[0]['name']} {p['home']:.0%}, draw {p['draw']:.0%}, {teams[1]['name']} {p['away']:.0%} "
-                f"(evidence tier {r['prediction']['evidence']}, as of {r['prediction']['as_of']})."
-            )
+            text = prediction_sentence(session, r, teams)
+            facts = text  # the sentence already carries fixture order, venue, date and probabilities
             return {"text": text, "sources": [{"type": "kickcast_prediction", "data": r}], "found": True, "facts": facts}
         text = f"I don't have enough data to predict that matchup: {r['reason']}."
         return {"text": text, "sources": [], "found": False, "facts": text}

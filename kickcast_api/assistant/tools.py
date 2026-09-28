@@ -87,7 +87,7 @@ def team_league_position(session: Session, team_id: str) -> dict:
 def match_prediction_lookup(session: Session, home_team_id: str, away_team_id: str) -> dict:
     """Our own model's prediction for a matchup (uses the next scheduled fixture between
     these two teams if one exists, else predicts the matchup directly)."""
-    m = (
+    upcoming = (
         session.query(Match)
         .filter(
             or_(
@@ -96,9 +96,10 @@ def match_prediction_lookup(session: Session, home_team_id: str, away_team_id: s
             ),
             Match.status == "scheduled",
         )
-        .order_by(Match.date.asc())
-        .first()
+        .order_by(Match.date.asc(), Match.kickoff.asc())
+        .all()
     )
+    m = upcoming[0] if upcoming else None
     league_code = m.league_code if m else _guess_league(session, home_team_id, away_team_id)
     if league_code is None:
         return {"found": False, "reason": "couldn't determine which competition these teams play in"}
@@ -107,7 +108,13 @@ def match_prediction_lookup(session: Session, home_team_id: str, away_team_id: s
         return {"found": False, "reason": "not enough finished-match history to fit a model yet"}
     home, away = (m.home_team_id, m.away_team_id) if m else (home_team_id, away_team_id)
     pred = model.predict(home, away, neutral=(m.neutral if m else False))
-    return {"found": True, "match": match_dict(session, m) if m else None, "prediction": pred}
+    # "match" is the fixture record: its home/away order is the ONLY source of who is at home
+    # (never the order teams appear in the question). fixtures_upcoming lets the caller say
+    # "the next of N" when several fixtures exist.
+    return {
+        "found": True, "match": match_dict(session, m) if m else None, "prediction": pred,
+        "fixtures_upcoming": len(upcoming),
+    }
 
 
 def _guess_league(session: Session, home_team_id: str, away_team_id: str) -> str | None:

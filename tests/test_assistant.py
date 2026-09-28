@@ -74,6 +74,50 @@ def test_league_standings_top_and_position(session):
     assert pos["league_name"] == "Test League"  # the real DB name, never the raw code, in any user-facing text
 
 
+def test_prediction_sentence_uses_fixture_order_not_question_order(session):
+    """Real failure: "Predict Real Madrid vs Barcelona" said "Real Madrid 56%, a draw 21%, and
+    Barcelona 24%" while the fixture (and the card) had Barcelona at home with 56%. The
+    sentence must take home/away order, venue and probabilities from the fixture record."""
+    r = assistant_tools.match_prediction_lookup(session, "team-0", "team-1")
+    fixture = r["match"]
+    assert fixture["home_team"]["id"] == "team-0"  # Ridgeway United is the home side in the record
+    probs = r["prediction"]["probabilities"]
+
+    # The question names the AWAY team first.
+    out = fallback.answer(session, "Predict Rovers 1 vs Ridgeway United")
+    assert out["found"] is True
+    text = out["text"]
+    assert text.startswith("Ridgeway United (home) vs Rovers 1 on ")
+    assert f"Ridgeway United {probs['home']:.0%}" in text
+    assert f"Rovers 1 {probs['away']:.0%}" in text
+    assert f"a draw {probs['draw']:.0%}" in text
+    assert text.index("Ridgeway United") < text.index("Rovers 1")
+    # Same answer whichever order the user typed it.
+    assert fallback.answer(session, "Predict Ridgeway United vs Rovers 1")["text"] == text
+    # the source card data agrees with the sentence
+    assert out["sources"][0]["data"]["match"]["home_team"]["name"] == "Ridgeway United"
+
+
+def test_prediction_sentence_uses_next_fixture_and_says_when_several_exist(session):
+    later = date(2030, 1, 1)
+    session.add(Match(
+        league_code="test.1", season="2024-25", date=later, kickoff=None, home_team_id="team-1",
+        away_team_id="team-0", home_goals=None, away_goals=None, status="scheduled", round="Matchday 40",
+        neutral=False, source="synthetic", source_id="synthetic:later-return",
+    ))
+    session.commit()
+    text = fallback.answer(session, "Predict Rovers 1 vs Ridgeway United")["text"]
+    assert "the next of 2 scheduled fixtures between them" in text
+    assert text.startswith("Ridgeway United (home) vs Rovers 1 on ")  # the EARLIER fixture, not the 2030 one
+    assert "2030" not in text
+
+
+def test_prediction_without_a_fixture_says_it_is_hypothetical(session):
+    text = fallback.answer(session, "Predict Rovers 2 vs Rovers 3")["text"]
+    assert "no scheduled fixture between Rovers 2 and Rovers 3" in text
+    assert "hypothetical with Rovers 2 as the home side" in text
+
+
 def test_match_prediction_lookup_real_numbers(session):
     r = assistant_tools.match_prediction_lookup(session, "team-0", "team-1")
     assert r["found"] is True
