@@ -299,3 +299,116 @@ Nothing was deployed, no accounts were created, no money was spent. `.env`'s rea
 values were never printed, logged, committed, or copied anywhere. Working tree is clean;
 every item above is its own commit (`git log --oneline 1d38540..HEAD`, 13 commits) for
 incremental review.
+
+---
+
+## Session 3 — 2026-09-27: frontend redesign, three real backend bugs found and fixed
+with real data, hybrid assistant answers
+
+12 commits this session, `f4518d4`..`783e830` (`git log --oneline d71dfb7..HEAD`). Frontend
+work and backend work are separate commits throughout, as requested. Every fix below was
+verified against the real running server/real database, not just read from the code -
+exact commands and real output are in each commit message.
+
+### Frontend: dark/blue redesign + persistent assistant widget (4 commits)
+
+Full visual redesign (`f4518d4`, `b2b03e2`, `76da8c2`): navy/slate background, blue accent
+(was flat black/emerald), team crests (initials avatars - no crest-image pipeline exists),
+a real 3-way probability bar everywhere, standings with right-aligned tabular numbers,
+tabbed team pages, card-based awards. Verified responsive at 375px; two spots (the match
+page hero, team page's next-match line) needed explicit wrapping fixes for long team names.
+
+The `/assistant` full page (`4e83b67`) is gone - the assistant is now a floating chat
+bubble on every page, opening into a docked side panel (Intercom-style) with an expand
+button that promotes the same conversation to full-screen (ChatGPT-style) without losing
+history. Source data renders as inline cards (`AssistantSourceCard`) instead of plain text.
+
+### Real bug #1: homepage connection-pool exhaustion (`fbbcfe2`)
+
+The homepage was firing ~28 concurrent per-request DB sessions on every load (one GET per
+league's fixtures, one per candidate match's prediction) against the default SQLAlchemy
+pool (size 5, overflow 10 = 15) - a real, reproducible 500 (`sqlalchemy.exc.TimeoutError`)
+under ordinary browsing, not just heavy load. Fixed with two new batch endpoints
+(`kickcast_api/routes/batch.py`: `GET /fixtures?leagues=...`, `GET /predictions/summary?
+match_ids=...`) that do the same work in 3 total requests instead of 28, plus
+`pool_size=20, max_overflow=20, pool_pre_ping=True` as a backstop. Verified: 30 sequential
+loads across 5 pages and a 15-way concurrent burst of the homepage, zero pool timeouts.
+
+### Real bug #2: homepage showed stale/future fixtures as "upcoming" (`c8554f5`, folded
+into further fixes below)
+
+Reported as previously fixed but never actually was (`git log` had no such commit). Real
+DB query found La Liga/Serie A's earliest "scheduled" rows were Matchday 38 of 2024-25
+(over a year stale, football-data.co.uk/openfootball never marked them finished) and
+Ligue 1 had rows from **March 2020** (COVID-era, still "scheduled" 6 years later). Fixed
+with a hard `[now, now+7d]` window on the homepage's batch fixtures query.
+
+### A1-A4: the stale-data bug's real root cause, plus a second unrelated data-integrity bug
+
+- **A1** (`f07b753`): the team page's "Next match" hero used a *separate* query from the
+  "Upcoming" list below it - real example, the Inter team page: hero showed "Como vs Inter,
+  2025-05-23" while (before A2) the list showed the same stale thing, proving they'd
+  drifted before. Refactored to one shared query so they structurally cannot diverge again.
+- **A2** (`3ab46fa`): found the actual root cause - a source reporting "no score yet" for a
+  match whose date has already passed. Patched `scripts/ingest.py`'s `upsert_match` (the
+  single write path for every source) to relabel these `not_played` at ingest time, and
+  ran a one-time cleanup script against the real DB: **148 stale rows fixed** (`es.1`
+  2024-25: 10, `fr.1` 2019-20: 101, `fr.1` 2025-26: 1, `international` 2026-27: 26, `it.1`
+  2024-25: 10). Verified: the Inter page now correctly shows "2026-10-10 Inter vs Parma".
+- **A3** (`c15f525`): compared `/leagues/es.1/standings` against the real La Liga 2026-27
+  table (the brief's reference numbers). Barcelona matched exactly; the rest didn't,
+  because **Atlético Madrid's match history was split across two team ids** ("atletico"
+  from openfootball's `de Madrid`-suffix mis-canonicalization, "atletico madrid" from
+  football-data.co.uk) - two separate standings rows with identical stats. Fixed the
+  canonicalization (`kickcast_engine/data/team_aliases.py`) and merged the existing split
+  data (`scripts/merge_atletico_madrid_ids.py`): 213 duplicate rows deleted (the same real
+  match, ingested twice under two id spellings), 61 renamed onto the correct id. All 5
+  standings positions now match the brief's real reference numbers exactly. Added a
+  dedicated sort-order test (points, then GD, then GF).
+- **A4** (`9d50721`): homepage now widens its window from 7 to 14 days when the 7-day
+  result is thin (real example: today, mid-international-break, 7 days = 6 matches, all
+  Nations League; 14 days = 20, a real mix once domestic leagues resume Oct 9-10), and
+  shows "International break: club football resumes `<date>`" via a new
+  `GET /fixtures/next-domestic-date` endpoint when even the widened window has nothing
+  domestic in it.
+
+### Assistant: Gemini overuse fixed, then partly un-fixed on purpose (`02e84d5`, `783e830`)
+
+First pass (`02e84d5`): audited real usage and found *every* question was costing a Gemini
+call (confirmed - "When does Arsenal play next?" was already cached with `mode: "gemini"`
+from earlier testing) on a 20/day quota. Added markdown stripping, a DB-lookup classifier
+that skipped Gemini entirely for simple questions, and fixed the DB→Wikipedia→Gemini
+ordering (Wikipedia was being tried *after* a wasted tool-calling attempt, not before) -
+while fixing that, found and fixed a real Wikipedia search-ranking bug (the raw question
+"How did Real Madrid win the 2016 Champions League final?" ranked the 2017 final above the
+2016 one; stripping interrogative stopwords before searching fixes it, verified against
+the live MediaWiki API).
+
+Second pass, this session's Part B (`783e830`): the brief asked to reverse the "skip
+Gemini for lookups" decision - use Gemini for lookups too, but *only* to phrase facts we
+already looked up (never to invent new ones), cached by `hash(question + facts)` so a
+repeat question costs nothing, with a graceful plain-template-plus-"AI phrasing paused"
+fallback when quota runs out or the call fails, and a new `ASSISTANT_GEMINI_FOR_LOOKUPS`
+flag to turn the whole thing off if quota gets tight. Modes: `db`, `gemini+db`,
+`wikipedia+gemini`, `fallback`.
+
+**Tested for real against the running server with the real key** - the real free-tier
+daily quota (20/day) turned out to already be exhausted from this session's own earlier
+verification calls (confirmed against the raw Gemini API directly: a real 429
+`RESOURCE_EXHAUSTED`, not just our own drifted local counter, which still showed 20/20
+remaining because failed calls never increment it). Real result for "When does Arsenal
+play next?": `{"text": "Arsenal vs Leeds on 2026-10-10 (Matchday 6). (AI phrasing paused
+for today.)", "mode": "db", "cached": false}` on both calls (correctly never caches a
+paused/failed answer). The Wikipedia path was also tested for real under the same
+exhaustion and correctly fell back to the raw extract + link + paused note.
+
+**Still needs testing once the real quota resets**: the actual success path for both
+`gemini+db` and `wikipedia+gemini` against a real call (does the phrasing read naturally,
+does the opponent-form/prediction extra actually show up), and a real cache hit following
+a real successful compose. The logic for both is verified deterministically via mocks
+(`tests/test_assistant.py`), just not yet against a live model response.
+
+Checks at the end of this session: `pytest` 142 passed / 1 skipped (the live-quota test,
+skipping correctly on the real exhaustion above - not a regression), `ruff` and `mypy`
+clean, frontend `lint` and `build` clean. Nothing was deployed, no money was spent, no
+`.env` values were printed or committed.
