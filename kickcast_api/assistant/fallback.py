@@ -9,13 +9,13 @@ nothing matches, it says so rather than guessing, per the "never invent a fact" 
 
 from __future__ import annotations
 
-import re
-from datetime import UTC, date, datetime
+from datetime import date
 
 from sqlalchemy.orm import Session
 
-from ..models import Team
 from . import tools
+from .entities import COMPETITION_NAMES, find_competitions, find_teams
+from .intent import Intent, classify, references_other_season
 
 
 def prediction_sentence(session: Session, r: dict, asked: list[dict]) -> str:
@@ -46,7 +46,6 @@ _NEXT_WORDS = ("next", "when", "upcoming", "fixture", "play next", "playing next
 _RESULT_WORDS = ("score", "result", "beat", "lost", "won", "lose", "win against", "draw")
 _TABLE_WORDS = ("table", "standings", "position", "top of", "leading", "first place", "where are")
 _PREDICT_WORDS = ("predict", "odds", "chance", "probability", "who will win", "favourite", "favorite")
-_YEAR_RE = re.compile(r"\b(19\d{2}|20\d{2})\b")
 
 _DECLINE_SPECIFIC_YEAR = (
     "I can only answer from our own database right now (no AI assistant configured/available), "
@@ -55,35 +54,17 @@ _DECLINE_SPECIFIC_YEAR = (
     "available, or check the team's fixtures/results page for older matches we do have on file."
 )
 
+ASK_WHICH_MATCH = (
+    "Which match do you mean? Name the teams, for example \"Barcelona vs Real Madrid\"."
+)
+
 
 def _references_other_season(question: str) -> str | None:
-    """These fallback tools only ever answer 'next'/'most recent'/'current' - never a specific
-    past match - so a question naming a year outside the current season is out of scope for all
-    of them. Returns that year if so, else None. (Current season years pass through normally.)"""
-    now = datetime.now(UTC)
-    current_season_years = {now.year, now.year + 1, now.year - 1}
-    for m in _YEAR_RE.finditer(question):
-        year = int(m.group(1))
-        if year not in current_season_years:
-            return m.group(1)
-    return None
+    return references_other_season(question)
 
 
 def _mentioned_teams(session: Session, question: str) -> list[dict]:
-    q = question.lower()
-    names = session.query(Team.id, Team.name).all()
-    hits = [(tid, name) for tid, name in names if len(name) >= 4 and name.lower() in q]
-    hits.sort(key=lambda h: -len(h[1]))  # longest/most-specific name match first
-    seen: set[str] = set()
-    out = []
-    for tid, name in hits:
-        if tid in seen:
-            continue
-        seen.add(tid)
-        out.append({"id": tid, "name": name})
-        if len(out) >= 2:
-            break
-    return out
+    return find_teams(session, question)
 
 
 def is_simple_lookup(session: Session, question: str) -> bool:
@@ -144,51 +125,70 @@ def _next_match_facts(session: Session, session_team: dict, m: dict) -> str:
     return " ".join(lines)
 
 
-def answer(session: Session, question: str) -> dict:
+def _nf(text: str) -> dict:
+    return {"text": text, "sources": [], "found": False, "facts": text}
+
+
+def _scorers_sentence(session: Session, m: dict) -> str:
+    events = tools.match_goal_events(session, m["id"])
+    if not events:
+        return "Goal scorers aren't on record for this match."
+    parts = []
+    for e in events:
+        tag = " (o.g.)" if e["own_goal"] else " (pen.)" if e["penalty"] else ""
+        parts.append(f"{e['scorer']} {e['minute']}'{tag}" if e["minute"] is not None else f"{e['scorer']}{tag}")
+    return "Scorers: " + ", ".join(parts) + "."
+
+
+def answer(session: Session, question: str, intent: Intent | None = None, teams: list[dict] | None = None) -> dict:
     """Returns {"text", "sources", "found", "facts"}. "facts" is a plain-language,
     complete write-up of everything actually retrieved (never more than that) - safe to
-    hand an LLM as strict grounding (see gemini_client.compose_from_facts): it must
-    never state anything beyond what's written here."""
-    q = question.lower()
-    teams = _mentioned_teams(session, question)
+    hand an LLM as strict grounding: it must never state anything beyond what's written here.
+    Dispatches on the deterministic intent (intent.classify), never on overlapping keyword lists."""
+    intent = intent or classify(question)
+    teams = teams if teams is not None else find_teams(session, question)
 
     other_year = _references_other_season(question)
     if other_year is not None:
         return {"text": _DECLINE_SPECIFIC_YEAR.format(year=other_year), "sources": [], "found": False, "facts": None}
 
-    if any(w in q for w in _PREDICT_WORDS) and len(teams) == 2:
+    if intent is Intent.PREDICTION:
+        if len(teams) < 2:
+            return _nf("Which two teams? Ask like \"Predict Barcelona vs Real Madrid\".")
         r = tools.match_prediction_lookup(session, teams[0]["id"], teams[1]["id"])
-        if r["found"]:
-            text = prediction_sentence(session, r, teams)
-            facts = text  # the sentence already carries fixture order, venue, date and probabilities
-            return {"text": text, "sources": [{"type": "kickcast_prediction", "data": r}], "found": True, "facts": facts}
-        text = f"I don't have enough data to predict that matchup: {r['reason']}."
-        return {"text": text, "sources": [], "found": False, "facts": text}
+        if not r["found"]:
+            return _nf(f"I don't have enough data to predict that matchup: {r['reason']}.")
+        text = prediction_sentence(session, r, teams)
+        return {"text": text, "sources": [{"type": "kickcast_prediction", "data": r}], "found": True, "facts": text}
 
-    if any(w in q for w in _NEXT_WORDS) and teams:
+    if intent is Intent.MATCH_LOOKUP:
+        if not teams:
+            return _nf(ASK_WHICH_MATCH)
         r = tools.team_next_match(session, teams[0]["id"])
-        if r["found"]:
-            m = r["match"]
-            text = (
-                f"{m['home_team']['name']} vs {m['away_team']['name']} on {m['date']}"
-                + (f" ({m['round']})" if m["round"] else "") + "."
-            )
-            facts = _next_match_facts(session, teams[0], m)
-            return {"text": text, "sources": [{"type": "kickcast_match", "data": m}], "found": True, "facts": facts}
-        text = f"I don't have a scheduled next match for {teams[0]['name']} in our database."
-        return {"text": text, "sources": [], "found": False, "facts": text}
+        if not r["found"]:
+            return _nf(f"I don't have a scheduled next match for {teams[0]['name']} in our database.")
+        m = r["match"]
+        text = (
+            f"{m['home_team']['name']} vs {m['away_team']['name']} on {m['date']}"
+            + (f" ({m['round']})" if m["round"] else "") + "."
+        )
+        facts = _next_match_facts(session, teams[0], m)
+        return {"text": text, "sources": [{"type": "kickcast_match", "data": m}], "found": True, "facts": facts}
 
-    if any(w in q for w in _RESULT_WORDS) and teams:
+    if intent is Intent.RESULT:
+        if not teams:
+            return _nf(ASK_WHICH_MATCH)
         r = tools.team_recent_results(session, teams[0]["id"], limit=1)
-        if r["found"]:
-            m = r["matches"][0]
-            text = f"{m['home_team']['name']} {m['home_goals']} - {m['away_goals']} {m['away_team']['name']} ({m['date']})."
-            facts = f"{teams[0]['name']}'s most recent finished match: {text}"
-            return {"text": text, "sources": [{"type": "kickcast_match", "data": m}], "found": True, "facts": facts}
-        text = f"I don't have a finished match on record for {teams[0]['name']}."
-        return {"text": text, "sources": [], "found": False, "facts": text}
+        if not r["found"]:
+            return _nf(f"I don't have a finished match on record for {teams[0]['name']}.")
+        m = r["matches"][0]
+        text = f"{m['home_team']['name']} {m['home_goals']} - {m['away_goals']} {m['away_team']['name']} ({m['date']})."
+        if "scor" in question.lower():
+            text += " " + _scorers_sentence(session, m)
+        facts = f"{teams[0]['name']}'s most recent finished match: {text}"
+        return {"text": text, "sources": [{"type": "kickcast_match", "data": m}], "found": True, "facts": facts}
 
-    if any(w in q for w in _TABLE_WORDS):
+    if intent is Intent.TABLE:
         if teams:
             r = tools.team_league_position(session, teams[0]["id"])
             if r["found"]:
@@ -200,16 +200,41 @@ def answer(session: Session, question: str) -> dict:
                     + "."
                 )
                 return {"text": text, "sources": [{"type": "kickcast_standings", "data": r}], "found": True, "facts": facts}
-        text = (
-            "I couldn't tell which league or team you mean - try naming a specific team, "
-            "or check the league standings page directly."
-        )
-        return {"text": text, "sources": [], "found": False, "facts": None}
+        comps = [c for c in find_competitions(question) if c not in ("CL", "international")]
+        if comps:
+            r = tools.league_standings_top(session, comps[0], n=5)
+            if r["found"]:
+                rows = ", ".join(f"{t['position']}. {t['team_name']} {t['pts']}" for t in r["table"])
+                text = f"{COMPETITION_NAMES[comps[0]]} {r['season']} top of the table: {rows}."
+                return {"text": text, "sources": [], "found": True, "facts": text}
+        return _nf("Which team or league table do you mean? Name a team, or a league such as \"Premier League\".")
 
+    if intent is Intent.TOP_SCORERS:
+        comps = find_competitions(question)
+        if not comps:
+            return _nf("Which competition's top scorers? For example \"Premier League top scorers\".")
+        r = tools.league_top_scorers_lookup(comps[0])
+        if not r["found"]:
+            return _nf(f"I don't have current top-scorer data for the {COMPETITION_NAMES[comps[0]]} right now.")
+        rows = ", ".join(f"{x['player']} ({x['team_name']}) {x['goals']}" for x in r["scorers"])
+        text = f"{COMPETITION_NAMES[comps[0]]} top scorers {r['season']}: {rows}."
+        return {"text": text, "sources": [], "found": True, "facts": text}
+
+    return unknown_reply()
+
+
+EXAMPLE_QUESTIONS = (
+    "Predict Barcelona vs Real Madrid",
+    "When does Arsenal play next?",
+    "Where do Man City stand in the table?",
+)
+
+
+def unknown_reply() -> dict:
     text = (
-        "I can only answer from our own database right now (no AI assistant configured/available) - "
-        "try asking about a specific team's next match, last result, league position, or a head-to-head "
-        "prediction, naming the team(s) by name."
+        "I don't recognize that one. Try: "
+        + "; ".join(f"\"{q}\"" for q in EXAMPLE_QUESTIONS)
+        + "."
     )
     return {"text": text, "sources": [], "found": False, "facts": None}
 

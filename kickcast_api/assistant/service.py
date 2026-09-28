@@ -19,15 +19,8 @@ import hashlib
 
 from sqlalchemy.orm import Session
 
-from . import cache, fallback, gemini_client, text_format, wikipedia, youtube
-
-_VIDEO_WORDS = ("watch", "video", "highlight", "highlights", "clip", "link")
-_CHANNEL_HINTS = (
-    ("champions league", "UEFA"), ("europa league", "UEFA"), ("uefa", "UEFA"),
-    ("nations league", "UEFA"), ("premier league", "Premier League"),
-    ("la liga", "LaLiga"), ("laliga", "LaLiga"), ("serie a", "Serie A"),
-    ("bundesliga", "Bundesliga"), ("ligue 1", "Ligue 1"),
-)
+from . import cache, fallback, gemini_client, quota, text_format, wikipedia
+from .intent import DB_INTENTS, Intent, classify
 
 AI_PAUSED_NOTE = " (AI phrasing paused for today.)"
 
@@ -55,29 +48,6 @@ _DECLINE_PHRASES = (
 def _looks_like_decline(text: str) -> bool:
     t = text.lower()
     return any(p in t for p in _DECLINE_PHRASES)
-
-
-def _guess_channel(text: str) -> str | None:
-    t = text.lower()
-    for hint, channel in _CHANNEL_HINTS:
-        if hint in t:
-            return channel
-    return None
-
-
-def _maybe_attach_video(session: Session, question: str, result: dict) -> dict:
-    """Only for questions that actually ask for one ("give me a link to watch it" etc.) -
-    YouTube is never used as a source of facts, only to find a link for an answer
-    already established from a tool or Wikipedia."""
-    if not any(w in question.lower() for w in _VIDEO_WORDS):
-        return result
-    wiki_sources = [s for s in result["sources"] if s.get("type") == "wikipedia"]
-    topic = wiki_sources[0]["title"] if wiki_sources else question
-    channel = _guess_channel(topic)
-    video = youtube.find_official_highlight(session, f"{topic} highlights", channel=channel)
-    if video is None:
-        return result
-    return {**result, "sources": [*result["sources"], {"type": "youtube", **video}]}
 
 
 def _fact_cache_key(question: str, facts: str) -> str:
@@ -110,7 +80,6 @@ def _db_lookup_answer(session: Session, question: str, fb: dict) -> dict:
     composed = gemini_client.ask_gemini_with_context(session, question, facts, "Soccer Prediction Engine database facts")
     if composed is not None and not _looks_like_decline(composed["text"]):
         answer = {"text": text_format.strip_markdown(composed["text"]), "sources": sources, "mode": "gemini+db"}
-        answer = _maybe_attach_video(session, question, answer)
         cache.set_cached(session, cache_key, answer)
         return {**answer, "cached": False}
 
@@ -146,9 +115,25 @@ def _wikipedia_answer(session: Session, question: str, wiki: dict) -> dict | Non
         return None
 
     answer = {"text": text_format.strip_markdown(composed["text"]), "sources": sources, "mode": "wikipedia+gemini"}
-    answer = _maybe_attach_video(session, question, answer)
     cache.set_cached(session, cache_key, answer)
     return {**answer, "cached": False}
+
+
+NO_VERIFIED_LINK = "I don't have a verified official highlights link for that match."
+
+
+def _gemini_usable(session: Session) -> bool:
+    return gemini_client.available() and quota.gemini_quota_remaining(session) > 0
+
+
+def _plain(text: str, sources: list[dict] | None = None, mode: str = "db") -> dict:
+    return {"text": text_format.strip_markdown(text), "sources": sources or [], "mode": mode, "cached": False}
+
+
+def _video_answer(session: Session, question: str) -> dict:
+    """Video/highlights questions never touch Wikipedia or Gemini - only our own match record
+    and the official-channel YouTube search."""
+    return _plain(NO_VERIFIED_LINK)
 
 
 def ask(session: Session, question: str) -> dict:
@@ -156,30 +141,32 @@ def ask(session: Session, question: str) -> dict:
     if not question:
         return {"text": "Ask me something about a team, fixture, table, or prediction.", "sources": [], "mode": "invalid", "cached": False}
 
-    # 1. A plain DB lookup (next match, last result, table position, head-to-head
-    # prediction): get the facts from our own tools first, always.
-    if fallback.is_simple_lookup(session, question):
-        fb = fallback.answer(session, question)
+    intent = classify(question)
+
+    # 1. Video/highlights: its own path, decided before any lookup.
+    if intent is Intent.VIDEO:
+        return _video_answer(session, question)
+
+    # 2. A DB question (prediction, table, top scorers, result, next match): facts from our own
+    # tools first, always; Gemini only rephrases those facts when it is usable.
+    if intent in DB_INTENTS:
+        fb = fallback.answer(session, question, intent)
         if not fb["found"]:
-            # Nothing to phrase - an honest "not on record" is already the whole answer,
-            # and spending a Gemini call to rephrase "I don't have that" adds no value.
-            return {"text": text_format.strip_markdown(fb["text"]), "sources": fb["sources"], "mode": "db", "cached": False}
+            # Nothing to phrase - an honest "not on record" is already the whole answer.
+            return _plain(fb["text"], fb["sources"])
         return _db_lookup_answer(session, question, fb)
 
-    # 2. Not a plain lookup: try Wikipedia facts (free, no quota) before any Gemini call -
-    # DB -> Wikipedia -> Gemini, in that order (see MORNING_REPORT.md's prior session,
-    # which found this backwards and fixed the ordering).
-    wiki = wikipedia.lookup(session, question)
-    if wiki is not None and wiki.get("found"):
-        wiki_answer = _wikipedia_answer(session, question, wiki)
-        if wiki_answer is not None:
-            return wiki_answer
-        # else: wrong/irrelevant article for this question - fall through below.
+    # 3. General history/context: Wikipedia (free, no quota) before any Gemini call.
+    if intent is Intent.HISTORY:
+        wiki = wikipedia.lookup(session, question)
+        if wiki is not None and wiki.get("found"):
+            wiki_answer = _wikipedia_answer(session, question, wiki)
+            if wiki_answer is not None:
+                return wiki_answer
 
-    # 3. Genuine open-ended reasoning (e.g. "who is the best young player right now") -
-    # the DB-tools-plus-reasoning path. Cached by the raw question (no separate "facts"
-    # exist for this path - it's whatever Gemini's own tool-calling turns up).
-    if gemini_client.available():
+    # 4. Open-ended reasoning (e.g. "who is the best young player right now") - only when Gemini
+    # is actually usable; cached by the raw question since it costs quota.
+    if _gemini_usable(session):
         cached = cache.get_cached(session, question)
         if cached is not None:
             return {**cached, "cached": True}
@@ -190,10 +177,9 @@ def ask(session: Session, question: str) -> dict:
                 outside_db = gemini_client.ask_gemini_with_search(session, question)
                 if outside_db is not None:
                     result = outside_db
-            result = _maybe_attach_video(session, question, result)
             answer = {"text": text_format.strip_markdown(result["text"]), "sources": result["sources"], "mode": "gemini+db"}
             cache.set_cached(session, question, answer)  # only Gemini answers are cached - they cost quota
             return {**answer, "cached": False}
 
-    fb = fallback.answer(session, question)
-    return {"text": text_format.strip_markdown(fb["text"]), "sources": fb["sources"], "mode": "fallback", "cached": False}
+    fb = fallback.unknown_reply()
+    return _plain(fb["text"], fb["sources"], mode="fallback")

@@ -17,7 +17,7 @@ from typing import Any
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from ..models import League, Match, Team
+from ..models import Goalscorer, League, Match, Team
 from ..predictions import get_model
 from ..serialize import latest_season, match_dict, standings
 
@@ -59,6 +59,25 @@ def league_standings_top(session: Session, league_code: str, n: int = 6) -> dict
         return {"found": False}
     table = standings(session, league_code, season)[:n]
     return {"found": True, "season": season, "table": table}
+
+
+def match_goal_events(session: Session, match_id: int) -> list[dict]:
+    """Recorded goals for a match (internationals only - see routes/matches.py); [] otherwise."""
+    rows = (
+        session.query(Goalscorer).filter(Goalscorer.match_id == match_id).order_by(Goalscorer.minute.asc()).all()
+    )
+    return [{"scorer": e.scorer_name, "minute": e.minute, "own_goal": e.own_goal, "penalty": e.penalty} for e in rows]
+
+
+def league_top_scorers_lookup(league_code: str, limit: int = 5) -> dict:
+    """Current-season top scorers for a competition, from the cached football-data.org
+    leaderboard (the same source the Awards page uses)."""
+    from .. import football_data_scorers
+
+    live = football_data_scorers.fetch_scorers(league_code)
+    if live is None or not live["scorers"]:
+        return {"found": False}
+    return {"found": True, "season": live["season_label"], "scorers": live["scorers"][:limit]}
 
 
 def team_league_position(session: Session, team_id: str) -> dict:
