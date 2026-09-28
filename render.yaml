@@ -1,6 +1,7 @@
+# Render runs ONLY the API. The Next.js frontend is deployed on Vercel - see DEPLOY.md.
 services:
   - type: web
-    name: kickcast-api
+    name: soccer-prediction-api
     runtime: python
     plan: free
     region: oregon
@@ -11,13 +12,20 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     envVars:
+      # Fixed values (not prompted for):
       - key: APP_ENV
         value: production
+      - key: ENABLE_API_FOOTBALL
+        value: "false" # API-Football's terms give no licence to publish its data publicly - see DEPLOY.md
+      - key: ENABLE_ESPN
+        value: "false" # ESPN's public scoreboard is undocumented with no published terms - see DEPLOY.md
+      # KICKCAST_DB_PATH is left unset - defaults to <repo>/data/kickcast.db, which the build step
+      # already wrote.
+
+      # Prompted for at Blueprint creation. Every one may be left blank except where noted -
+      # see .env.example for what each unlocks.
       - key: FRONTEND_ORIGIN
-        sync: false # set to the deployed kickcast-web URL, e.g. https://kickcast-web.onrender.com
-      # KICKCAST_DB_PATH is left unset - defaults to <repo>/data/kickcast.db, which the
-      # build step already wrote. Every key below is optional - see .env.example for what each one unlocks. Leave
-      # unset to run entirely on free, keyless data sources.
+        sync: false # your Vercel URL, e.g. https://soccer-prediction-engine.vercel.app (no trailing slash)
       - key: FOOTBALL_DATA_ORG_API_KEY
         sync: false
       - key: GEMINI_API_KEY
@@ -26,21 +34,6 @@ services:
         sync: false
       - key: API_FOOTBALL_KEY
         sync: false
-      - key: ENABLE_API_FOOTBALL
-        value: "false" # API-Football's terms give no licence to publish its data publicly - see DEPLOY.md
-      - key: ENABLE_ESPN
-        value: "false" # ESPN's public scoreboard is undocumented with no published terms - see DEPLOY.md
-
-  - type: web
-    name: kickcast-web
-    runtime: node
-    plan: free
-    region: oregon
-    branch: master
-    rootDir: frontend
-    buildCommand: "npm ci && npm run build"
-    startCommand: "npm run start -- --port $PORT"
-    autoDeploy: true
-    envVars:
-      - key: NEXT_PUBLIC_API_URL
-        sync: false # set to the deployed kickcast-api URL, e.g. https://kickcast-api.onrender.com
+      # Render can't prompt for and generate the same variable, so this one is created for you.
+      - key: ADMIN_TOKEN
+        generateValue: true
