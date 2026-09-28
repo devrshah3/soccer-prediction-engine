@@ -8,6 +8,10 @@ import { formatShortDate } from "@/lib/time";
 // never a hardcoded list, so this never shows a competition we don't actually have data
 // for). Each tile's "Next: <date> - <n> matches" comes from a real /fixtures call, not an
 // invented number. Item 3 adds the season selector and points-table sheet on top of this.
+// Fetches live data from the backend on every request - never statically prerendered, since
+// the backend isn't guaranteed reachable at frontend build time (separate deploys).
+export const dynamic = "force-dynamic";
+
 const WINDOW_DAYS = 30;
 const WINDOW_LIMIT = 100;
 

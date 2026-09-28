@@ -2,6 +2,10 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/time";
 
+// Fetches live data from the backend on every request - never statically prerendered, since
+// the backend isn't guaranteed reachable at frontend build time (separate deploys).
+export const dynamic = "force-dynamic";
+
 const SOURCES: { name: string; used: string; license: string; href?: string }[] = [
   {
     name: "openfootball",

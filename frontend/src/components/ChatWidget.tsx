@@ -15,6 +15,46 @@ const STARTERS = [
   "What was Liverpool's last result?",
 ];
 
+const WAKING_TEXT = "Waking up the server, this can take up to a minute...";
+
+// The free backend sleeps when idle. A first question can therefore time out: say so and retry
+// (up to ~75s in total) instead of showing an error. Rate-limit and validation replies (HTTP 429/400)
+// carry a friendly {detail} that is shown as the answer.
+async function askWithWakeRetry(
+  question: string,
+  conversationId: string,
+  onWaking: (waking: boolean) => void
+): Promise<{ text: string; sources?: unknown[]; mode?: string }> {
+  const deadline = Date.now() + 75_000;
+  let notified = false;
+  for (;;) {
+    try {
+      const res = await fetch(`${API_BASE}/assistant/ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, conversation_id: conversationId }),
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (res.status >= 502 && res.status <= 504) throw new Error("waking");
+      const body = await res.json().catch(() => null);
+      if (notified) onWaking(false);
+      if (body && typeof body.text === "string") return body;
+      if (body && typeof body.detail === "string") return { text: body.detail, mode: "notice" };
+      return { text: "Something went wrong. Please try again in a moment.", mode: "notice" };
+    } catch {
+      if (Date.now() > deadline) {
+        onWaking(false);
+        return { text: "I couldn't reach the server. It may be restarting - please try again in a minute.", mode: "notice" };
+      }
+      if (!notified) {
+        notified = true;
+        onWaking(true);
+      }
+      await new Promise((r) => setTimeout(r, 4000));
+    }
+  }
+}
+
 // Mounted once in the root layout, so this state survives client-side navigation between
 // pages (the layout tree isn't remounted on route change) without needing any persistence.
 export function ChatWidget() {
@@ -42,17 +82,14 @@ export function ChatWidget() {
     setLoading(true);
     scrollToBottom();
     try {
-      const res = await fetch(`${API_BASE}/assistant/ask`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q, conversation_id: (conversationId.current ??= crypto.randomUUID()) }),
-      });
-      const body = await res.json();
+      const body = await askWithWakeRetry(q, (conversationId.current ??= crypto.randomUUID()), (waking) =>
+        setMessages((m) => (waking ? [...m.filter((x) => x.mode !== "waking"), { role: "assistant", text: WAKING_TEXT, mode: "waking" }] : m.filter((x) => x.mode !== "waking")))
+      );
       setMessages((m) => [...m, { role: "assistant", text: body.text, sources: body.sources, mode: body.mode }]);
     } catch {
       setMessages((m) => [
         ...m,
-        { role: "assistant", text: "Couldn't reach the API. Is the backend running?" },
+        { role: "assistant", text: "Something went wrong. Please try again in a moment." },
       ]);
     } finally {
       setLoading(false);

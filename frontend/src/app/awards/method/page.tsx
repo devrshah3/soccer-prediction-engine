@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 
+// Fetches live data from the backend on every request - never statically prerendered, since
+// the backend isn't guaranteed reachable at frontend build time (separate deploys).
+export const dynamic = "force-dynamic";
+
 export default async function AwardsMethodPage() {
   const backtest = await api.awardsMethod().catch((e) => {
     if (e instanceof ApiError && e.status === 404) return null;

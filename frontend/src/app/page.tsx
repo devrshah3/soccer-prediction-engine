@@ -7,6 +7,10 @@ import { matchState } from "@/lib/matchState";
 import { isTodaySettled } from "@/lib/rollover";
 import { formatShortDate } from "@/lib/time";
 
+// Fetches live data from the backend on every request - never statically prerendered, since
+// the backend isn't guaranteed reachable at frontend build time (separate deploys).
+export const dynamic = "force-dynamic";
+
 const MIN_MATCHES_BEFORE_WIDENING = 10;
 const WIDE_WINDOW_DAYS = 14;
 

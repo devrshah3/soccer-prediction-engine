@@ -149,8 +149,32 @@ class ApiError extends Error {
   }
 }
 
+// The backend runs on a free instance that sleeps after 15 minutes idle and needs up to a minute to
+// wake. So: a short timeout (never hang a page on a sleeping server), a short-lived Next.js data cache
+// (visitors get the last good data while it wakes; a stale entry is kept if revalidation fails), and a
+// distinct error the app-level boundary turns into "Waking up the server..." instead of a raw error.
+const REQUEST_TIMEOUT_MS = 8000;
+const REVALIDATE_SECONDS = 60;
+const UNAVAILABLE_STATUSES = new Set([502, 503, 504]);
+
+class BackendUnavailableError extends Error {
+  constructor(path: string) {
+    super(`backend unavailable: ${path}`);
+    this.name = "BackendUnavailableError";
+  }
+}
+
 async function apiFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      next: { revalidate: REVALIDATE_SECONDS },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch {
+    throw new BackendUnavailableError(path); // timeout, DNS, connection refused: the server is asleep or down
+  }
+  if (UNAVAILABLE_STATUSES.has(res.status)) throw new BackendUnavailableError(path);
   if (!res.ok) {
     throw new ApiError(res.status, `${path} -> ${res.status}`);
   }
@@ -327,4 +351,4 @@ export const api = {
   meta: () => apiFetch<{ ingested_at: string | null; data_version: string | null }>("/meta"),
 };
 
-export { ApiError };
+export { ApiError, BackendUnavailableError };
