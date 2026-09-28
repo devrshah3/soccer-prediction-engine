@@ -25,6 +25,13 @@ export type Match = {
   source: string;
 };
 
+export type GoalEvent = { team_id: string; scorer: string; minute: number | null; own_goal: boolean; penalty: boolean };
+
+// GET /matches/{id} only - goal_events is attached for a finished match (empty if we
+// genuinely have none on record, e.g. any domestic match - see kickcast_api/routes/
+// matches.py), never present at all for a scheduled one.
+export type MatchDetail = Match & { goal_events?: GoalEvent[] };
+
 export type StandingsRow = {
   team_id: string;
   team_name: string;
@@ -212,7 +219,7 @@ export const api = {
   awards: () => apiFetch<Awards>("/awards"),
   replayMatches: () => apiFetch<{ source: string; matches: ReplayMatchSummary[] }>("/replay/matches"),
   replayMatch: (id: string) => apiFetch<ReplayMatch>(`/replay/matches/${encodeURIComponent(id)}`),
-  match: (id: number) => apiFetch<Match>(`/matches/${id}`),
+  match: (id: number) => apiFetch<MatchDetail>(`/matches/${id}`),
   prediction: (id: number) => apiFetch<Prediction | null>(`/matches/${id}/prediction`).catch((e) => {
     if (e instanceof ApiError && e.status === 503) return null;
     throw e;

@@ -8,7 +8,7 @@ from kickcast_engine.models.goal_timing import goal_timing_windows
 from .. import domestic_scorers
 from ..cards import get_card_model
 from ..db import get_session
-from ..models import Match
+from ..models import Goalscorer, Match
 from ..predictions import get_model
 from ..scorers import team_likely_scorers
 from ..serialize import match_dict, team_names
@@ -25,7 +25,29 @@ def _get_match(session: Session, match_id: int) -> Match:
 
 @router.get("/{match_id}")
 def match_detail(match_id: int, session: Session = Depends(get_session)) -> dict:
-    return match_dict(session, _get_match(session, match_id))
+    m = _get_match(session, match_id)
+    result = match_dict(session, m)
+    if m.status == "finished":
+        # Only queried on the single-match detail endpoint, never in match_dict() itself
+        # (used by every list-returning endpoint) - a per-row Goalscorer query there would
+        # reintroduce the N+1 fan-out already fixed once for the homepage (see batch.py).
+        # Goalscorer.match_id is only populated for international matches (see
+        # scripts/ingest.py's ingest_goalscorers) - a domestic match honestly comes back
+        # with an empty list, never a guessed one.
+        events = (
+            session.query(Goalscorer)
+            .filter(Goalscorer.match_id == match_id)
+            .order_by(Goalscorer.minute.asc())
+            .all()
+        )
+        result["goal_events"] = [
+            {
+                "team_id": e.team_id, "scorer": e.scorer_name, "minute": e.minute,
+                "own_goal": e.own_goal, "penalty": e.penalty,
+            }
+            for e in events
+        ]
+    return result
 
 
 @router.get("/{match_id}/prediction")

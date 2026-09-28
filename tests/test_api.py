@@ -194,6 +194,54 @@ def test_match_detail(client):
     r = client.get(f"/matches/{m['id']}")
     assert r.status_code == 200
     assert r.json()["status"] == "scheduled"
+    assert "goal_events" not in r.json()  # only attached for finished matches
+
+
+def test_match_detail_includes_goal_events_for_a_finished_match_when_we_have_them(client):
+    finished = client.get("/leagues/test.1/fixtures?status=finished").json()[0]
+    r = client.get(f"/matches/{finished['id']}")
+    assert r.status_code == 200
+    assert r.json()["goal_events"] == []  # synthetic fixture has no Goalscorer rows - honest empty, not guessed
+
+
+def test_match_detail_returns_real_goal_events_when_present(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'test_goals.db'}")
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine)
+    session = TestSession()
+    session.add(League(code="goals.1", name="Goals League", country="Testland", kind="domestic_league"))
+    session.add(Team(id="g-0", name="Club 0", country="Testland"))
+    session.add(Team(id="g-1", name="Club 1", country="Testland"))
+    session.commit()
+    m = Match(
+        league_code="goals.1", season="2024-25", date=date(2024, 8, 1), kickoff=None,
+        home_team_id="g-0", away_team_id="g-1", home_goals=2, away_goals=1,
+        status="finished", round="Matchday 1", neutral=False,
+        source="synthetic", source_id="synthetic:goals",
+    )
+    session.add(m)
+    session.flush()
+    session.add(Goalscorer(match_id=m.id, date=m.date, team_id="g-0", scorer_name="Player A", minute=10, source="synthetic"))
+    session.add(Goalscorer(match_id=m.id, date=m.date, team_id="g-1", scorer_name="Player B", minute=55, source="synthetic"))
+    session.add(Goalscorer(match_id=m.id, date=m.date, team_id="g-0", scorer_name="Player C", minute=80, source="synthetic"))
+    session.commit()
+
+    def override():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_session] = override
+    try:
+        c = TestClient(app)
+        events = c.get(f"/matches/{m.id}").json()["goal_events"]
+    finally:
+        app.dependency_overrides.clear()
+
+    assert [e["minute"] for e in events] == [10, 55, 80]  # ordered by minute
+    assert events[0]["scorer"] == "Player A"
 
 
 def test_prediction_has_valid_probabilities(client):

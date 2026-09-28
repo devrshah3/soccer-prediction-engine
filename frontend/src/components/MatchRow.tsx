@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { League, Match, PredictionSummary } from "@/lib/api";
+import { matchState } from "@/lib/matchState";
 import { timeAgo } from "@/lib/time";
 import { KickoffTime } from "./KickoffTime";
 import { LeagueChip } from "./LeagueChip";
@@ -15,7 +16,10 @@ export function MatchRow({
   league?: League;
   prediction?: PredictionSummary | null;
 }) {
-  const finished = match.status === "finished";
+  const state = matchState(match);
+  const showScore = state.kind === "finished";
+  const showPrediction = state.kind === "upcoming";
+
   return (
     <Link
       href={`/matches/${match.id}`}
@@ -34,7 +38,7 @@ export function MatchRow({
           <TeamCrest name={match.home_team.name} />
           <span className="truncate text-sm font-medium text-foreground">{match.home_team.name}</span>
         </div>
-        {finished ? (
+        {showScore ? (
           <span className="shrink-0 rounded-md bg-surface-raised px-2.5 py-1 text-sm font-bold tabular-nums text-foreground ring-1 ring-inset ring-border">
             {match.home_goals} &ndash; {match.away_goals}
           </span>
@@ -46,7 +50,21 @@ export function MatchRow({
           <TeamCrest name={match.away_team.name} />
         </div>
       </div>
-      {!finished && prediction && (
+
+      {state.kind === "finished" && (
+        <p className="mt-3 text-xs font-medium uppercase tracking-wide text-muted-2">Full time</p>
+      )}
+      {state.kind === "in_progress" && (
+        <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-success">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
+          In progress &middot; updated {Math.max(0, Math.round(state.minutesSinceKickoff))}m ago
+        </p>
+      )}
+      {state.kind === "pending_result" && (
+        <p className="mt-3 text-xs font-medium text-muted-2">Full time, score pending</p>
+      )}
+
+      {showPrediction && prediction && (
         <div className="mt-4 border-t border-border pt-3">
           <ProbabilityBar
             home={prediction.probabilities.home}
@@ -60,7 +78,7 @@ export function MatchRow({
           </p>
         </div>
       )}
-      {!finished && !prediction && (
+      {showPrediction && !prediction && (
         <p className="mt-3 text-xs text-muted-2">prediction not available yet</p>
       )}
     </Link>

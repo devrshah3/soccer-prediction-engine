@@ -4,6 +4,7 @@ import { KickoffTime } from "@/components/KickoffTime";
 import { ProbabilityBar } from "@/components/ProbabilityBar";
 import { TeamCrest } from "@/components/TeamCrest";
 import { api, ApiError } from "@/lib/api";
+import { matchState } from "@/lib/matchState";
 
 export default async function MatchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -16,26 +17,34 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   });
   if (!match) notFound();
 
-  const prediction =
-    match.status === "scheduled"
-      ? await api.prediction(matchId).catch((e) => {
-          // 503 = no validated model for this competition yet (e.g. Champions League -
-          // see kickcast_api/predictions.py's explicit guard) - real, expected, not a
-          // page error.
-          if (e instanceof ApiError && e.status === 503) return null;
-          throw e;
-        })
-      : null;
+  const state = matchState(match);
+  const needsPrediction = state.kind === "upcoming" || state.kind === "finished";
+  const prediction = needsPrediction
+    ? await api.prediction(matchId).catch((e) => {
+        // 503 = no validated model for this competition yet (e.g. Champions League -
+        // see kickcast_api/predictions.py's explicit guard) - real, expected, not a
+        // page error.
+        if (e instanceof ApiError && e.status === 503) return null;
+        throw e;
+      })
+    : null;
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted">
         {match.round} &middot; <KickoffTime date={match.date} kickoff={match.kickoff} />
+        {state.kind === "in_progress" && (
+          <span className="ml-2 inline-flex items-center gap-1.5 text-success">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
+            In progress &middot; updated {Math.max(0, Math.round(state.minutesSinceKickoff))}m ago
+          </span>
+        )}
+        {state.kind === "pending_result" && <span className="ml-2 text-muted-2">Full time, score pending</span>}
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-4 rounded-xl border border-border bg-surface px-4 py-8 sm:gap-6">
         <TeamLink id={match.home_team.id} name={match.home_team.name} />
-        {match.status === "finished" ? (
+        {state.kind === "finished" ? (
           <span className="shrink-0 text-3xl font-bold tabular-nums text-foreground">
             {match.home_goals} &ndash; {match.away_goals}
           </span>
@@ -45,7 +54,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         <TeamLink id={match.away_team.id} name={match.away_team.name} />
       </div>
 
-      {match.status === "scheduled" && (
+      {state.kind === "upcoming" && (
         <section className="rounded-xl border border-border bg-surface p-5 sm:p-6">
           <h2 className="mb-4 text-lg font-semibold text-foreground">Prediction</h2>
           {prediction ? (
@@ -137,13 +146,38 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         </section>
       )}
 
-      {match.status === "finished" && (
+      {state.kind === "finished" && (
         <section className="rounded-xl border border-border bg-surface p-5">
           <h2 className="mb-2 text-lg font-semibold text-foreground">Result</h2>
           <p className="text-sm text-muted">
-            Full time {match.home_goals} &ndash; {match.away_goals}. Goal scorers/minutes and an official
-            highlights link aren&apos;t available yet - see MORNING_REPORT.md.
+            Full time {match.home_goals} &ndash; {match.away_goals}.
           </p>
+          {match.goal_events && match.goal_events.length > 0 ? (
+            <ul className="mt-3 space-y-1.5">
+              {match.goal_events.map((e, i) => (
+                <li key={i} className="flex gap-3 text-sm">
+                  <span className="w-9 shrink-0 tabular-nums text-muted-2">{e.minute != null ? `${e.minute}'` : ""}</span>
+                  <span className="text-foreground">
+                    {e.scorer}
+                    {e.own_goal ? " (own goal)" : e.penalty ? " (pen.)" : ""}
+                    {" "}&mdash;{" "}
+                    {e.team_id === match.home_team.id ? match.home_team.name : match.away_team.name}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-xs text-muted-2">
+              Goal scorers/minutes aren&apos;t on record for this match.
+            </p>
+          )}
+          {prediction && (
+            <p className="mt-4 border-t border-border pt-3 text-xs text-muted-2">
+              Pre-match prediction: {match.home_team.name} {Math.round(prediction.probabilities.home * 100)}%, draw{" "}
+              {Math.round(prediction.probabilities.draw * 100)}%, {match.away_team.name}{" "}
+              {Math.round(prediction.probabilities.away * 100)}% (evidence tier {prediction.evidence})
+            </p>
+          )}
         </section>
       )}
 
