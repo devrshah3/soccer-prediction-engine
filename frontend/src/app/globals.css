@@ -70,9 +70,10 @@
   border-color: var(--border);
 }
 
+/* clip, not hidden: `hidden` turns body into a scroll container and breaks position: sticky. */
 html,
 body {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 html {

@@ -10,17 +10,16 @@ const ITEMS = [
   { href: "/replay", label: "Replay", icon: ReplayIcon },
 ];
 
-// Floating bottom glass dock (item 2's four sections). The active item is a brighter
-// glass "lens" with its label; others are icon-only with an aria-label. Fixed, so it must
-// never overlap the assistant bubble (bottom-right) - the dock is centered and the
-// assistant bubble sits further right/lower, verified in the Playwright screenshots.
-export function Dock() {
+// The four-section glass pill, centred in the top bar. The active item is a brighter glass
+// "lens" with its label; the others are icon-only with an aria-label (on phones the lens
+// is icon-only too, to keep the whole bar on one row at 375px).
+export function NavPill() {
   const pathname = usePathname();
 
   return (
     <nav
       aria-label="Primary"
-      className="glass glass-float fixed inset-x-0 bottom-4 z-40 mx-auto flex w-fit items-center gap-1 !rounded-full p-1.5 sm:bottom-6"
+      className="glass glass-float pointer-events-auto flex w-fit items-center gap-0.5 !rounded-full p-1 sm:gap-1 sm:p-1.5"
     >
       {ITEMS.map((item) => {
         const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -31,7 +30,7 @@ export function Dock() {
             href={item.href}
             aria-label={item.label}
             aria-current={active ? "page" : undefined}
-            className={`flex items-center gap-2 rounded-full px-3 py-2.5 text-xs font-medium transition-all sm:px-4 ${
+            className={`flex items-center gap-2 rounded-full px-2.5 py-2 text-xs font-medium transition-all sm:px-4 sm:py-2.5 ${
               active
                 ? "bg-gradient-to-r from-accent to-accent-2 text-accent-foreground shadow-[0_0_18px_var(--accent-glow)]"
                 : "text-muted hover:bg-white/[0.08] hover:text-foreground"

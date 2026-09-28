@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { ChatWidget } from "@/components/ChatWidget";
-import { Dock } from "@/components/glass/Dock";
+import { NavPill } from "@/components/glass/NavPill";
+import { SearchBox } from "@/components/SearchBox";
 import { SceneBackground } from "@/components/SceneBackground";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/time";
@@ -29,33 +30,33 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full scroll-pt-24 antialiased`}
       data-theme="dark"
     >
       <body className="relative flex min-h-full flex-col text-foreground">
         <SceneBackground />
-        <header className="sticky top-0 z-40 px-3 pt-3 sm:px-6 sm:pt-4">
-          <nav className="glass mx-auto flex max-w-5xl items-center justify-between gap-4 !rounded-2xl px-4 py-3">
-            <Link href="/" className="flex items-center gap-2 text-base font-bold tracking-tight text-foreground">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-2 text-sm text-accent-foreground shadow-[0_0_14px_var(--accent-glow)]">
+        <header className="pointer-events-none sticky top-3 z-40 px-3 sm:px-6">
+          <nav
+            aria-label="Site"
+            className="relative mx-auto grid max-w-5xl grid-cols-[auto_1fr_auto] items-center gap-2 sm:grid-cols-[1fr_auto_1fr] sm:gap-4"
+          >
+            <Link
+              href="/"
+              aria-label="KickCast home"
+              className="glass glass-float pointer-events-auto flex w-fit items-center gap-2 !rounded-full p-1 text-base font-bold tracking-tight text-foreground sm:pr-4"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-2 text-sm text-accent-foreground shadow-[0_0_14px_var(--accent-glow)]">
                 K
               </span>
-              KickCast
+              <span className="hidden sm:inline">KickCast</span>
             </Link>
-            <label className="flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs text-muted">
-              <SearchIcon className="h-3.5 w-3.5 shrink-0" />
-              <input
-                type="search"
-                placeholder="Search teams, leagues..."
-                disabled
-                className="w-24 bg-transparent text-foreground outline-none placeholder:text-muted-2 sm:w-36"
-                aria-label="Search (coming soon)"
-              />
-            </label>
+            <div className="flex justify-center">
+              <NavPill />
+            </div>
+            <SearchBox />
           </nav>
         </header>
-        <main className="relative z-0 mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-28 sm:px-6 sm:py-8 sm:pb-28">{children}</main>
-        <Dock />
+        <main className="relative z-0 mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
         <footer className="relative z-0 px-4 pb-8 pt-4 text-center text-xs text-muted-2 sm:px-6">
           <div className="glass mx-auto max-w-3xl !rounded-2xl px-4 py-3">
             Predictions are our own model, backtested out-of-sample - not a promise of accuracy.
@@ -69,14 +70,5 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <ChatWidget />
       </body>
     </html>
-  );
-}
-
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
-      <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
   );
 }
