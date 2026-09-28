@@ -75,6 +75,47 @@ python scripts/analyze_corners_and_timing.py data/sb_summaries.jsonl reports/cor
 pytest && ruff check . && mypy kickcast_engine --ignore-missing-imports
 ```
 
+## Keeping data fresh
+
+Fixtures, results, and predictions don't update on their own unless something re-runs the
+pipeline. Two things happen automatically once the backend (`uvicorn kickcast_api.main:app`)
+is running, no extra setup:
+- **Prediction precompute**: every scheduled match in the next 90 days gets a stored
+  prediction nightly at 03:00 UTC, and again right after any `scripts/ingest.py` run (see
+  `kickcast_api/precompute.py`). This doesn't touch fixtures/results, only predictions.
+- **Live results** (only if `API_FOOTBALL_KEY` is set): a date-scoped API-Football poll
+  every 10 minutes, but only during an actual match window - see
+  `kickcast_api/live/results_updater.py`.
+
+Fixtures and results themselves (openfootball, martj42, football-data.org) need a real
+re-ingest, which needs network access this project doesn't run for you automatically.
+One command does the whole thing - re-fetch, re-ingest (idempotent), recompute
+predictions, and log what changed (new fixtures, moved dates, new results):
+
+```bash
+python scripts/daily_refresh.py
+```
+
+To run it daily without touching anything, add a real crontab entry (adjust the paths):
+
+```
+0 6 * * * cd /path/to/kickcast && .venv/bin/python scripts/daily_refresh.py >> logs/daily_refresh.log 2>&1
+```
+
+football-data.org (Champions League) is refreshed as part of the same `ingest.py` run
+this script calls - its client already enforces the real 10 calls/minute limit
+(`kickcast_api/football_data_org.py`), so no separate schedule is needed for it.
+
+When a fixture's date or time changes between two ingests, it's matched by competition/
+season/round/teams and updated in place (not duplicated) - the previous date/kickoff is
+kept on the row (`Match.previous_date`/`previous_kickoff`) rather than silently discarded.
+This needs a real `round` value to work (true for domestic "Matchday N" rounds and
+Nations League groups); a competition without one falls back to being treated as a new
+fixture instead of a moved one.
+
+The homepage footer shows "fixtures updated X ago" from `GET /meta`'s `ingested_at`, so
+staleness is always visible, never hidden.
+
 ## Data credit
 
 Historical data: [StatsBomb Open Data](https://github.com/statsbomb/open-data),

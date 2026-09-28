@@ -5,6 +5,7 @@ import { ChatWidget } from "@/components/ChatWidget";
 import { MobileNav } from "@/components/MobileNav";
 import { NavLink } from "@/components/NavLink";
 import { api } from "@/lib/api";
+import { timeAgo } from "@/lib/time";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,6 +35,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   // scripts/ingest.py run) - never link to an empty/404ing page, per "don't build UI for
   // data we don't have".
   const hasChampionsLeague = leagues.some((l) => l.code === "CL");
+  const meta = await api.meta().catch(() => ({ ingested_at: null, data_version: null }));
 
   const navLinks = [
     ...domesticLeagues.map((l) => ({ href: `/leagues/${l.code}`, label: l.name })),
@@ -75,6 +77,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           Data: openfootball (CC0), football-data.co.uk, StatsBomb Open Data, martj42/international_results (CC0),
           football-data.org (Champions League), API-Football (domestic scorer data), Wikipedia (CC BY-SA).
           Predictions are our own model, backtested out-of-sample - not a promise of accuracy.
+          {meta.ingested_at && <> &middot; fixtures {timeAgo(meta.ingested_at)}</>}
         </footer>
         <ChatWidget />
       </body>

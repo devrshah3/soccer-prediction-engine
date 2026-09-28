@@ -248,6 +248,8 @@ export const api = {
     matchIds.length === 0
       ? Promise.resolve({} as Record<string, PredictionSummary | null>)
       : apiFetch<Record<string, PredictionSummary | null>>(`/predictions/summary?match_ids=${matchIds.join(",")}`),
+  // C.9: when the data was last refreshed - the footer's "fixtures updated X ago".
+  meta: () => apiFetch<{ ingested_at: string | null; data_version: string | null }>("/meta"),
 };
 
 export { ApiError };

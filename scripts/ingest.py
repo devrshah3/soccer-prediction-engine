@@ -64,14 +64,39 @@ def upsert_team(session, team_id: str, name: str, country: str | None, cache: di
     cache[team_id] = True
 
 
-def upsert_match(session, existing: dict, key: tuple, fields: dict) -> Match:
+def upsert_match(session, existing: dict, by_round: dict, key: tuple, fields: dict) -> Match:
+    """C.9: `key` is (league_code, date, home_team_id, away_team_id) - if a source now
+    reports a different date/kickoff for what's otherwise the same fixture, that key
+    itself changes, so the usual `existing.get(key)` lookup misses and would otherwise
+    silently insert a duplicate row rather than updating the real one in place.
+
+    Falls back to a second lookup by (league_code, season, round, home_team_id,
+    away_team_id) - round-based ("Matchday N", a Nations League group's matchday, a cup
+    round) - and only when that fallback actually finds the SAME opponents already on
+    record under a different date does it treat this as a moved fixture: update in place,
+    and record the previous date/kickoff rather than discarding them. A competition
+    without a meaningful `round` value (or a real schedule swap between two OTHER teams
+    that happens to reuse a round label) won't be caught by this and is treated as a new
+    fixture instead - a real, honest limitation, not silently guessed around.
+    """
     m = existing.get(key)
+    round_key = (key[0], fields.get("season"), fields.get("round"), key[2], key[3]) if fields.get("round") else None
+    if m is None and round_key is not None:
+        candidate = by_round.get(round_key)
+        if candidate is not None and (candidate.date != key[1] or candidate.kickoff != fields.get("kickoff")):
+            candidate.previous_date = candidate.date
+            candidate.previous_kickoff = candidate.kickoff
+            candidate.date = key[1]
+            m = candidate
+            existing[key] = m
     if m is None:
         m = Match(league_code=key[0], date=key[1], home_team_id=key[2], away_team_id=key[3])
         session.add(m)
         existing[key] = m
     for k, v in fields.items():
         setattr(m, k, v)
+    if round_key is not None:
+        by_round[round_key] = m
     if m.status == "scheduled" and m.date < datetime.now(timezone.utc).date():
         # A source can report "no final score yet" for a match whose date has already
         # passed (a postponed/abandoned fixture the source never updated, or a data gap
@@ -93,16 +118,18 @@ def upsert_stats(session, match: Match, stats: dict) -> None:
         setattr(row, k, v)
 
 
-def load_existing_matches(session, league_code: str) -> dict:
-    return {
-        (m.league_code, m.date, m.home_team_id, m.away_team_id): m
-        for m in session.query(Match).filter(Match.league_code == league_code)
+def load_existing_matches(session, league_code: str) -> tuple[dict, dict]:
+    rows = session.query(Match).filter(Match.league_code == league_code).all()
+    primary = {(m.league_code, m.date, m.home_team_id, m.away_team_id): m for m in rows}
+    by_round = {
+        (m.league_code, m.season, m.round, m.home_team_id, m.away_team_id): m for m in rows if m.round
     }
+    return primary, by_round
 
 
 def ingest_domestic(session, kc_code: str, fd_code: str, name: str, country: str) -> int:
     upsert_league(session, kc_code, name, country, "domestic_league")
-    existing = load_existing_matches(session, kc_code)
+    existing, by_round = load_existing_matches(session, kc_code)
     team_cache: dict = {}
     n = 0
 
@@ -113,7 +140,7 @@ def ingest_domestic(session, kc_code: str, fd_code: str, name: str, country: str
         upsert_team(session, fd_row["away"], fd_row["away_raw"], country, team_cache)
         key = (kc_code, date.fromisoformat(fd_row["date"]), fd_row["home"], fd_row["away"])
         m = upsert_match(
-            session, existing, key,
+            session, existing, by_round, key,
             {
                 "season": fd_row["season"], "kickoff": None,
                 "home_goals": fd_row["home_goals"], "away_goals": fd_row["away_goals"],
@@ -147,7 +174,7 @@ def ingest_domestic(session, kc_code: str, fd_code: str, name: str, country: str
             to_utc_hhmm(match_date, local_kickoff, LEAGUE_TIMEZONES[kc_code]) if local_kickoff else None
         )
         upsert_match(
-            session, existing, key,
+            session, existing, by_round, key,
             {
                 "season": of_row["season"], "kickoff": kickoff_utc,
                 "home_goals": of_row["home_goals"], "away_goals": of_row["away_goals"],
@@ -182,7 +209,7 @@ def _intl_team_id(raw_id: str, domestic_ids: set[str]) -> str:
 
 def ingest_international(session) -> int:
     upsert_league(session, "international", "International", None, "international")
-    existing = load_existing_matches(session, "international")
+    existing, by_round = load_existing_matches(session, "international")
     team_cache: dict = {}
     domestic_ids = _domestic_team_ids(session)
     n = 0
@@ -195,7 +222,7 @@ def ingest_international(session) -> int:
         upsert_team(session, away_id, international.canonical(m.away), None, team_cache)
         key = ("international", m.date, home_id, away_id)
         upsert_match(
-            session, existing, key,
+            session, existing, by_round, key,
             {
                 "season": str(m.date.year), "kickoff": None,
                 "home_goals": m.home_goals, "away_goals": m.away_goals,
@@ -220,7 +247,7 @@ def ingest_international(session) -> int:
                 to_utc_hhmm(d, local_kickoff, LEAGUE_TIMEZONES["international"]) if local_kickoff else None
             )
             upsert_match(
-                session, existing, key,
+                session, existing, by_round, key,
                 {
                     "season": "2026-27", "kickoff": kickoff_utc,
                     "home_goals": None, "away_goals": None,
@@ -263,7 +290,7 @@ def ingest_champions_league(session) -> int:
         return 0
 
     upsert_league(session, "CL", "UEFA Champions League", "Europe", "continental_cup")
-    existing = load_existing_matches(session, "CL")
+    existing, by_round = load_existing_matches(session, "CL")
     team_cache: dict = {}
     n = 0
     season_start_year = int(payload["matches"][0]["season"]["startDate"][:4]) if payload["matches"] else None
@@ -289,7 +316,7 @@ def ingest_champions_league(session) -> int:
         full_time = fx.get("score", {}).get("fullTime", {}) if finished else {}
         round_label = f"{fx['stage']} MD{fx['matchday']}" if fx.get("matchday") else fx["stage"]
         upsert_match(
-            session, existing, key,
+            session, existing, by_round, key,
             {
                 "season": season_label, "kickoff": kickoff_utc,
                 "home_goals": full_time.get("home"), "away_goals": full_time.get("away"),

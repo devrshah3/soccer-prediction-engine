@@ -56,6 +56,11 @@ class Match(Base):
     neutral: Mapped[bool] = mapped_column(Boolean, default=False)
     source: Mapped[str] = mapped_column(String)
     source_id: Mapped[str] = mapped_column(String)
+    # C.9: when a re-ingest detects the same fixture (matched by league/season/round/
+    # teams - see scripts/ingest.py's upsert_match) now has a different date or kickoff,
+    # the OLD value is kept here before overwriting, rather than silently discarded.
+    previous_date: Mapped[Date | None] = mapped_column(SADate, nullable=True)
+    previous_kickoff: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class MatchStats(Base):

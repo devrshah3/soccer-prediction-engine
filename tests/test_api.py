@@ -74,6 +74,38 @@ def client(tmp_path):
     app.dependency_overrides.clear()
 
 
+def test_meta_endpoint_null_when_never_ingested(client):
+    r = client.get("/meta")
+    assert r.status_code == 200
+    assert r.json() == {"ingested_at": None, "data_version": None}
+
+
+def test_meta_endpoint_reflects_real_meta_rows(tmp_path):
+    from kickcast_api.models import Meta
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'test_meta.db'}")
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine)
+    session = TestSession()
+    session.add(Meta(key="ingested_at", value="2026-09-28T03:00:00+00:00"))
+    session.add(Meta(key="data_version", value="12"))
+    session.commit()
+
+    def override():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_session] = override
+    try:
+        r = TestClient(app).get("/meta")
+    finally:
+        app.dependency_overrides.clear()
+    assert r.json() == {"ingested_at": "2026-09-28T03:00:00+00:00", "data_version": "12"}
+
+
 def test_list_leagues(client):
     r = client.get("/leagues")
     assert r.status_code == 200

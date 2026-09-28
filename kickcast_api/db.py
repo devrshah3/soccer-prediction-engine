@@ -9,7 +9,7 @@ import os
 from collections.abc import Iterator
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from .models import Base
@@ -43,8 +43,36 @@ engine = make_engine()
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
+# C.9: SQLAlchemy's create_all() only creates MISSING TABLES - it never alters an
+# existing one, so a real column added to an existing model (like Match.previous_date/
+# previous_kickoff) needs an explicit ALTER TABLE against a database file created before
+# that column existed. This project has no migration framework (Alembic etc. would be
+# overkill here); this is a small, idempotent, additive-only substitute: nullable columns
+# only, added if missing, never dropped or altered further.
+_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
+    "matches": [
+        ("previous_date", "DATE"),
+        ("previous_kickoff", "VARCHAR"),
+    ],
+}
+
+
+def _run_migrations(bind) -> None:
+    inspector = inspect(bind)
+    if not inspector.has_table("matches"):
+        return  # a fresh DB - create_all() above already created it with every column
+    with bind.begin() as conn:
+        for table, columns in _MIGRATIONS.items():
+            existing = {c["name"] for c in inspector.get_columns(table)}
+            for name, sql_type in columns:
+                if name not in existing:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}"))
+
+
 def init_db(bind=None) -> None:
-    Base.metadata.create_all(bind or engine)
+    target = bind or engine
+    Base.metadata.create_all(target)
+    _run_migrations(target)
 
 
 def get_session() -> Iterator[Session]:

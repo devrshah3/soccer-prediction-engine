@@ -36,29 +36,76 @@ def test_upsert_match_relabels_a_past_dated_scheduled_row_as_not_played(tmp_path
     gap - must not be treated as a real upcoming fixture. This is what let stale rows
     (fr.1 2019-20, es.1/it.1's 2024-25 finale) surface as "next match" on real pages."""
     session = _session(tmp_path)
-    existing: dict = {}
+    existing, by_round = {}, {}
     key = ("test.1", (datetime.now(UTC) - timedelta(days=30)).date(), "home", "away")
-    m = ingest.upsert_match(session, existing, key, {"season": "2024-25", "kickoff": None, "status": "scheduled"})
+    m = ingest.upsert_match(session, existing, by_round, key, {"season": "2024-25", "kickoff": None, "status": "scheduled"})
     assert m.status == "not_played"
 
 
 def test_upsert_match_keeps_a_future_scheduled_row_scheduled(tmp_path):
     session = _session(tmp_path)
-    existing: dict = {}
+    existing, by_round = {}, {}
     key = ("test.1", (datetime.now(UTC) + timedelta(days=30)).date(), "home", "away")
-    m = ingest.upsert_match(session, existing, key, {"season": "2026-27", "kickoff": None, "status": "scheduled"})
+    m = ingest.upsert_match(session, existing, by_round, key, {"season": "2026-27", "kickoff": None, "status": "scheduled"})
     assert m.status == "scheduled"
 
 
 def test_upsert_match_leaves_finished_rows_alone_regardless_of_date(tmp_path):
     session = _session(tmp_path)
-    existing: dict = {}
+    existing, by_round = {}, {}
     key = ("test.1", (datetime.now(UTC) - timedelta(days=30)).date(), "home", "away")
     m = ingest.upsert_match(
-        session, existing, key,
+        session, existing, by_round, key,
         {"season": "2024-25", "kickoff": None, "status": "finished", "home_goals": 1, "away_goals": 0},
     )
     assert m.status == "finished"
+
+
+def test_upsert_match_records_history_when_a_fixture_moves_by_round(tmp_path):
+    """C.9: the same fixture (matched by league/season/round/teams) now reported on a
+    different date/kickoff - update in place, keep the old date/kickoff rather than
+    silently discarding them, and don't create a duplicate row."""
+    session = _session(tmp_path)
+    existing, by_round = {}, {}
+    original_date = (datetime.now(UTC) + timedelta(days=10)).date()
+    key1 = ("test.1", original_date, "home", "away")
+    m1 = ingest.upsert_match(
+        session, existing, by_round, key1,
+        {
+            "season": "2026-27", "kickoff": "15:00", "status": "scheduled", "round": "Matchday 5",
+            "source": "synthetic", "source_id": "synthetic:1",
+        },
+    )
+    session.flush()
+    match_id = m1.id
+
+    moved_date = original_date + timedelta(days=2)
+    key2 = ("test.1", moved_date, "home", "away")
+    m2 = ingest.upsert_match(
+        session, existing, by_round, key2,
+        {"season": "2026-27", "kickoff": "18:00", "status": "scheduled", "round": "Matchday 5"},
+    )
+    assert m2.id == match_id  # same row, not a new one
+    assert m2.date == moved_date
+    assert m2.previous_date == original_date
+    assert m2.previous_kickoff == "15:00"
+
+
+def test_upsert_match_does_not_match_across_different_teams_with_the_same_round(tmp_path):
+    session = _session(tmp_path)
+    existing, by_round = {}, {}
+    d1 = (datetime.now(UTC) + timedelta(days=10)).date()
+    ingest.upsert_match(
+        session, existing, by_round, ("test.1", d1, "home", "away"),
+        {"season": "2026-27", "kickoff": "15:00", "status": "scheduled", "round": "Matchday 5"},
+    )
+    d2 = (datetime.now(UTC) + timedelta(days=11)).date()
+    m2 = ingest.upsert_match(
+        session, existing, by_round, ("test.1", d2, "other-home", "other-away"),
+        {"season": "2026-27", "kickoff": "15:00", "status": "scheduled", "round": "Matchday 5"},
+    )
+    assert m2.home_team_id == "other-home"
+    assert m2.previous_date is None  # a genuinely different fixture, not a moved one
 
 
 def test_domestic_ingest_is_idempotent(tmp_path):
