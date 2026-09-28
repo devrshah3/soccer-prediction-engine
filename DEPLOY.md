@@ -59,11 +59,31 @@ in short:
   match center reports "not enabled on this deployment" and Historical Replay is shown
   instead. Set `ENABLE_API_FOOTBALL=true` explicitly if you've checked the terms for your
   own plan and are comfortable with them.
-- ESPN's public scoreboard (`kickcast_api/live/espn.py`) is the same story: an undocumented
-  endpoint with no published terms, used as a keyless second source for scores, scorers and
-  cards (it covers the Nations League, which nothing else we have does). It is on in
-  development and off in production (`ENABLE_ESPN=false`) - so a production deploy has no live
-  or same-day international scores until you enable it having weighed that yourself.
+- ESPN's public scoreboard (`kickcast_api/live/espn.py`) is an undocumented endpoint with no
+  published terms, used as a keyless source for scores, scorers and cards (it covers the
+  Nations League and the scorers/cards of the domestic leagues, which nothing else we have
+  does). It is **on** in this deployment (`ENABLE_ESPN=true` in `render.yaml`, a deliberate
+  choice - set it to `"false"` to turn it off). The server reads it itself: at every start
+  and after every catch-up it re-reads the last 7 days, and during a match window it polls
+  every 10 minutes. Nothing ESPN-derived is committed to the repo. Without it, a deployed
+  site only has what the open sources knew at build time - typically no results at all for
+  the last few days (the martj42 CSV lags by weeks) and no scorers for club matches.
+
+## Seed snapshot (run before pushing)
+
+Render's free disk resets to the build snapshot, so anything the running server learned is
+gone after a restart. `seed/seed.json.gz` (committed, well under 1 MB) carries **open-licensed**
+result / goal-event / match-stat rows (martj42 CC0, openfootball CC0, football-data.co.uk) for
+the current season window; it is loaded at build time (`scripts/build_deploy.py`) and at
+startup, before any refresh, and only ever fills gaps - it never overwrites a finished match.
+It deliberately contains nothing from ESPN or API-Football.
+
+Before pushing a release, from a machine with an up-to-date local database:
+
+```
+python scripts/export_seed.py          # writes seed/seed.json.gz, prints its size (cap: 5 MB)
+git add seed/seed.json.gz && git commit -m "Refresh seed snapshot"
+```
 
 ## Testing the build step locally before deploying
 

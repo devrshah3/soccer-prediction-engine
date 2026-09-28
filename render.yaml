@@ -18,7 +18,7 @@ services:
       - key: ENABLE_API_FOOTBALL
         value: "false" # API-Football's terms give no licence to publish its data publicly - see DEPLOY.md
       - key: ENABLE_ESPN
-        value: "false" # ESPN's public scoreboard is undocumented with no published terms - see DEPLOY.md
+        value: "true" # keyless source for recent results/scorers/cards (the Nations League has no other) - undocumented, no published terms: see DEPLOY.md
       # KICKCAST_DB_PATH is left unset - defaults to <repo>/data/kickcast.db, which the build step
       # already wrote.
 

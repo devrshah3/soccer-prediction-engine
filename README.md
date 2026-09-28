@@ -116,7 +116,7 @@ is running, no extra setup:
 - **Live results**: a poll every 10 minutes, but only during an actual match window and with a
   short catch-up for missed ones - see `kickcast_api/live/results_updater.py`. Sources are
   API-Football (needs `API_FOOTBALL_KEY`, 100 calls/day) and ESPN's public scoreboard (keyless);
-  both are off by default in production - see [DEPLOY.md](DEPLOY.md).
+  API-Football is off by default in production; ESPN is on in the Render blueprint - see [DEPLOY.md](DEPLOY.md).
 
 Fixtures and results themselves (openfootball, martj42, football-data.org) need a real
 re-ingest, which needs network access this project doesn't run for you automatically.
@@ -162,7 +162,7 @@ calls/minute limit and used as a source for scores in the leagues it covers).
 
 Live scores, scorers and cards, both optional: [API-Football](https://www.api-football.com/) (free
 plan, key required) and ESPN's public scoreboard (undocumented, keyless, no published terms).
-Neither is enabled in a production deploy unless you turn it on.
+API-Football is off in a production deploy unless you turn it on; ESPN is on in the Render blueprint (see DEPLOY.md).
 
 Match stats, cards and historical closing odds: [football-data.co.uk](https://www.football-data.co.uk/).
 No formal license/terms-of-use text restricting research or personal use was found on the site
