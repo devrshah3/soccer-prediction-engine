@@ -200,8 +200,10 @@ export const api = {
   leagues: () => apiFetch<League[]>("/leagues"),
   standings: (code: string, season?: string) =>
     apiFetch<Standings>(`/leagues/${encodeURIComponent(code)}/standings${season ? `?season=${season}` : ""}`),
-  leagueFixtures: (code: string, status: "scheduled" | "finished" | "all" = "scheduled", limit = 20) =>
-    apiFetch<Match[]>(`/leagues/${encodeURIComponent(code)}/fixtures?status=${status}&limit=${limit}`),
+  leagueFixtures: (code: string, status: "scheduled" | "finished" | "all" = "scheduled", limit = 20, season?: string) =>
+    apiFetch<Match[]>(
+      `/leagues/${encodeURIComponent(code)}/fixtures?status=${status}&limit=${limit}${season ? `&season=${encodeURIComponent(season)}` : ""}`
+    ),
   // Fixtures for several leagues in one request (see kickcast_api/routes/batch.py) - used by
   // the homepage instead of one /leagues/{code}/fixtures call per league. `days` bounds
   // "scheduled" results to [now, now + days] - the homepage tries 7 first, then widens to

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { slugForCode } from "@/lib/leagueSlugs";
 import { ProbabilityBar } from "./ProbabilityBar";
 import { TeamCrest } from "./TeamCrest";
 
@@ -66,7 +67,7 @@ export function AssistantSourceCard({ source }: { source: Source }) {
     const s = source.data;
     return (
       <Link
-        href={`/leagues/${s.league_code}`}
+        href={`/leagues/${slugForCode(s.league_code)}`}
         className="block rounded-lg border border-border bg-surface-raised p-3 text-sm transition-colors hover:border-border-strong hover:bg-surface-hover"
       >
         <span className="font-semibold text-accent">#{s.position}</span>{" "}

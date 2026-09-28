@@ -40,7 +40,8 @@ def league_standings(code: str, season: str | None = None, session: Session = De
 
 @router.get("/{code}/fixtures")
 def league_fixtures(
-    code: str, status: str = "scheduled", limit: int = 50, session: Session = Depends(get_session)
+    code: str, status: str = "scheduled", limit: int = 50, season: str | None = None,
+    session: Session = Depends(get_session),
 ) -> list[dict]:
     _get_league(session, code)
     if status not in ("scheduled", "finished", "all"):
@@ -48,6 +49,11 @@ def league_fixtures(
     q = session.query(Match).filter(Match.league_code == code)
     if status != "all":
         q = q.filter(Match.status == status)
+    # Without this, a past-season request (e.g. the frontend's league page browsing
+    # 2015-16) would silently return the most recent (current-season) matches instead -
+    # real bug caught by curling the frontend's past-season view before item 3 shipped.
+    if season is not None:
+        q = q.filter(Match.season == season)
     # Sort on (date, kickoff), not date alone - see kickcast_api/routes/batch.py's
     # fixtures_by_league docstring for the real bug a date-only sort caused there.
     order = (Match.date.asc(), Match.kickoff.asc()) if status != "finished" else (Match.date.desc(), Match.kickoff.desc())

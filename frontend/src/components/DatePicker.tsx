@@ -22,7 +22,7 @@ function nextWeekday(targetDow: number): string {
 // browser-native calendar, not a custom-built one - simpler and fully accessible for
 // free), and quick chips. Keeps the selected date in the URL (?date=YYYY-MM-DD); no date
 // param at all means "today, with automatic rollover" (see page.tsx).
-export function DatePicker({ selected }: { selected: string }) {
+export function DatePicker({ selected, basePath = "/" }: { selected: string; basePath?: string }) {
   const router = useRouter();
   const today = useMemo(() => isoDaysFromToday(0), []);
   const min = useMemo(() => isoDaysFromToday(-RANGE_DAYS), []);
@@ -30,9 +30,9 @@ export function DatePicker({ selected }: { selected: string }) {
 
   function go(date: string) {
     if (date === today) {
-      router.push("/");
+      router.push(basePath);
     } else {
-      router.push(`/?date=${date}`);
+      router.push(`${basePath}?date=${date}`);
     }
   }
 

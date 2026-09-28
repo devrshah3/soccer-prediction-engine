@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Flag } from "@/components/Flag";
 import { api, type League, type Match } from "@/lib/api";
+import { slugForCode } from "@/lib/leagueSlugs";
 import { formatShortDate } from "@/lib/time";
 
 // Item 2's leagues hub: one glass tile per real competition in the DB (api.leagues() -
@@ -38,7 +39,7 @@ function LeagueTile({ league, fixtures }: { league: League; fixtures: Match[] })
 
   return (
     <Link
-      href={`/leagues/${encodeURIComponent(league.code)}`}
+      href={`/leagues/${slugForCode(league.code)}`}
       className="glass flex items-center gap-4 p-4 transition-all hover:-translate-y-0.5 hover:border-white/25"
     >
       <Flag country={league.country} className="h-9 w-12 shrink-0 rounded-md" />

@@ -205,6 +205,50 @@ def test_league_fixtures_default_scheduled(client):
     assert len(body) == 1
 
 
+def test_league_fixtures_season_filter(tmp_path):
+    """Regression: the frontend's league page browsing a past season (e.g. 2015-16) used
+    to get back the CURRENT season's matches instead, since this endpoint ignored season
+    entirely - caught by curling the frontend's past-season view before it shipped."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'test_season_filter.db'}")
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine)
+    session = TestSession()
+    session.add(League(code="sf.1", name="SF League", country="Testland", kind="domestic_league"))
+    for i in range(2):
+        session.add(Team(id=f"sf-{i}", name=f"SF Club {i}", country="Testland"))
+    session.commit()
+    session.add(Match(
+        league_code="sf.1", season="2015-16", date=date(2016, 5, 1), kickoff=None,
+        home_team_id="sf-0", away_team_id="sf-1", home_goals=2, away_goals=1,
+        status="finished", round="Matchday 38", neutral=False,
+        source="synthetic", source_id="synthetic:old",
+    ))
+    session.add(Match(
+        league_code="sf.1", season="2026-27", date=date(2026, 9, 1), kickoff=None,
+        home_team_id="sf-1", away_team_id="sf-0", home_goals=0, away_goals=0,
+        status="finished", round="Matchday 1", neutral=False,
+        source="synthetic", source_id="synthetic:new",
+    ))
+    session.commit()
+
+    def override():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_session] = override
+    try:
+        c = TestClient(app)
+        body = c.get("/leagues/sf.1/fixtures?status=finished&season=2015-16").json()
+        assert len(body) == 1
+        assert body[0]["season"] == "2015-16"
+        assert body[0]["home_goals"] == 2
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_team_detail_and_position(client):
     r = client.get("/teams/team-0")
     assert r.status_code == 200
