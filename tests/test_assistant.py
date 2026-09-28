@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from kickcast_api.assistant import cache, conversation, fallback, quota, service, text_format
 from kickcast_api.assistant import tools as assistant_tools
 from kickcast_api.assistant.entities import find_entities
+from kickcast_api.assistant.intent import Intent, classify
 from kickcast_api.models import Base, League, Match, Team
 
 
@@ -724,6 +725,37 @@ def test_conversations_are_isolated_from_each_other(session, monkeypatch):
     _video_env(monkeypatch, "found", VIDEO)
     service.ask(session, "Predict Rovers 1 vs Ridgeway United", "conv-aaaaaaaa")
     assert "Which match do you mean?" in service.ask(session, "highlights", "conv-bbbbbbbb")["text"]
+
+
+# ---------------------------------------------------------------- unknown questions (Gemini paused)
+
+
+def test_unknown_reply_is_one_short_line_with_three_answerable_examples(session):
+    reply = fallback.unknown_reply()["text"]
+    assert "\n" not in reply and len(reply) < 200  # one short line
+    examples = [part.strip(' ."') for part in reply.split("Try: ")[1].split(";")]
+    assert len(examples) == 3
+    expected = [Intent.PREDICTION, Intent.MATCH_LOOKUP, Intent.TABLE]
+    assert [classify(e) for e in examples] == expected  # each example really is a shape we handle
+
+
+@pytest.mark.parametrize("why", ["no_key", "quota_exhausted", "call_failed"])
+def test_unrecognised_question_gets_the_unknown_reply_whenever_gemini_is_unusable(session, monkeypatch, why):
+    seen = _wiki_env(monkeypatch, DRAKE_ARTICLE)  # an unrelated article is on offer - it must never be shown
+    if why == "no_key":
+        monkeypatch.setattr(service.gemini_client, "available", lambda: False)
+    else:
+        monkeypatch.setattr(service.gemini_client, "available", lambda: True)
+        if why == "quota_exhausted":
+            monkeypatch.setattr(service.quota, "gemini_quota_remaining", lambda s: 0)
+            monkeypatch.setattr(service.gemini_client, "ask_gemini", _boom)  # never even attempted
+        else:
+            monkeypatch.setattr(service.gemini_client, "ask_gemini", lambda s, q: None)
+    result = service.ask(session, "What is the airspeed velocity of an unladen swallow")
+    assert result["mode"] == "fallback"
+    assert result["text"].startswith("I don't recognize that one. Try: ")
+    assert "Drake" not in result["text"] and result["sources"] == []
+    assert seen == []
 
 
 def test_db_intents_never_touch_wikipedia(session, monkeypatch):
