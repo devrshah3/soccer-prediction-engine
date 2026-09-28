@@ -59,6 +59,12 @@ def enable_api_football() -> bool:
     return _bool("ENABLE_API_FOOTBALL", not is_production())
 
 
+def enable_espn() -> bool:
+    """ESPN's public scoreboard is an undocumented endpoint with no published terms - same
+    stance as API-Football: on in development, off in production unless explicitly enabled."""
+    return _bool("ENABLE_ESPN", not is_production())
+
+
 def enable_football_data_org() -> bool:
     return _bool("ENABLE_FOOTBALL_DATA_ORG", True)
 

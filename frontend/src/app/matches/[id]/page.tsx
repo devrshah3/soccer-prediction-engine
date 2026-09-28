@@ -4,7 +4,7 @@ import { CardList } from "@/components/CardList";
 import { GoalTimeline } from "@/components/GoalList";
 import { KickoffTime } from "@/components/KickoffTime";
 import { LiveAutoRefresh } from "@/components/LiveAutoRefresh";
-import { MatchStatusLine } from "@/components/MatchStatusLine";
+import { MatchStatusLine, ScoreCadenceNote } from "@/components/MatchStatusLine";
 import { ProbabilityBar } from "@/components/ProbabilityBar";
 import { TeamCrest } from "@/components/TeamCrest";
 import { api, ApiError } from "@/lib/api";
@@ -40,18 +40,18 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           {match.round} &middot; <KickoffTime date={match.date} kickoff={match.kickoff} />
         </p>
         <MatchStatusLine state={state} className="mt-1" />
+        {state.kind === "live" && <div className="mt-1"><ScoreCadenceNote /></div>}
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-4 glass px-4 py-8 sm:gap-6">
         <TeamLink id={match.home_team.id} name={match.home_team.name} />
-        {state.kind === "finished" && state.score ? (
-          <span className="shrink-0 text-3xl font-bold tabular-nums text-foreground">
-            {state.score.home} &ndash; {state.score.away}
-          </span>
-        ) : state.kind === "live" && state.score ? (
-          <span className="shrink-0 text-3xl font-bold tabular-nums text-foreground">
-            {state.score.home} &ndash; {state.score.away}
-          </span>
+        {state.kind !== "scheduled" && state.score ? (
+          <div className="shrink-0 text-center">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-2">Score</p>
+            <span className="text-3xl font-bold tabular-nums text-foreground">
+              {state.score.home} &ndash; {state.score.away}
+            </span>
+          </div>
         ) : (
           <span className="shrink-0 text-sm font-medium uppercase tracking-wide text-muted-2">vs</span>
         )}

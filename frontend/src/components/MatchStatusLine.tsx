@@ -1,4 +1,3 @@
-import { timeAgo } from "@/lib/time";
 import type { MatchState } from "@/lib/matchState";
 
 // Caption shown under a prediction bar during a live match, so it's clear the odds are the
@@ -29,17 +28,27 @@ export function MatchStatusLine({ state, className = "" }: { state: MatchState; 
         {label}
       </p>
       {!state.score && <p className="mt-0.5 text-xs text-muted-2">No live score available</p>}
-      {state.score && state.updatedAt && (
-        // Relative to the render clock, so it may differ by a minute between server and client.
+      {state.updatedAt && (
+        // Our own last-fetch time, not the match clock - we are NOT real-time. Relative to the
+        // render clock, so server and client may differ by a minute.
         <p className="mt-0.5 text-[11px] text-muted-2" suppressHydrationWarning>
-          {scoreUpdatedLabel(state.updatedAt)}
+          {updatedLabel(state.updatedAt)}
         </p>
       )}
     </div>
   );
 }
 
-function scoreUpdatedLabel(iso: string): string {
-  const ago = timeAgo(iso); // "just now" | "updated 3m ago" | ...
-  return ago === "just now" ? "score updated just now" : `score ${ago}`;
+export function updatedLabel(iso: string, now: number = Date.now()): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "Updated recently";
+  const min = Math.max(0, Math.round((now - t) / 60000));
+  if (min < 1) return "Updated just now";
+  if (min < 60) return `Updated ${min} min ago`;
+  return `Updated ${Math.round(min / 60)} h ago`;
+}
+
+// Shown on the match page while a match is live: the honest cadence, next to the score.
+export function ScoreCadenceNote() {
+  return <p className="text-xs text-muted-2">Scores update roughly every 10 minutes, not instantly.</p>;
 }

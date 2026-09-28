@@ -28,6 +28,8 @@ services:
         sync: false
       - key: ENABLE_API_FOOTBALL
         value: "false" # API-Football's terms give no licence to publish its data publicly - see DEPLOY.md
+      - key: ENABLE_ESPN
+        value: "false" # ESPN's public scoreboard is undocumented with no published terms - see DEPLOY.md
 
   - type: web
     name: kickcast-web

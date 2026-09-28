@@ -47,7 +47,7 @@ def poll_live_matches(session: Session) -> int:
     now = datetime.now(timezone.utc).isoformat()
     updated = 0
     for fx in fixtures:
-        m = find_match(candidates, fx)
+        m = find_match(session, candidates, fx)
         if m is None:
             continue
         state = session.get(LiveMatchState, m.id)

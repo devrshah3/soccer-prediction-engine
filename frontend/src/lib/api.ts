@@ -171,6 +171,10 @@ class ApiError extends Error {
 // distinct error the app-level boundary turns into "Waking up the server..." instead of a raw error.
 const REQUEST_TIMEOUT_MS = 8000;
 const REVALIDATE_SECONDS = 60;
+// Endpoints that carry scores/status: Next serves a stale entry once while it refreshes, so a long
+// window here made a page show "Live - no score" for a full cycle after the DB already had the
+// final result (seen 2026-09-28). Short window = the page is at most ~one refresh behind our DB.
+const LIVE_REVALIDATE_SECONDS = 10;
 const UNAVAILABLE_STATUSES = new Set([502, 503, 504]);
 
 class BackendUnavailableError extends Error {
@@ -180,11 +184,11 @@ class BackendUnavailableError extends Error {
   }
 }
 
-async function apiFetch<T>(path: string): Promise<T> {
+async function apiFetch<T>(path: string, revalidate: number = REVALIDATE_SECONDS): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {
-      next: { revalidate: REVALIDATE_SECONDS },
+      next: { revalidate },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch {
@@ -330,7 +334,7 @@ export const api = {
   // show "International break: club football resumes <date>" when nothing domestic falls
   // within the homepage's current window.
   nextDomesticFixtureDate: () => apiFetch<{ date: string | null }>("/fixtures/next-domestic-date"),
-  team: (id: string) => apiFetch<TeamDetail>(`/teams/${encodeURIComponent(id)}`),
+  team: (id: string) => apiFetch<TeamDetail>(`/teams/${encodeURIComponent(id)}`, LIVE_REVALIDATE_SECONDS),
   teamFixtures: (id: string, status: "scheduled" | "finished" | "all" = "all", limit = 100) =>
     apiFetch<Match[]>(`/teams/${encodeURIComponent(id)}/fixtures?status=${status}&limit=${limit}`),
   trophyOdds: (code: string, season?: string) =>
@@ -346,11 +350,11 @@ export const api = {
   // reached only via the "most recent day" link. The server never serves today or later.
   replayDay: (tzOffsetMinutes: number, date?: string) =>
     apiFetch<ReplayDay>(`/replay/day?tz=${tzOffsetMinutes}${date ? `&date=${encodeURIComponent(date)}` : ""}`),
-  match: (id: number) => apiFetch<MatchDetail>(`/matches/${id}`),
+  match: (id: number) => apiFetch<MatchDetail>(`/matches/${id}`, LIVE_REVALIDATE_SECONDS),
   // B.8: every match on a given local date, each scheduled one carrying its (precomputed
   // where possible) prediction plus long_range/date_may_change flags.
   matchesByDate: (date: string, league?: string) =>
-    apiFetch<MatchOnDate[]>(`/matches?date=${date}${league ? `&league=${encodeURIComponent(league)}` : ""}`),
+    apiFetch<MatchOnDate[]>(`/matches?date=${date}${league ? `&league=${encodeURIComponent(league)}` : ""}`, LIVE_REVALIDATE_SECONDS),
   // B.5/B.6: the nearest other date with matches - "forward" for automatic rollover,
   // "nearest" for an empty-date page's "go to the nearest date with matches" link.
   nearbyMatchDate: (date: string, direction: "forward" | "nearest" = "forward") =>

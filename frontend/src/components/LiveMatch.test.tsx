@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GoalEvent, Match } from "@/lib/api";
 import { MatchRow } from "./MatchRow";
+import { ScoreCadenceNote } from "./MatchStatusLine";
 
 const home = { id: "city", name: "Man City" };
 const away = { id: "united", name: "Man United" };
@@ -40,13 +41,38 @@ describe("live match goals", () => {
     expect(screen.getByText("1 – 0")).toBeTruthy();
     expect(screen.getByText("Live · 50'")).toBeTruthy();
     expect(within(screen.getByLabelText("Goals")).getAllByRole("listitem")).toHaveLength(1);
-    expect(screen.getByText("score updated 3m ago")).toBeTruthy();
+    expect(screen.getByText("Updated 3 min ago")).toBeTruthy();
 
     // next poll: a second goal has been scored
     rerender(<MatchRow match={match({ live: live(2), goal_events: [goals[0], goals[1]] })} />);
     expect(screen.getByText("2 – 0")).toBeTruthy();
     expect(within(screen.getByLabelText("Goals")).getAllByRole("listitem")).toHaveLength(2);
     expect(screen.getByText("67' Foden (pen)")).toBeTruthy();
+  });
+
+  it("shows 0 – 0 (not 'no score') when the source has reported a live 0-0 with no goals yet", () => {
+    render(<MatchRow match={match({ live: { match_status: "1H", minute: 20, home_score: 0, away_score: 0, updated_at: new Date(NOW.getTime() - 120000).toISOString() } })} />);
+    expect(screen.getByText("0 – 0")).toBeTruthy();
+    expect(screen.queryByText("No live score available")).toBeNull();
+    expect(screen.getByText("Updated 2 min ago")).toBeTruthy();
+    expect(screen.queryByLabelText("Goals")).toBeNull();
+  });
+
+  it("only says 'No live score available' when we have never had any data for the match", () => {
+    render(<MatchRow match={match({ live: null, home_goals: null, away_goals: null })} />);
+    expect(screen.getByText("No live score available")).toBeTruthy();
+    expect(screen.queryByText(/Updated/)).toBeNull();
+  });
+
+  it("a stored 0-0 from the results updater also counts as data", () => {
+    render(<MatchRow match={match({ home_goals: 0, away_goals: 0 })} />);
+    expect(screen.getByText("0 – 0")).toBeTruthy();
+    expect(screen.queryByText("No live score available")).toBeNull();
+  });
+
+  it("states the update cadence honestly on the match page", () => {
+    render(<ScoreCadenceNote />);
+    expect(screen.getByText("Scores update roughly every 10 minutes, not instantly.")).toBeTruthy();
   });
 
   it("keeps the pre-match bar while showing the live score", () => {

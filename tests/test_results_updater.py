@@ -101,7 +101,7 @@ def test_update_todays_results_ignores_a_match_it_cannot_confidently_map(session
         lambda s, d: [{
             "fixture_id": 1, "minute": 90, "match_status": "FT",
             "home_team_id": 555, "away_team_id": 556,
-            "home_team_name": "Alpha FC", "away_team_name": "Beta United",
+            "home_team_name": "Totally Different", "away_team_name": "Some Other Side",
             "home_score": 2, "away_score": 1, "events": [],
         }],
     )
@@ -243,3 +243,32 @@ def test_old_unresolved_dates_are_only_rechecked_every_six_hours(tmp_path, monke
     assert calls == ["2026-09-27"]
     results_updater.update_todays_results(s, now + timedelta(hours=6, minutes=1))
     assert len(calls) == 2
+
+
+@pytest.mark.parametrize(
+    ("team_id", "team_name", "provider_name"),
+    [
+        ("northern-ireland", "Northern Ireland", "Northern Ireland"),
+        ("bosnia-and-herzegovina", "Bosnia and Herzegovina", "Bosnia-Herzegovina"),
+        ("turkey", "Turkey", "T\u00fcrkiye"),
+        ("republic-of-ireland", "Republic of Ireland", "Republic of Ireland"),
+    ],
+)
+def test_multi_word_and_respelled_national_teams_match(tmp_path, team_id, team_name, provider_name):
+    """Regression: international team ids are slugs ('northern-ireland'); the matcher compared
+    them with space-separated canonical names, so every multi-word nation silently never matched."""
+    from kickcast_api.live.matching import find_match
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'm.db'}")
+    Base.metadata.create_all(engine)
+    s = sessionmaker(bind=engine)()
+    s.add(League(code="international", name="International", country="World", kind="international"))
+    s.add_all([Team(id=team_id, name=team_name, country=None), Team(id="hungary", name="Hungary", country=None)])
+    s.commit()
+    m = Match(league_code="international", season="2026-27", date=datetime(2026, 9, 28, tzinfo=timezone.utc).date(), kickoff="18:45",
+              home_team_id=team_id, away_team_id="hungary", home_goals=None, away_goals=None, status="scheduled",
+              round="NL", neutral=False, source="uefa", source_id="x")
+    s.add(m)
+    s.commit()
+    fx = {"home_team_name": provider_name, "away_team_name": "Hungary"}
+    assert find_match(s, [m], fx) is m

@@ -10,15 +10,17 @@ Two kinds:
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from .. import build, catchup, settings
 from ..db import SessionLocal
-from . import api_football
+from . import api_football, espn
 from .poller import POLL_INTERVAL_MINUTES, poll_live_matches
 from .results_updater import POLL_INTERVAL_MINUTES as RESULTS_POLL_INTERVAL_MINUTES
-from .results_updater import update_todays_results
+from .results_updater import update_results_from_espn, update_todays_results
 
 NIGHTLY_PRECOMPUTE_HOUR_UTC = 3  # low-traffic hour; the C.9 daily re-ingest should run before this
 
@@ -37,6 +39,14 @@ def _results_job() -> None:
     session = SessionLocal()
     try:
         update_todays_results(session)  # no-op outside a match window - see its own docstring
+    finally:
+        session.close()
+
+
+def _espn_job() -> None:
+    session = SessionLocal()
+    try:
+        update_results_from_espn(session)  # no-op outside a match window / catch-up need
     finally:
         session.close()
 
@@ -82,6 +92,11 @@ def start() -> BackgroundScheduler:
     if api_football.available():
         _scheduler.add_job(_job, "interval", minutes=POLL_INTERVAL_MINUTES, id="poll_live_matches")
         _scheduler.add_job(_results_job, "interval", minutes=RESULTS_POLL_INTERVAL_MINUTES, id="update_todays_results")
+    if espn.available():
+        # keyless second results source - works when API-Football's daily quota is spent
+        _scheduler.add_job(
+            _espn_job, "interval", minutes=RESULTS_POLL_INTERVAL_MINUTES, id="update_results_espn", next_run_time=datetime.now(timezone.utc)
+        )
     _scheduler.start()
     return _scheduler
 

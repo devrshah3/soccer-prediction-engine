@@ -147,8 +147,9 @@ async function CurrentSeasonView({
 
   const recentDates = [1, 2, 3].map((n) => isoDaysFromToday(-n));
   const recentByDate = await Promise.all(recentDates.map((d) => api.matchesByDate(d, code).catch(() => [] as MatchOnDate[])));
-  const recentResults = recentByDate
-    .flat()
+  // Once today has rolled over to the next matchday, today's own finished results move down here
+  // (already fetched above - no extra request) instead of vanishing until tomorrow.
+  const recentResults = [...(settled ? todaysMatches : []), ...recentByDate.flat()]
     .filter((m) => m.status === "finished")
     .sort((a, b) => `${b.date}${b.kickoff ?? ""}`.localeCompare(`${a.date}${a.kickoff ?? ""}`));
 

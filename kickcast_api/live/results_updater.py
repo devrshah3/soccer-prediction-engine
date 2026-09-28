@@ -15,6 +15,7 @@ plausibly need updating right now - not on every scheduler tick.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import or_
@@ -65,12 +66,13 @@ def _minutes_since_kickoff(m: Match, now: datetime) -> float | None:
 UNRESOLVED_STATUSES = ("scheduled", "not_played")  # ingest relabels a stale 'scheduled' row 'not_played'
 
 
-def dates_needing_check(session: Session, now: datetime) -> list[str]:
+def dates_needing_check(session: Session, now: datetime, last_calls: dict[str, datetime] | None = None) -> list[str]:
     """Dates worth one date-scoped API call right now: today if a match of ours is in its
     normal window; plus any of the last few days that still hold a match past kickoff that
     never got its final status (catch-up - covers a server that was down, an exhausted
     quota, or matches around midnight UTC). Catch-up asks are spaced per date so an
     unresolvable match (postponed, unmapped) can't drain the shared 100/day budget."""
+    last_calls = _last_date_call if last_calls is None else last_calls
     dates: list[str] = []
     today = now.date().isoformat()
     if in_match_window(session, now):
@@ -89,7 +91,7 @@ def dates_needing_check(session: Session, now: datetime) -> list[str]:
         if not ages:
             continue
         gap = LATE_CHECK_GAP_MINUTES if min(ages) < 12 * 60 else OLD_LATE_CHECK_GAP_MINUTES
-        last = _last_date_call.get(day)
+        last = last_calls.get(day)
         if last is None or (now - last).total_seconds() / 60 >= gap:
             dates.append(day)
     return dates
@@ -133,12 +135,36 @@ def update_todays_results(session: Session, now: datetime | None = None) -> int:
     return updated
 
 
+log = logging.getLogger("uvicorn.error")  # so scheduled-job activity shows in the server log
+
+_espn_last_date_call: dict[str, datetime] = {}
+
+
+def update_results_from_espn(session: Session, now: datetime | None = None) -> int:
+    """Same job as update_todays_results, from ESPN's keyless scoreboard - no daily quota, so it
+    is what keeps scores flowing when API-Football's 100/day is spent. Returns rows changed."""
+    from . import espn  # local: keeps the API-Football path importable without it
+
+    now = now or datetime.now(timezone.utc)
+    updated = 0
+    for day in dates_needing_check(session, now, _espn_last_date_call):
+        codes = {m.league_code for m in _todays_candidate_matches(session, day)}
+        fixtures = espn.fetch_fixtures(day, codes)
+        if fixtures is None:
+            continue
+        _espn_last_date_call[day] = now
+        changed = _apply_fixtures(session, day, fixtures, now)
+        log.info("results/espn: %s - %d fixtures from source, %d of our matches changed", day, len(fixtures), changed)
+        updated += changed
+    return updated
+
+
 def _apply_fixtures(session: Session, day: str, fixtures: list[dict], now: datetime) -> int:
     candidates = _todays_candidate_matches(session, day)
     now_iso = now.isoformat()
     updated = 0
     for fx in fixtures:
-        m = find_match(candidates, fx)
+        m = find_match(session, candidates, fx)
         if m is None:
             continue
         status = fx.get("match_status")
@@ -149,7 +175,8 @@ def _apply_fixtures(session: Session, day: str, fixtures: list[dict], now: datet
             m.home_goals = home_score
             m.away_goals = away_score
             changed = True
-            _fetch_final_events(session, m, fx)
+            if not fx.get("events_authoritative"):
+                _fetch_final_events(session, m, fx)
         elif status not in _FINISHED_CODES and (m.home_goals != home_score or m.away_goals != away_score) and home_score is not None:
             # still in progress, but a live score is available and differs - update the
             # score without marking finished yet.
@@ -157,16 +184,22 @@ def _apply_fixtures(session: Session, day: str, fixtures: list[dict], now: datet
             m.away_goals = away_score
             changed = True
 
+        source = fx.get("source") or "api-football-date-poll"
+        if fx.get("events_authoritative"):
+            # complete as of this poll (even an empty list = 0-0): replace what we hold, so a new
+            # goal appears - and a VAR-cancelled one disappears - on the very next poll.
+            sync_events(session, m, fx.get("events") or [], source=source)
+
         state = session.get(LiveMatchState, m.id)
         if state is None:
-            state = LiveMatchState(match_id=m.id, source="api-football-date-poll", match_status=status or "unknown")
+            state = LiveMatchState(match_id=m.id, source=source, match_status=status or "unknown")
             session.add(state)
         state.minute = fx.get("minute")
         state.home_score = home_score
         state.away_score = away_score
         state.match_status = status or "unknown"
         state.last_updated_at = now_iso
-        state.source = "api-football-date-poll"
+        state.source = source
 
         if changed:
             updated += 1
@@ -184,4 +217,4 @@ def _fetch_final_events(session: Session, m: Match, fx: dict) -> None:
         sync_events(session, m, events)
 
 
-__all__ = ["POLL_INTERVAL_MINUTES", "dates_needing_check", "in_match_window", "needs_result_check", "update_todays_results"]
+__all__ = ["POLL_INTERVAL_MINUTES", "dates_needing_check", "in_match_window", "needs_result_check", "update_results_from_espn", "update_todays_results"]

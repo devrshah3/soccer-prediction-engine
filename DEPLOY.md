@@ -57,6 +57,11 @@ in short:
   match center reports "not enabled on this deployment" and Historical Replay is shown
   instead. Set `ENABLE_API_FOOTBALL=true` explicitly if you've checked the terms for your
   own plan and are comfortable with them.
+- ESPN's public scoreboard (`kickcast_api/live/espn.py`) is the same story: an undocumented
+  endpoint with no published terms, used as a keyless second source for scores, scorers and
+  cards (it covers the Nations League, which nothing else we have does). It is on in
+  development and off in production (`ENABLE_ESPN=false`) - so a production deploy has no live
+  or same-day international scores until you enable it having weighed that yourself.
 
 ## Testing the build step locally before deploying
 
