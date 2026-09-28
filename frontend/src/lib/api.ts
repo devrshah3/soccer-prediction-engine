@@ -32,6 +32,14 @@ export type GoalEvent = { team_id: string; scorer: string; minute: number | null
 // matches.py), never present at all for a scheduled one.
 export type MatchDetail = Match & { goal_events?: GoalEvent[] };
 
+// GET /matches?date=... only - prediction/long_range/date_may_change are only present
+// for a scheduled match (see kickcast_api/routes/matches.py's matches_by_date).
+export type MatchOnDate = Match & {
+  prediction?: PredictionSummary | null;
+  long_range?: boolean;
+  date_may_change?: boolean;
+};
+
 export type StandingsRow = {
   team_id: string;
   team_name: string;
@@ -222,6 +230,14 @@ export const api = {
   replayMatches: () => apiFetch<{ source: string; matches: ReplayMatchSummary[] }>("/replay/matches"),
   replayMatch: (id: string) => apiFetch<ReplayMatch>(`/replay/matches/${encodeURIComponent(id)}`),
   match: (id: number) => apiFetch<MatchDetail>(`/matches/${id}`),
+  // B.8: every match on a given local date, each scheduled one carrying its (precomputed
+  // where possible) prediction plus long_range/date_may_change flags.
+  matchesByDate: (date: string, league?: string) =>
+    apiFetch<MatchOnDate[]>(`/matches?date=${date}${league ? `&league=${encodeURIComponent(league)}` : ""}`),
+  // B.5/B.6: the nearest other date with matches - "forward" for automatic rollover,
+  // "nearest" for an empty-date page's "go to the nearest date with matches" link.
+  nearbyMatchDate: (date: string, direction: "forward" | "nearest" = "forward") =>
+    apiFetch<{ date: string | null }>(`/matches/nearby-date?date=${date}&direction=${direction}`),
   prediction: (id: number) => apiFetch<Prediction | null>(`/matches/${id}/prediction`).catch((e) => {
     if (e instanceof ApiError && e.status === 503) return null;
     throw e;

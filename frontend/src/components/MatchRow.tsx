@@ -11,10 +11,14 @@ export function MatchRow({
   match,
   league,
   prediction,
+  longRange,
+  dateMayChange,
 }: {
   match: Match;
   league?: League;
   prediction?: PredictionSummary | null;
+  longRange?: boolean;
+  dateMayChange?: boolean;
 }) {
   const state = matchState(match);
   const showScore = state.kind === "finished";
@@ -77,6 +81,12 @@ export function MatchRow({
             {timeAgo(prediction.computed_at ?? prediction.as_of)} &middot; evidence {prediction.evidence} &middot;{" "}
             {prediction.model_version}
           </p>
+          {longRange && (
+            <p className="mt-1 text-[11px] text-muted-2">
+              Long-range: based on results up to {prediction.as_of}; team news and form can change.
+            </p>
+          )}
+          {dateMayChange && <p className="mt-1 text-[11px] text-warning">Date may change</p>}
         </div>
       )}
       {showPrediction && !prediction && (
