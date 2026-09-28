@@ -28,7 +28,8 @@ const PAGES = [
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
-const browser = await chromium.launch();
+// Real GPU (ANGLE/Metal) so the 3D ball is what gets captured; software GL would show the static one.
+const browser = await chromium.launch({ args: ["--use-angle=metal", "--ignore-gpu-blocklist"] });
 const problems = [];
 
 for (const [vpName, viewport] of Object.entries(VIEWPORTS)) {

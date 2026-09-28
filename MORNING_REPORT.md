@@ -639,3 +639,61 @@ Method page says the method does not clearly beat naive.
 pytest 196 passed / 1 skipped; ruff clean; mypy only the 5 stub errors; frontend lint + build clean;
 vitest 47/47. Both dev servers restarted (API :8000, frontend :3000).
 Re-run the screenshots: `cd frontend && node scripts/screenshots.mjs`.
+
+---
+
+## Session 6 - 2026-09-28: top nav, outcome colours, real 3D ball
+
+Commits: `82375a2` (1 nav), `dd27d25` (2 colours), `b806e90` (3 ball), plus the final QA commit.
+
+### 1. Top nav
+Logo chip | glass pill | search, sticky at `top-3`; active item is the blue lens with its label, the rest icon-only
+with aria-labels. At 375px: K mark only, icon-only lens, search collapses to an icon that expands on tap. Dock
+padding removed, `scroll-pt-24` added, league picker stays inside the Leagues page. **Measured:** after
+scrolling 900px the pill's top is still 12px at both 1440px and 375px, and `scrollWidth` == viewport.
+Found on the way: `overflow-x: hidden` on both `html` and `body` had made `body` a scroll container, so
+`position: sticky` never worked - even the old header was not sticky. Now `overflow-x: clip`.
+
+### 2. Outcome colours
+`--out-home-*` blue, `--out-draw-*` amber, `--out-away-*` rose (from/to/glow) - one place to change them, used by the single
+`ProbabilityBar` on home, date view, league, team, match and assistant cards. Leader = full brightness + glow;
+the other two at 0.72 opacity; a dot legend "Finland 52% . Draw 27% . Belarus 22%" under every bar, plus an
+aria-label on the bar. **Contrast, sampled from real screenshots (`frontend/scripts/contrast.mjs`):**
+min blue 3.85:1, amber 6.51:1, rose 4.36:1 (target 3:1 for non-text UI); leader segments >= 6.0:1. The first version
+(0.62 opacity) measured 3.10:1 for blue, so it was eased.
+
+### 3. Real-time 3D ball (three.js 0.186.1, MIT)
+True truncated icosahedron (12 pentagons + 20 hexagons, 60 vertices, 90 equal edges - unit tested), inflated
+panels, recessed seams, MeshPhysicalMaterial with procedural leather bump, clearcoat, navy embossed pentagons,
+RoomEnvironment reflections, cool key + blue rim light. Top-right, cropped, 0.05 rad/s, parallax, ~1.5px blur,
+vignette. **Guards:** dynamic import only at >=900px with reduced-motion off and Save-Data off; DPR <= 1.5; 30fps cap;
+paused when the tab is hidden, the ball is off screen or the page is scrolling; everything disposed on unmount;
+software rasterizers / WebGL failure -> static `frontend/public/scene/ball.webp` (28.6 KB, rendered from the same
+ball by `scripts/render-ball-fallback.mjs`), same position and blur. Old SVG ball and its animation deleted.
+**Measured (`frontend/scripts/measure-fps.mjs`, home page at 1440px, glass cards on, 6s of wheel scrolling,
+Apple M3 Pro via ANGLE/Metal):** 59.8 fps with the ball vs 59.9 without (0.1 fps cost); 59.7 fps under 4x CPU
+throttle. Without a GPU the ball first cost scrolling down to **19.9 fps** (below your 50fps line); freezing it while
+scrolling gave 38 fps; refusing software renderers (they get the static ball) gives 59.6 fps.
+**Added JS:** one chunk, 540 KB raw / 132 KB gzip. Verified on the production build: fetched only at >=900px with motion allowed;
+375px, 899px and reduced-motion visits fetch only ball.webp; `/dev/ball` (the capture page) is a 404 in production.
+Caveat: all fps numbers are from one machine (a fast GPU); I did not test a real low-end GPU.
+
+### Contrast over the ball (text, real backdrop)
+Method: hide all text, screenshot, sample the pixels behind each text run, compare with its computed colour.
+The ball region initially failed WCAG AA badly (team odds panel 1.07:1, "Method" 1.96:1, hub tiles 2.3:1). Fixed with a
+dense base under `.glass`/`.glass-row`, dense bases for the few controls in the top-right corner, a lighter `--accent-text`,
+`--danger-text` and muted tokens, and moving the ball further into the corner. **Now 0 text runs below AA (4.5:1 normal / 3:1 large) on
+home, team, match, leagues, league, replay and awards** (lowest 4.77:1 on awards).
+
+### Bugs found by looking/measuring this session
+- The page gradient on `body` painted over the fixed scene layer once `html` got a background last session, so the ball,
+  orbs and pitch lines were all invisible - moved the gradient to `html`.
+- `for path in ...` in my shell loops clobbered zsh's `$PATH` (a tooling slip, not product code).
+- The replay recap tests were not hermetic: `.env` is loaded at import, so with quota available they made real Gemini
+  calls and one failed intermittently. Gemini is now off by default in those tests (1.3s instead of 5.5s).
+
+### Checks
+pytest 196 passed / 1 skipped (Gemini live test skips on quota), ruff clean, mypy only the 5 pre-existing missing-stub errors
+(scipy, apscheduler), frontend lint + build clean, vitest 59/59, screenshots (20, 1.95 MB, `reports/screenshots/`) show
+no overlap between the top bar, ball, cards and assistant bubble at 1440px and 375px. Dev servers restarted (API :8000, web :3000).
+Re-run: `cd frontend && node scripts/screenshots.mjs`, `node scripts/contrast.mjs`, `node scripts/measure-fps.mjs`.

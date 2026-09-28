@@ -28,6 +28,14 @@ def _pred(home: float, draw: float, away: float) -> str:
     })
 
 
+@pytest.fixture(autouse=True)
+def _no_real_gemini(monkeypatch):
+    """kickcast_api loads .env at import, so a real GEMINI_API_KEY would make recap tests
+    call the live API (flaky, spends quota). Off by default; _enable_gemini turns it on
+    with a fake."""
+    monkeypatch.setattr(gemini_client, "available", lambda: False)
+
+
 @pytest.fixture
 def session(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'replay.db'}")
