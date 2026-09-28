@@ -182,6 +182,58 @@ def test_trophy_odds_unknown_league_404(client):
     assert client.get("/leagues/nope/trophy-odds").status_code == 404
 
 
+def test_next_match_cannot_diverge_from_the_upcoming_fixtures_list(tmp_path):
+    """Regression for a real bug: next_match used to be a separate ad-hoc query (status=
+    scheduled, date ascending, unbounded) that could disagree with the team's own fixtures
+    list - a stale/anomalous "scheduled" row sorted first for one but was already excluded
+    from the other. Reproduced with real production data: the Inter team page's "Next
+    match" hero showed a stale 2025 "Como vs Inter" row while the Upcoming list below it
+    (same status="scheduled" data) did not. Both now come from the exact same query, so
+    they cannot diverge - proven here with two scheduled matches for the same team, an
+    intentionally out-of-date-order one included, to make sure "first in the list" really
+    does mean "earliest by date", not just "whatever happens to be first"."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'test_next_match.db'}")
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine)
+    session = TestSession()
+    session.add(League(code="nm.1", name="NM League", country="Testland", kind="domestic_league"))
+    for i in range(4):
+        session.add(Team(id=f"nm-{i}", name=f"NM Club {i}", country="Testland"))
+    session.commit()
+
+    later = Match(
+        league_code="nm.1", season="2024-25", date=date(2026, 11, 20), kickoff=None,
+        home_team_id="nm-0", away_team_id="nm-1", home_goals=None, away_goals=None,
+        status="scheduled", round="Matchday 12", neutral=False,
+        source="synthetic", source_id="synthetic:later",
+    )
+    earlier = Match(
+        league_code="nm.1", season="2024-25", date=date(2026, 10, 3), kickoff=None,
+        home_team_id="nm-2", away_team_id="nm-0", home_goals=None, away_goals=None,
+        status="scheduled", round="Matchday 8", neutral=False,
+        source="synthetic", source_id="synthetic:earlier",
+    )
+    session.add(later)  # inserted out of date order on purpose
+    session.add(earlier)
+    session.commit()
+
+    def override():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_session] = override
+    try:
+        c = TestClient(app)
+        detail = c.get("/teams/nm-0").json()
+        fixtures = c.get("/teams/nm-0/fixtures?status=scheduled").json()
+        assert detail["next_match"]["id"] == fixtures[0]["id"] == earlier.id
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_prediction_includes_card_data_when_available(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'test_cards.db'}")
     Base.metadata.create_all(engine)

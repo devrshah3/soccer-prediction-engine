@@ -29,6 +29,21 @@ def _primary_league(session: Session, team_id: str) -> str | None:
     return row[0] if row else None
 
 
+def _team_matches(session: Session, team_id: str, status: str, limit: int) -> list[Match]:
+    """The single query behind both a team's fixtures list and its "next match" - the
+    latter used to be a separate ad-hoc query (status="scheduled", date ascending, no
+    limit) that could disagree with this one. It did: a stale "scheduled" row (see A2's
+    data cleanup) sorted before the real next match in that separate query but was
+    already excluded by the same status handling here once cleaned up. "Next match" is
+    now simply `_team_matches(..., "scheduled", 1)[0]` - the same list's first row, so
+    the two can never diverge again."""
+    q = session.query(Match).filter(or_(Match.home_team_id == team_id, Match.away_team_id == team_id))
+    if status != "all":
+        q = q.filter(Match.status == status)
+    order = Match.date.asc() if status == "scheduled" else Match.date.desc()
+    return q.order_by(order).limit(limit).all()
+
+
 @router.get("/{team_id}")
 def team_detail(team_id: str, session: Session = Depends(get_session)) -> dict:
     team = _get_team(session, team_id)
@@ -38,12 +53,8 @@ def team_detail(team_id: str, session: Session = Depends(get_session)) -> dict:
         season = latest_season(session, league_code)
         position = team_position(session, league_code, season, team_id) if season else None
 
-    next_match = (
-        session.query(Match)
-        .filter(or_(Match.home_team_id == team_id, Match.away_team_id == team_id), Match.status == "scheduled")
-        .order_by(Match.date.asc())
-        .first()
-    )
+    upcoming = _team_matches(session, team_id, "scheduled", limit=1)
+    next_match = upcoming[0] if upcoming else None
     recent_form = None
     if league_code and season:
         table = {row["team_id"]: row for row in standings(session, league_code, season)}
@@ -63,9 +74,5 @@ def team_fixtures(
     _get_team(session, team_id)
     if status not in ("scheduled", "finished", "all"):
         raise HTTPException(400, "status must be 'scheduled', 'finished', or 'all'")
-    q = session.query(Match).filter(or_(Match.home_team_id == team_id, Match.away_team_id == team_id))
-    if status != "all":
-        q = q.filter(Match.status == status)
-    order = Match.date.asc() if status == "scheduled" else Match.date.desc()
-    matches = q.order_by(order).limit(limit).all()
+    matches = _team_matches(session, team_id, status, limit)
     return [match_dict(session, m) for m in matches]
