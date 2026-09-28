@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { GoalTimeline } from "@/components/GoalList";
 import { KickoffTime } from "@/components/KickoffTime";
 import { MatchStatusLine } from "@/components/MatchStatusLine";
 import { ProbabilityBar } from "@/components/ProbabilityBar";
@@ -31,10 +32,12 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted">
-        {match.round} &middot; <KickoffTime date={match.date} kickoff={match.kickoff} />
+      <div className="text-sm text-muted">
+        <p>
+          {match.round} &middot; <KickoffTime date={match.date} kickoff={match.kickoff} />
+        </p>
         <MatchStatusLine state={state} className="mt-1" />
-      </p>
+      </div>
 
       <div className="flex flex-wrap items-center justify-center gap-4 glass px-4 py-8 sm:gap-6">
         <TeamLink id={match.home_team.id} name={match.home_team.name} />
@@ -162,25 +165,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
               <>Full time, score pending.</>
             )}
           </p>
-          {match.goal_events && match.goal_events.length > 0 ? (
-            <ul className="mt-3 space-y-1.5">
-              {match.goal_events.map((e, i) => (
-                <li key={i} className="flex gap-3 text-sm">
-                  <span className="w-9 shrink-0 tabular-nums text-muted-2">{e.minute != null ? `${e.minute}'` : ""}</span>
-                  <span className="text-foreground">
-                    {e.scorer}
-                    {e.own_goal ? " (own goal)" : e.penalty ? " (pen.)" : ""}
-                    {" "}&mdash;{" "}
-                    {e.team_id === match.home_team.id ? match.home_team.name : match.away_team.name}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-xs text-muted-2">
-              Goal scorers/minutes aren&apos;t on record for this match.
-            </p>
-          )}
+          <GoalTimeline goals={match.goal_events} home={match.home_team} away={match.away_team} />
           {prediction && (
             <p className="mt-4 border-t border-border pt-3 text-xs text-muted-2">
               Pre-match prediction: {match.home_team.name} {Math.round(prediction.probabilities.home * 100)}%, draw{" "}

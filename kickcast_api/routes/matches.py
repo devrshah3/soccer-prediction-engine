@@ -11,7 +11,8 @@ from kickcast_engine.models.goal_timing import goal_timing_windows
 from .. import domestic_scorers
 from ..cards import get_card_model
 from ..db import get_session
-from ..models import Goalscorer, Match
+from ..match_events import events_for_matches
+from ..models import Match
 from ..precompute import get_precomputed_prediction
 from ..predictions import get_model, get_model_computed_at
 from ..scorers import team_likely_scorers
@@ -52,9 +53,13 @@ def matches_by_date(date: str, league: str | None = None, session: Session = Dep
 
     today = datetime.now(UTC).date()
     days_out = (target_date - today).days
+    events = events_for_matches(session, matches)  # one batched query for the whole day
     out = []
     for m in matches:
         row = match_dict(session, m)
+        ev = events.get(m.id)
+        if ev and (m.status == "finished" or ev["goals"] or ev["cards"]):
+            row["goal_events"] = ev["goals"]
         if m.status == "scheduled":
             pred = get_precomputed_prediction(session, m.id)
             if pred is None:
@@ -115,26 +120,14 @@ def nearby_match_date(date: str, direction: str = "forward", session: Session = 
 def match_detail(match_id: int, session: Session = Depends(get_session)) -> dict:
     m = _get_match(session, match_id)
     result = match_dict(session, m)
-    if m.status == "finished":
-        # Only queried on the single-match detail endpoint, never in match_dict() itself
-        # (used by every list-returning endpoint) - a per-row Goalscorer query there would
-        # reintroduce the N+1 fan-out already fixed once for the homepage (see batch.py).
-        # Goalscorer.match_id is only populated for international matches (see
-        # scripts/ingest.py's ingest_goalscorers) - a domestic match honestly comes back
-        # with an empty list, never a guessed one.
-        events = (
-            session.query(Goalscorer)
-            .filter(Goalscorer.match_id == match_id)
-            .order_by(Goalscorer.minute.asc())
-            .all()
-        )
-        result["goal_events"] = [
-            {
-                "team_id": e.team_id, "scorer": e.scorer_name, "minute": e.minute,
-                "own_goal": e.own_goal, "penalty": e.penalty,
-            }
-            for e in events
-        ]
+    # Only on the single-match endpoint and the batched date list, never in match_dict() itself
+    # (used by every list endpoint) - a per-row query there would reintroduce the N+1 fan-out
+    # already fixed once for the homepage (see batch.py). Empty lists mean "no source has any":
+    # a domestic match never gets a guessed one.
+    ev = events_for_matches(session, [m]).get(m.id)
+    if ev is not None and (m.status == "finished" or ev["goals"] or ev["cards"]):  # nothing to say about a future fixture
+        result["goal_events"] = ev["goals"]
+        result["card_events"] = ev["cards"]
     return result
 
 

@@ -26,6 +26,9 @@ export type Match = {
   // Provider live state (API-Football poll) - present only for a not-yet-finished match we
   // have polled data for; see kickcast_api/serialize.py.
   live?: LiveInfo | null;
+  // Goals we have for a finished or in-progress match (kickcast_api/match_events.py); absent
+  // when no source has any - the UI then shows the score alone.
+  goal_events?: GoalEvent[];
 };
 
 export type LiveInfo = {
@@ -35,12 +38,13 @@ export type LiveInfo = {
   away_score: number | null;
 };
 
-export type GoalEvent = { team_id: string; scorer: string; minute: number | null; own_goal: boolean; penalty: boolean };
+// team_id is the team CREDITED with the goal (null if the source's team couldn't be resolved).
+export type GoalEvent = { team_id: string | null; scorer: string; minute: number | null; own_goal: boolean; penalty: boolean };
 
 // GET /matches/{id} only - goal_events is attached for a finished match (empty if we
 // genuinely have none on record, e.g. any domestic match - see kickcast_api/routes/
 // matches.py), never present at all for a scheduled one.
-export type MatchDetail = Match & { goal_events?: GoalEvent[] };
+export type MatchDetail = Match;
 
 // GET /matches?date=... only - prediction/long_range/date_may_change are only present
 // for a scheduled match (see kickcast_api/routes/matches.py's matches_by_date).

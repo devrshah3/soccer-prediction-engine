@@ -3,6 +3,7 @@ import type { League, Match, PredictionSummary } from "@/lib/api";
 import { matchState } from "@/lib/matchState";
 import { isPredictionStale } from "@/lib/predictionFreshness";
 import { MatchStatusLine, PRE_MATCH_CAPTION } from "./MatchStatusLine";
+import { GoalList } from "./GoalList";
 import { KickoffTime } from "./KickoffTime";
 import { LeagueChip } from "./LeagueChip";
 import { PredictionInfoPopover } from "./PredictionInfoPopover";
@@ -61,6 +62,13 @@ export function MatchRow({
         </div>
       </div>
 
+      {state.kind !== "scheduled" && (
+        <GoalList
+          goals={match.goal_events}
+          home={{ id: match.home_team.id, name: match.home_team.name }}
+          away={{ id: match.away_team.id, name: match.away_team.name }}
+        />
+      )}
       <MatchStatusLine state={state} className="mt-3" />
 
       {showPrediction && prediction && (
