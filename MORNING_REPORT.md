@@ -697,3 +697,64 @@ pytest 196 passed / 1 skipped (Gemini live test skips on quota), ruff clean, myp
 (scipy, apscheduler), frontend lint + build clean, vitest 59/59, screenshots (20, 1.95 MB, `reports/screenshots/`) show
 no overlap between the top bar, ball, cards and assistant bubble at 1440px and 375px. Dev servers restarted (API :8000, web :3000).
 Re-run: `cd frontend && node scripts/screenshots.mjs`, `node scripts/contrast.mjs`, `node scripts/measure-fps.mjs`.
+
+---
+
+## Session 7 - 2026-09-28: deployment prep finished + committed (4 commits)
+
+Picked up a prior session's uncommitted deployment-prep work (`kickcast_api/settings.py`,
+`build.py`, `catchup.py`, `artifacts.py`, `scripts/build_deploy.py`, `tests/test_deploy.py`,
+the frontend wake-retry/error-boundary changes, `requirements.txt`) plus two unrelated
+already-staged data files, verified everything against real checks, fixed what was actually
+broken, and committed all of it. Nothing was deployed, no accounts created, no screenshots
+taken (not asked for this session).
+
+### What was actually broken (found by running the checks, not assumed)
+- **`data/nations_league_2026_27_md5_6.json` and `data/uefa_teams.json` were referenced by
+  already-committed code** (`scripts/ingest.py`'s `NATIONS_LEAGUE_JSON_FILES`,
+  `scripts/backtest_international.py`) but never checked in - a fresh clone would have
+  silently skipped Matchdays 5-6 and crashed the international backtest. Committed them.
+- **`frontend/next build` failed for real**: `/leagues` (and, once that was fixed, every
+  other page that reads live backend data with no dynamic route param/searchParams) was
+  being statically prerendered at build time, which requires the backend to be reachable
+  *during the frontend's own build* - not guaranteed on a two-service deploy. Fixed by
+  adding `export const dynamic = "force-dynamic"` to `/`, `/leagues`, `/about`,
+  `/awards/method` (the four that had no other dynamic API forcing this already).
+- **2 real (non-stub) mypy errors**, pre-existing in already-committed code, not touched by
+  this session's diff until now: `assistant/entities.py`'s seen-set dedup idiom
+  (`func-returns-value`) and a variable-type conflict in `assistant/service.py`'s `ask()`
+  (reused `result` across two different-typed branches). Both fixed; mypy is back to only
+  the 5 pre-existing missing-stub errors (scipy, apscheduler) reported in every prior session.
+- **`kickcast_api/settings.py` documented CORS-limited-to-`FRONTEND_ORIGIN` and `/docs`
+  disabled in production, but `main.py` never actually read those functions** - CORS was
+  hardcoded to `localhost:3000` and `/docs` was always on. Would have shipped either broken
+  (frontend blocked by CORS) or with `/docs` exposed in production. Wired `main.py` to
+  `settings.frontend_origins()` and `settings.enable_docs()`.
+
+### Verified, not assumed
+- Read `.env`'s four real key values directly (not printed) and ran `git log --all -S<key>`
+  for each across full history: **zero hits for all four** - no key has ever been committed.
+- `.env` itself: not staged, and `git check-ignore -v .env` confirms `.gitignore` covers it.
+- `python scripts/build_deploy.py`'s two dependent modules (`kickcast_api.build`,
+  `kickcast_api.db`) import cleanly; the full build step itself was **not** run this session
+  (it makes real network calls against several providers' daily quotas - not run without
+  being asked).
+- `render.yaml` and `DEPLOY.md` have **not** been exercised against a real Render account -
+  said so explicitly in DEPLOY.md's "Known gaps" section rather than implying otherwise.
+
+### Explicitly NOT built (flagged in DEPLOY.md rather than guessed at)
+`settings.py` reads `ADMIN_TOKEN`, `RATE_LIMIT_PER_MINUTE`,
+`ASSISTANT_RATE_LIMIT_PER_MINUTE`/`_HOUR`, `TRUSTED_PROXY_HOPS`, `IP_HASH_SALT`,
+`GEMINI_PER_VISITOR_DAILY` and `MAX_QUESTION_CHARS`, but nothing in the API calls any of
+them yet - no rate-limiting middleware, no admin-authenticated recompute endpoint. Building
+that blind (no existing plumbing point, no spec for the admin endpoint's shape) risked
+guessing wrong more than it helped, so it's left as a named gap instead.
+
+### Checks at the end of this session
+pytest 277 passed / 1 skipped, ruff clean, mypy 5 pre-existing missing-stub errors only
+(scipy, apscheduler - same as every prior session), frontend lint clean, vitest 67/67,
+frontend `next build` clean (all live-data pages now render dynamically, none prerendered).
+
+### Commits
+`a680e4e` (missing data files), `6ef1ede` (backend deployment readiness), `873cf05`
+(frontend deployment readiness), `95ab723` (`render.yaml` + `DEPLOY.md`).
