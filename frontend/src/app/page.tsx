@@ -94,7 +94,7 @@ async function DefaultHomePage({ today, leagues }: { today: string; leagues: Map
   const todaySorted = [...todaysMatches].sort((a, b) => {
     const rank = (m: MatchOnDate) => {
       const s = matchState(m).kind;
-      return s === "in_progress" ? 0 : s === "finished" || s === "pending_result" ? 1 : 2;
+      return s === "live" ? 0 : s === "finished" ? 1 : 2;
     };
     return rank(a) - rank(b) || (a.kickoff ?? "").localeCompare(b.kickoff ?? "");
   });

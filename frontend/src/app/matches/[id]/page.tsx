@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { KickoffTime } from "@/components/KickoffTime";
+import { MatchStatusLine, PRE_MATCH_ODDS_LABEL } from "@/components/MatchStatusLine";
 import { ProbabilityBar } from "@/components/ProbabilityBar";
 import { TeamCrest } from "@/components/TeamCrest";
 import { api, ApiError } from "@/lib/api";
@@ -19,35 +20,31 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   if (!match) notFound();
 
   const state = matchState(match);
-  const needsPrediction = state.kind === "upcoming" || state.kind === "finished";
-  const prediction = needsPrediction
-    ? await api.prediction(matchId).catch((e) => {
-        // 503 = no validated model for this competition yet (e.g. Champions League -
-        // see kickcast_api/predictions.py's explicit guard) - real, expected, not a
-        // page error.
-        if (e instanceof ApiError && e.status === 503) return null;
-        throw e;
-      })
-    : null;
+  // Live keeps its (pre-match) prediction; finished shows it only as a footnote under the result.
+  const prediction = await api.prediction(matchId).catch((e) => {
+    // 503 = no validated model for this competition yet (e.g. Champions League -
+    // see kickcast_api/predictions.py's explicit guard) - real, expected, not a
+    // page error.
+    if (e instanceof ApiError && e.status === 503) return null;
+    throw e;
+  });
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted">
         {match.round} &middot; <KickoffTime date={match.date} kickoff={match.kickoff} />
-        {state.kind === "in_progress" && (
-          <span className="ml-2 inline-flex items-center gap-1.5 text-success">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
-            In progress &middot; updated {Math.max(0, Math.round(state.minutesSinceKickoff))}m ago
-          </span>
-        )}
-        {state.kind === "pending_result" && <span className="ml-2 text-muted-2">Full time, score pending</span>}
+        <MatchStatusLine state={state} className="ml-2 inline-flex" />
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-4 glass px-4 py-8 sm:gap-6">
         <TeamLink id={match.home_team.id} name={match.home_team.name} />
-        {state.kind === "finished" ? (
+        {state.kind === "finished" && state.score ? (
           <span className="shrink-0 text-3xl font-bold tabular-nums text-foreground">
-            {match.home_goals} &ndash; {match.away_goals}
+            {state.score.home} &ndash; {state.score.away}
+          </span>
+        ) : state.kind === "live" && state.score ? (
+          <span className="shrink-0 text-3xl font-bold tabular-nums text-foreground">
+            {state.score.home} &ndash; {state.score.away}
           </span>
         ) : (
           <span className="shrink-0 text-sm font-medium uppercase tracking-wide text-muted-2">vs</span>
@@ -55,9 +52,11 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         <TeamLink id={match.away_team.id} name={match.away_team.name} />
       </div>
 
-      {state.kind === "upcoming" && (
+      {state.kind !== "finished" && (
         <section className="glass p-5 sm:p-6">
-          <h2 className="mb-4 text-lg font-semibold text-foreground">Prediction</h2>
+          <h2 className="mb-4 text-lg font-semibold text-foreground">
+            {state.kind === "live" ? PRE_MATCH_ODDS_LABEL : "Prediction"}
+          </h2>
           {prediction ? (
             <>
               <div className="mx-auto max-w-md">
@@ -155,7 +154,11 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         <section className="glass p-5">
           <h2 className="mb-2 text-lg font-semibold text-foreground">Result</h2>
           <p className="text-sm text-muted">
-            Full time {match.home_goals} &ndash; {match.away_goals}.
+            {state.score ? (
+              <>Full time {state.score.home} &ndash; {state.score.away}.</>
+            ) : (
+              <>Full time, score pending.</>
+            )}
           </p>
           {match.goal_events && match.goal_events.length > 0 ? (
             <ul className="mt-3 space-y-1.5">

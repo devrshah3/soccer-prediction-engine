@@ -25,8 +25,8 @@ describe("isTodaySettled", () => {
     expect(isTodaySettled(matches, now)).toBe(true);
   });
 
-  it("is settled once every match is past the pending-result window even with no score", () => {
-    const now = new Date(`${DAY}T20:00:00Z`); // 8h after a 12:00 kickoff - well past 135 min
+  it("is settled once every match is past the 150-minute fallback even with no finished flag", () => {
+    const now = new Date(`${DAY}T20:00:00Z`); // 8h after a 12:00 kickoff - well past 150 min
     const matches = [{ status: "scheduled" as const, date: DAY, kickoff: "12:00" }];
     expect(isTodaySettled(matches, now)).toBe(true);
   });

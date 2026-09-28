@@ -2,11 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FormDots } from "@/components/FormDots";
 import { KickoffTime } from "@/components/KickoffTime";
+import { MatchStatusLine, PRE_MATCH_ODDS_LABEL } from "@/components/MatchStatusLine";
 import { ProbabilityBar } from "@/components/ProbabilityBar";
 import { Tabs } from "@/components/Tabs";
 import { TeamCrest } from "@/components/TeamCrest";
 import { api, ApiError } from "@/lib/api";
 import { nameForCode, slugForCode } from "@/lib/leagueSlugs";
+import { matchState } from "@/lib/matchState";
 
 export default async function TeamPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: rawId } = await params;
@@ -26,6 +28,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
     team.next_match ? api.prediction(team.next_match.id) : Promise.resolve(null),
     team.league_code ? api.trophyOdds(team.league_code, team.season ?? undefined) : Promise.resolve(null),
   ]);
+  const nextState = team.next_match ? matchState(team.next_match) : null;
   const teamOdds = trophyOdds?.teams.find((t) => t.team_id === id);
 
   return (
@@ -62,7 +65,9 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
 
       {team.next_match && (
         <section>
-          <h2 className="mb-3 text-lg font-semibold text-foreground">Next match</h2>
+          <h2 className="mb-3 text-lg font-semibold text-foreground">
+            {nextState?.kind === "finished" ? "Latest match" : nextState?.kind === "live" ? "Live now" : "Next match"}
+          </h2>
           <div className="glass p-5">
             <p className="mb-3 text-sm text-muted">
               {team.next_match.round} &middot;{" "}
@@ -72,13 +77,23 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
               <span className="flex items-center gap-2">
                 <TeamCrest name={team.next_match.home_team.name} /> {team.next_match.home_team.name}
               </span>
-              <span className="shrink-0 text-sm text-muted-2">vs</span>
+              {nextState?.kind === "finished" && nextState.score ? (
+                <span className="shrink-0 text-lg font-bold tabular-nums">
+                  {nextState.score.home} &ndash; {nextState.score.away}
+                </span>
+              ) : (
+                <span className="shrink-0 text-sm text-muted-2">vs</span>
+              )}
               <span className="flex items-center gap-2">
                 {team.next_match.away_team.name} <TeamCrest name={team.next_match.away_team.name} />
               </span>
             </p>
-            {nextPrediction ? (
+            {nextState && <MatchStatusLine state={nextState} className="mb-3 justify-center" />}
+            {nextState?.kind === "finished" ? null : nextPrediction ? (
               <>
+                {nextState?.kind === "live" && (
+                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-2">{PRE_MATCH_ODDS_LABEL}</p>
+                )}
                 <ProbabilityBar
                   size="lg"
                   home={nextPrediction.probabilities.home}

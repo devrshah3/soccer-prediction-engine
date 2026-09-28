@@ -23,6 +23,16 @@ export type Match = {
   away_goals: number | null;
   neutral: boolean;
   source: string;
+  // Provider live state (API-Football poll) - present only for a not-yet-finished match we
+  // have polled data for; see kickcast_api/serialize.py.
+  live?: LiveInfo | null;
+};
+
+export type LiveInfo = {
+  match_status: string; // API-Football code: "1H" / "HT" / "2H" / "FT" ...
+  minute: number | null;
+  home_score: number | null;
+  away_score: number | null;
 };
 
 export type GoalEvent = { team_id: string; scorer: string; minute: number | null; own_goal: boolean; penalty: boolean };

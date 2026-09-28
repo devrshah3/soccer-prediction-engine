@@ -8,11 +8,28 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from .models import Match, Team
+from .models import LiveMatchState, Match, Team
 
 
 def team_names(session: Session, team_ids: set[str]) -> dict[str, str]:
     return {t.id: t.name for t in session.query(Team).filter(Team.id.in_(team_ids))}
+
+
+def _live_info(session: Session, m: Match) -> dict | None:
+    """Provider live state for a not-yet-finished match, only if the poller has written
+    one (needs API_FOOTBALL_KEY) - otherwise None, and the frontend falls back to elapsed
+    time since kickoff rather than inventing a live flag or score."""
+    if m.status == "finished":
+        return None
+    state = session.get(LiveMatchState, m.id)
+    if state is None:
+        return None
+    return {
+        "match_status": state.match_status,
+        "minute": state.minute,
+        "home_score": state.home_score,
+        "away_score": state.away_score,
+    }
 
 
 def match_dict(session: Session, m: Match) -> dict:
@@ -31,6 +48,7 @@ def match_dict(session: Session, m: Match) -> dict:
         "away_goals": m.away_goals,
         "neutral": m.neutral,
         "source": m.source,
+        "live": _live_info(session, m),
     }
 
 
