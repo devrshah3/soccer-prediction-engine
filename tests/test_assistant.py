@@ -497,6 +497,67 @@ def test_video_questions_never_touch_wikipedia_or_gemini(session, monkeypatch):
         assert not any(src.get("type") == "wikipedia" for src in result["sources"])
 
 
+def _video_env(monkeypatch, status, video=None):
+    seen = []
+    monkeypatch.setattr(service.wikipedia, "lookup", _boom)
+    monkeypatch.setattr(service.gemini_client, "available", lambda: False)
+
+    def fake(sess, match):
+        seen.append(match)
+        return {"status": status, "video": video, "channel": "UEFA"}
+
+    monkeypatch.setattr(service.youtube, "find_match_highlight", fake)
+    return seen
+
+
+VIDEO = {"title": "Ridgeway United v Rovers 1 | Highlights", "channel": "UEFA", "url": "https://www.youtube.com/watch?v=xyz", "published_at": "2024-08-01T20:00:00Z"}
+
+
+def test_highlights_use_the_latest_finished_match_from_our_records(session, monkeypatch):
+    seen = _video_env(monkeypatch, "found", VIDEO)
+    # the question names the teams in the opposite order to the record - irrelevant, the record decides
+    result = service.ask(session, "Give em the most recent match highlights of Rovers 1 vs Ridgeway United")
+    assert len(seen) == 1
+    m = seen[0]
+    assert {m.home_team_id, m.away_team_id} == {"team-0", "team-1"} and m.status == "finished"
+    assert result["text"].startswith("Ridgeway United ")  # the record's home side and score, then the date
+    latest = max(
+        (x for x in session.query(Match).filter(Match.status == "finished") if {x.home_team_id, x.away_team_id} == {"team-0", "team-1"}),
+        key=lambda x: x.date,
+    )
+    assert m.id == latest.id  # the most RECENT meeting, not just any
+    assert latest.date.strftime("%b") in result["text"] and str(latest.date.year) in result["text"]
+    assert "https://www.youtube.com/watch?v=xyz" in result["text"]
+    assert [x["type"] for x in result["sources"]] == ["kickcast_match", "youtube"]
+
+
+@pytest.mark.parametrize(
+    ("status", "phrase"),
+    [
+        ("none", "No verified official highlights link was found for that match."),
+        ("no_channel", "I don't have a verified official highlights link for that match."),
+        ("no_key", "I don't have a verified official highlights link for that match."),
+        ("quota", "allowance for checking YouTube"),
+        ("error", "couldn't reach YouTube"),
+    ],
+)
+def test_highlights_without_a_validated_link_say_so_honestly(session, monkeypatch, status, phrase):
+    _video_env(monkeypatch, status)
+    result = service.ask(session, "highlights of Ridgeway United vs Rovers 1")
+    assert phrase in result["text"]
+    assert "youtube.com" not in result["text"]
+    assert all(src["type"] != "youtube" for src in result["sources"])
+
+
+def test_highlights_with_no_finished_match_and_with_no_team(session, monkeypatch):
+    seen = _video_env(monkeypatch, "found", VIDEO)
+    session.add(Team(id="newcomers", name="Newcomers United"))
+    session.commit()
+    assert "don't have a finished match on record" in service.ask(session, "highlights of Newcomers United")["text"]
+    assert "Which match do you mean?" in service.ask(session, "A video link I wanna watch the highlights")["text"]
+    assert seen == []  # nothing searched without a match record
+
+
 def test_db_intents_never_touch_wikipedia(session, monkeypatch):
     monkeypatch.setattr(service.wikipedia, "lookup", _boom)
     monkeypatch.setattr(service.gemini_client, "available", lambda: False)

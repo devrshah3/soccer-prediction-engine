@@ -105,10 +105,13 @@ def find_teams(session: Session, question: str, limit: int = 2) -> list[dict]:
     return [{"id": tid, "name": name} for tid, (_, name) in ordered[:limit]]
 
 
-def team_title_aliases(session: Session, team_id: str) -> list[str]:
-    """Every normalised way a video title might name this team."""
-    variants = team_variants(session).get(team_id)
-    return variants[1] if variants else [normalize(team_id)]
+def team_title_variants(session: Session, team_id: str) -> list[str]:
+    """Every normalised way a video title might name this team. Deliberately excludes the bare
+    team id ("madrid"), which would also match "Atletico Madrid"."""
+    team = session.get(Team, team_id)
+    names = {normalize(team.name)} if team else set()
+    names |= {normalize(a) for a in TEAM_ALIASES.get(team_id, ())}
+    return sorted(n for n in names if n)
 
 
 def find_competitions(question: str) -> list[str]:

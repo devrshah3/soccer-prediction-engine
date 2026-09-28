@@ -17,13 +17,15 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import requests
 from sqlalchemy.orm import Session
 
-from ..models import YoutubeSearchCache
+from ..models import Match, YoutubeSearchCache
+from ..serialize import team_names
 from . import quota
+from .entities import contains_phrase, normalize, team_title_variants
 
 SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 
@@ -75,54 +77,108 @@ def official_channel_ids() -> dict[str, str]:
     return channels
 
 
-def find_official_highlight(session: Session, query: str, channel: str | None = None) -> dict | None:
-    """Cached by (query, channel) - a repeated lookup never costs quota twice. A cached
-    "no result found" is stored too (as null), so a query we already know fails doesn't
-    get re-searched either."""
+# competition (league code) -> name of the verified official channel that publishes its highlights.
+# The UEFA channel covers the Champions League and UEFA Nations League / European qualifiers only;
+# other international matches (friendlies, other confederations, the World Cup) have NO verified
+# channel configured, so they honestly get "no verified link".
+COMPETITION_CHANNELS: dict[str, str] = {
+    "en.1": "Premier League", "es.1": "LaLiga", "it.1": "Serie A", "de.1": "Bundesliga",
+    "fr.1": "Ligue 1", "CL": "UEFA",
+}
+MAX_DAYS_FROM_MATCH = 3
+NEGATIVE_TTL = timedelta(hours=6)  # a "nothing found" is re-searched sooner than a hit (highlights get uploaded late)
+
+
+def channel_name_for(match: Match) -> str | None:
+    if match.league_code in COMPETITION_CHANNELS:
+        return COMPETITION_CHANNELS[match.league_code]
+    if match.league_code == "international" and "UEFA" in (match.round or "").upper():
+        return "UEFA"
+    return None
+
+
+def _title_names_both_teams(session: Session, title: str, match: Match) -> bool:
+    text = normalize(title)
+    return all(
+        any(contains_phrase(text, v) for v in team_title_variants(session, team_id))
+        for team_id in (match.home_team_id, match.away_team_id)
+    )
+
+
+def _published_within_window(published_at: str, match: Match) -> bool:
+    try:
+        published = datetime.fromisoformat(published_at.replace("Z", "+00:00")).date()
+    except ValueError:
+        return False
+    return abs((published - match.date).days) <= MAX_DAYS_FROM_MATCH
+
+
+def validate_candidate(session: Session, item: dict, match: Match, allowed_channel_ids: set[str]) -> dict | None:
+    """Accept a search hit ONLY if: the channel is on the allowlist, the title names both teams
+    (known aliases allowed) and it was published within MAX_DAYS_FROM_MATCH days of the match."""
+    snippet = item.get("snippet", {})
+    video_id = item.get("id", {}).get("videoId")
+    if not video_id or snippet.get("channelId") not in allowed_channel_ids:
+        return None
+    if not _title_names_both_teams(session, snippet.get("title", ""), match):
+        return None
+    if not _published_within_window(snippet.get("publishedAt", ""), match):
+        return None
+    return {
+        "title": snippet["title"], "channel": snippet.get("channelTitle", ""),
+        "url": f"https://www.youtube.com/watch?v={video_id}", "published_at": snippet["publishedAt"],
+    }
+
+
+def find_match_highlight(session: Session, match: Match) -> dict:
+    """Official highlights for ONE of our own match records. The query comes from the record (team
+    names, date, competition), never from the user's words. Returns {"status", "video", "channel"}
+    with status: found | none (searched, nothing acceptable) | no_channel (no verified channel for
+    this competition) | no_key | quota | error."""
+    channel_name = channel_name_for(match)
+    channels = official_channel_ids()
+    if channel_name is None or channel_name not in channels:
+        return {"status": "no_channel", "video": None, "channel": channel_name}
     api_key = os.environ.get("YOUTUBE_API_KEY")
     if not api_key:
-        return None
+        return {"status": "no_key", "video": None, "channel": channel_name}
 
-    key = _cache_key(query, channel)
+    key = _cache_key(f"match:{match.id}", channel_name)
     cached = session.get(YoutubeSearchCache, key)
     if cached is not None:
-        result: dict | None = json.loads(cached.result_json)
-        return result
+        video: dict | None = json.loads(cached.result_json)
+        if video is not None:
+            return {"status": "found", "video": video, "channel": channel_name}
+        age = datetime.now(timezone.utc) - datetime.fromisoformat(cached.created_at)
+        if age < NEGATIVE_TTL:
+            return {"status": "none", "video": None, "channel": channel_name}
 
     if quota.youtube_quota_remaining(session) <= 0:
-        return None
+        return {"status": "quota", "video": None, "channel": channel_name}
 
+    names = team_names(session, {match.home_team_id, match.away_team_id})
     params: dict[str, str | int] = {
-        "key": api_key, "part": "snippet", "q": query, "type": "video",
-        "maxResults": 3, "order": "date",
+        "key": api_key, "part": "snippet", "type": "video", "maxResults": 10,
+        "q": f"{names.get(match.home_team_id, match.home_team_id)} {names.get(match.away_team_id, match.away_team_id)} highlights",
+        "channelId": channels[channel_name],
+        "publishedAfter": f"{(match.date - timedelta(days=1)).isoformat()}T00:00:00Z",
+        "publishedBefore": f"{(match.date + timedelta(days=MAX_DAYS_FROM_MATCH + 1)).isoformat()}T00:00:00Z",
     }
-    channels = official_channel_ids()
-    if channel and channel in channels:
-        params["channelId"] = channels[channel]
-
     try:
         resp = requests.get(SEARCH_URL, params=params, timeout=10)
         quota.record_youtube_call(session)
         resp.raise_for_status()
         items = resp.json().get("items", [])
     except requests.RequestException:
-        return None  # transient failure - don't cache, worth retrying later
+        return {"status": "error", "video": None, "channel": channel_name}  # transient: not cached
 
-    result = None
-    video_id = (items[0].get("id", {}) if items else {}).get("videoId")
-    if items and video_id:
-        video = items[0]
-        result = {
-            "title": video["snippet"]["title"],
-            "channel": video["snippet"]["channelTitle"],
-            "url": f"https://www.youtube.com/watch?v={video_id}",
-            "published_at": video["snippet"]["publishedAt"],
-        }
-    session.add(
-        YoutubeSearchCache(
-            query_hash=key, query=query, channel=channel,
-            result_json=json.dumps(result), created_at=datetime.now(timezone.utc).isoformat(),
-        )
-    )
+    allowed = set(channels.values())
+    accepted = [v for v in (validate_candidate(session, i, match, allowed) for i in items) if v]
+    accepted.sort(key=lambda v: "highlight" not in v["title"].lower())  # prefer titles that say so
+    video = accepted[0] if accepted else None
+    row = cached or YoutubeSearchCache(query_hash=key, query=f"match:{match.id}", channel=channel_name, result_json="null", created_at="")
+    row.result_json = json.dumps(video)
+    row.created_at = datetime.now(timezone.utc).isoformat()
+    session.add(row)
     session.commit()
-    return result
+    return {"status": "found" if video else "none", "video": video, "channel": channel_name}

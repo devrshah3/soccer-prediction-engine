@@ -17,9 +17,13 @@ from __future__ import annotations
 
 import hashlib
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from . import cache, fallback, gemini_client, quota, text_format, wikipedia
+from ..models import League, Match
+from ..serialize import match_dict
+from . import cache, fallback, gemini_client, quota, text_format, wikipedia, youtube
+from .entities import find_teams
 from .intent import DB_INTENTS, Intent, classify
 
 AI_PAUSED_NOTE = " (AI phrasing paused for today.)"
@@ -130,10 +134,57 @@ def _plain(text: str, sources: list[dict] | None = None, mode: str = "db") -> di
     return {"text": text_format.strip_markdown(text), "sources": sources or [], "mode": mode, "cached": False}
 
 
+def _latest_finished_match(session: Session, team_ids: list[str]) -> Match | None:
+    """The most recent finished match between the two teams (or, given one team, that team's)."""
+    q = session.query(Match).filter(Match.status == "finished")
+    if len(team_ids) >= 2:
+        a, b = team_ids[0], team_ids[1]
+        q = q.filter(
+            or_(
+                (Match.home_team_id == a) & (Match.away_team_id == b),
+                (Match.home_team_id == b) & (Match.away_team_id == a),
+            )
+        )
+    else:
+        q = q.filter(or_(Match.home_team_id == team_ids[0], Match.away_team_id == team_ids[0]))
+    return q.order_by(Match.date.desc(), Match.kickoff.desc()).first()
+
+
 def _video_answer(session: Session, question: str) -> dict:
-    """Video/highlights questions never touch Wikipedia or Gemini - only our own match record
-    and the official-channel YouTube search."""
-    return _plain(NO_VERIFIED_LINK)
+    """Video/highlights questions never touch Wikipedia or Gemini. The match comes from OUR
+    records (the latest finished one for the named teams), the search is built from that record,
+    and only a validated official-channel video is ever offered."""
+    teams = find_teams(session, question)
+    if not teams:
+        return _plain(fallback.ASK_WHICH_MATCH)
+    match = _latest_finished_match(session, [t["id"] for t in teams])
+    if match is None:
+        names = " and ".join(t["name"] for t in teams)
+        return _plain(f"I don't have a finished match on record for {names}, so there are no highlights to look for.")
+
+    m = match_dict(session, match)
+    league = session.get(League, match.league_code)
+    when = match.date.strftime("%a %b %d, %Y").replace(" 0", " ")
+    head = (
+        f"{m['home_team']['name']} {m['home_goals']}-{m['away_goals']} {m['away_team']['name']}, {when}"
+        + (f" ({league.name})" if league else "")
+        + "."
+    )
+    sources: list[dict] = [{"type": "kickcast_match", "data": m}]
+
+    found = youtube.find_match_highlight(session, match)
+    status = found["status"]
+    if status == "found":
+        video = found["video"]
+        sources.append({"type": "youtube", "title": video["title"], "url": video["url"], "channel": video["channel"]})
+        return _plain(f"{head} Official highlights ({video['channel']}): {video['title']} - {video['url']}", sources)
+    if status == "none":
+        return _plain(f"{head} No verified official highlights link was found for that match.", sources)
+    if status == "quota":
+        return _plain(f"{head} I've used today's allowance for checking YouTube, so I can't look for a link right now.", sources)
+    if status == "error":
+        return _plain(f"{head} I couldn't reach YouTube just now, so I can't offer a link.", sources)
+    return _plain(f"{head} {NO_VERIFIED_LINK}", sources)  # no verified channel / no API key
 
 
 def ask(session: Session, question: str) -> dict:
