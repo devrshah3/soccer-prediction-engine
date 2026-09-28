@@ -72,6 +72,45 @@ def matches_by_date(date: str, league: str | None = None, session: Session = Dep
     return out
 
 
+@router.get("/nearby-date")
+def nearby_match_date(date: str, direction: str = "forward", session: Session = Depends(get_session)) -> dict:
+    """The nearest OTHER date (not `date` itself) with at least one match on record.
+    direction="forward" (B.5's automatic rollover: the next date with matches, tomorrow
+    or the next matchday) only looks ahead. direction="nearest" (B.6's empty-date
+    recovery link) looks both ways and returns whichever is closer."""
+    try:
+        target = date_module.fromisoformat(date)
+    except ValueError:
+        raise HTTPException(400, "date must be YYYY-MM-DD") from None
+    if direction not in ("forward", "nearest"):
+        raise HTTPException(400, "direction must be 'forward' or 'nearest'")
+
+    forward_row = (
+        session.query(Match.date)
+        .filter(Match.date > target, Match.status.in_(["scheduled", "finished"]))
+        .order_by(Match.date.asc())
+        .first()
+    )
+    if direction == "forward":
+        return {"date": forward_row[0].isoformat() if forward_row else None}
+
+    backward_row = (
+        session.query(Match.date)
+        .filter(Match.date < target, Match.status.in_(["scheduled", "finished"]))
+        .order_by(Match.date.desc())
+        .first()
+    )
+    candidates = []
+    if forward_row:
+        candidates.append((abs((forward_row[0] - target).days), forward_row[0]))
+    if backward_row:
+        candidates.append((abs((target - backward_row[0]).days), backward_row[0]))
+    if not candidates:
+        return {"date": None}
+    candidates.sort(key=lambda c: c[0])
+    return {"date": candidates[0][1].isoformat()}
+
+
 @router.get("/{match_id}")
 def match_detail(match_id: int, session: Session = Depends(get_session)) -> dict:
     m = _get_match(session, match_id)

@@ -12,12 +12,15 @@ export type MatchState =
 // vs UTC now - no viewer-timezone dependency, so this is safe to compute on the server
 // without a hydration mismatch (unlike KickoffTime's local-time display, which needs the
 // client).
-export function matchState(match: Pick<Match, "status" | "date" | "kickoff">): MatchState {
+// `now` is injectable (defaults to the real clock) so rollover.ts's logic - and its own
+// tests - can exercise "before first kickoff"/"mid-day"/"after the last match" without
+// waiting on the real clock.
+export function matchState(match: Pick<Match, "status" | "date" | "kickoff">, now: Date = new Date()): MatchState {
   if (match.status === "finished") return { kind: "finished" };
   if (!match.kickoff) return { kind: "upcoming" }; // no kickoff time on record - can't compute elapsed
   const kickoffMs = new Date(`${match.date}T${match.kickoff}:00Z`).getTime();
   if (Number.isNaN(kickoffMs)) return { kind: "upcoming" };
-  const minutesSinceKickoff = (Date.now() - kickoffMs) / 60000;
+  const minutesSinceKickoff = (now.getTime() - kickoffMs) / 60000;
   if (minutesSinceKickoff < 0) return { kind: "upcoming" };
   if (minutesSinceKickoff < IN_PROGRESS_WINDOW_MINUTES) return { kind: "in_progress", minutesSinceKickoff };
   return { kind: "pending_result" };

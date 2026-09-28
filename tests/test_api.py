@@ -207,6 +207,31 @@ def test_matches_by_date_empty_date_returns_empty_list(client):
     assert client.get("/matches?date=2099-01-01").json() == []
 
 
+def test_nearby_date_forward_finds_the_next_date_with_matches(client):
+    # Fixture has finished matches every 7 days starting 2024-08-01, plus a scheduled one
+    # on 2024-09-12 - from 2024-08-02, forward should land on 2024-08-08.
+    r = client.get("/matches/nearby-date?date=2024-08-02&direction=forward")
+    assert r.status_code == 200
+    assert r.json()["date"] == "2024-08-08"
+
+
+def test_nearby_date_forward_null_past_the_last_known_match(client):
+    r = client.get("/matches/nearby-date?date=2024-09-13&direction=forward")
+    assert r.json()["date"] is None
+
+
+def test_nearby_date_nearest_prefers_the_closer_side(client):
+    # From 2024-08-02: backward candidate is 2024-08-01 (1 day), forward is 2024-08-08
+    # (6 days) - nearest must pick the closer one.
+    r = client.get("/matches/nearby-date?date=2024-08-02&direction=nearest")
+    assert r.json()["date"] == "2024-08-01"
+
+
+def test_nearby_date_rejects_bad_input(client):
+    assert client.get("/matches/nearby-date?date=not-a-date").status_code == 400
+    assert client.get("/matches/nearby-date?date=2024-08-02&direction=sideways").status_code == 400
+
+
 def test_matches_by_date_attaches_precomputed_prediction_and_flags(tmp_path):
     """B.8: a scheduled match inside the window gets its stored prediction attached, with
     long_range/date_may_change set from real day-counts, not guessed. A match just added
