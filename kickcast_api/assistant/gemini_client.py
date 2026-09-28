@@ -76,6 +76,14 @@ def available() -> bool:
     return bool(os.environ.get("GEMINI_API_KEY"))
 
 
+def gemini_for_lookups_enabled() -> bool:
+    """B3: ASSISTANT_GEMINI_FOR_LOOKUPS (default true) - lets a simple DB lookup (next
+    match, last result, table position, prediction) be phrased by Gemini instead of a
+    plain template (B1). Set to false to save quota when it's tight; the plain template
+    is always the fallback regardless, so turning this off never breaks an answer."""
+    return os.environ.get("ASSISTANT_GEMINI_FOR_LOOKUPS", "true").strip().lower() not in ("false", "0", "no")
+
+
 def ask_gemini(session: Session, question: str) -> dict | None:
     """Returns {"text", "sources", "used_search"} or None if unavailable/quota-exhausted/
     errored (callers must fall back to the DB-only path in that case, never silently
@@ -133,11 +141,14 @@ def ask_gemini(session: Session, question: str) -> dict | None:
 
 
 def ask_gemini_with_context(session: Session, question: str, context: str, context_label: str) -> dict | None:
-    """Answer using ONLY the given text (e.g. a Wikipedia extract) as grounding - the
-    real substitute for Search grounding on this key (see module docstring). The system
-    instruction is explicit: answer only from the provided context, say so and stop if
-    the context doesn't contain the answer, never fall back to unaided parametric
-    knowledge presented as fact."""
+    """Answer using ONLY the given text (e.g. a Wikipedia extract, or the plain-language
+    DB facts fallback.answer() gathers - see service.py's hybrid path, B1) as grounding -
+    the real substitute for Search grounding on this key (see module docstring). The
+    system instruction is explicit: answer only from the provided context, say so and
+    stop if the context doesn't contain the answer, never fall back to unaided parametric
+    knowledge presented as fact. May add ONE brief observation drawn from the context
+    itself (e.g. an opponent's form, if it's in there) - never a new fact, scorer, date,
+    result, or link that isn't already written in the context."""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         return None
@@ -146,10 +157,14 @@ def ask_gemini_with_context(session: Session, question: str, context: str, conte
 
     client = genai.Client(api_key=api_key)
     prompt = (
-        f"Using ONLY the {context_label} text below, answer the question. Be specific "
-        "(exact minutes, names, scores) where the text supports it. If the text does not "
-        "contain the answer, say plainly that you don't know from this source - do not "
-        f"use outside knowledge.\n\n--- {context_label} ---\n{context}\n--- end ---\n\n"
+        f"Using ONLY the {context_label} text below, answer the question in natural, "
+        "concise plain text (no Markdown). Be specific (exact minutes, names, scores) "
+        "where the text supports it. You may add ONE brief, genuinely useful observation "
+        "if the text below already contains it (e.g. an opponent's recent form, or our "
+        "model's prediction) - but never state a scorer, date, result, or link that is "
+        "not written in the text below. If the text does not contain the answer, say "
+        "plainly that you don't know from this source - do not use outside knowledge.\n\n"
+        f"--- {context_label} ---\n{context}\n--- end ---\n\n"
         f"Question: {question}"
     )
     try:

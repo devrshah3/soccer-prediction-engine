@@ -1,12 +1,21 @@
-"""Top-level assistant orchestration: cache -> Gemini (DB tools first; for what the
-tools couldn't answer, Google Search grounding if it's ever available on this key, else
-Wikipedia - see gemini_client.py's module docstring for why Search grounding is
-currently inert) -> DB-only fallback. Also attaches a real official-channel YouTube
-highlight link when the question asks for one. This is the only entry point
-routes/assistant.py should call.
+"""Top-level assistant orchestration (B1-B5 in MORNING_REPORT.md): DB facts first (or
+Wikipedia for anything that isn't a plain lookup), then - quota and config permitting -
+Gemini phrases those facts into a natural answer with at most one grounded extra
+observation. Gemini is never allowed to state a fact we didn't already look up ourselves.
+If Gemini is disabled, unavailable, or the call fails, the plain DB template (or the raw
+Wikipedia extract + link) is used instead, with a note that AI phrasing is paused. This is
+the only entry point routes/assistant.py should call.
+
+Modes returned: "db" (DB facts, plain template - no Gemini), "gemini+db" (DB facts phrased
+by Gemini, or the older DB-tools-plus-reasoning path for a question that isn't a plain
+lookup), "wikipedia+gemini" (Wikipedia facts phrased by Gemini), "fallback" (nothing
+matched a lookup shape and Wikipedia had nothing usable either, or a Wikipedia extract is
+shown as-is because Gemini couldn't phrase it).
 """
 
 from __future__ import annotations
+
+import hashlib
 
 from sqlalchemy.orm import Session
 
@@ -19,6 +28,8 @@ _CHANNEL_HINTS = (
     ("la liga", "LaLiga"), ("laliga", "LaLiga"), ("serie a", "Serie A"),
     ("bundesliga", "Bundesliga"), ("ligue 1", "Ligue 1"),
 )
+
+AI_PAUSED_NOTE = " (AI phrasing paused for today.)"
 
 
 def _all_tools_missed(sources: list[dict]) -> bool:
@@ -46,23 +57,6 @@ def _looks_like_decline(text: str) -> bool:
     return any(p in t for p in _DECLINE_PHRASES)
 
 
-def _try_wikipedia(session: Session, question: str) -> dict | None:
-    """Real substitute for Search grounding: look the question up on Wikipedia, then
-    have Gemini answer strictly from that extract (never from its own unaided
-    knowledge). Returns None if Wikipedia has nothing, or if Gemini's grounded call
-    fails - callers must not fabricate an answer in either case."""
-    wiki = wikipedia.lookup(session, question)
-    if wiki is None or not wiki.get("found"):
-        return None
-    grounded = gemini_client.ask_gemini_with_context(
-        session, question, wiki["extract"], f"Wikipedia article: {wiki['title']}"
-    )
-    if grounded is None:
-        return None
-    sources = [{"type": "wikipedia", "title": wiki["title"], "url": wiki["url"], "license": wiki["source"]}]
-    return {"text": grounded["text"], "sources": sources, "used_search": False}
-
-
 def _guess_channel(text: str) -> str | None:
     t = text.lower()
     for hint, channel in _CHANNEL_HINTS:
@@ -86,35 +80,109 @@ def _maybe_attach_video(session: Session, question: str, result: dict) -> dict:
     return {**result, "sources": [*result["sources"], {"type": "youtube", **video}]}
 
 
+def _fact_cache_key(question: str, facts: str) -> str:
+    """Content-addressed: the key is the question PLUS the exact facts it was answered
+    from, so if the underlying data changes (a match gets rescheduled, a new result comes
+    in), fallback.answer()/wikipedia.lookup() naturally produce different facts text next
+    time - a different key, a fresh cache miss, no explicit invalidation needed."""
+    return hashlib.sha256(f"{question.strip().lower()}\x00{facts}".encode()).hexdigest()
+
+
+def _gemini_lookup_ready() -> bool:
+    return gemini_client.gemini_for_lookups_enabled() and gemini_client.available()
+
+
+def _db_lookup_answer(session: Session, question: str, fb: dict) -> dict:
+    """B1: fb["facts"] is a plain-language write-up of exactly what fallback.answer()
+    looked up - handed to Gemini as strict grounding (it may phrase it naturally and add
+    at most one observation already present in the facts, e.g. the opponent's form or our
+    prediction, but must never state anything beyond them). Falls back to the plain
+    template - B2 - if Gemini is disabled, unavailable, or the call fails."""
+    facts, plain_text, sources = fb["facts"], fb["text"], fb["sources"]
+    if not facts or not _gemini_lookup_ready():
+        return {"text": text_format.strip_markdown(plain_text), "sources": sources, "mode": "db", "cached": False}
+
+    cache_key = _fact_cache_key(question, facts)
+    cached = cache.get_cached(session, cache_key)
+    if cached is not None:
+        return {**cached, "cached": True}
+
+    composed = gemini_client.ask_gemini_with_context(session, question, facts, "KickCast database facts")
+    if composed is not None and not _looks_like_decline(composed["text"]):
+        answer = {"text": text_format.strip_markdown(composed["text"]), "sources": sources, "mode": "gemini+db"}
+        answer = _maybe_attach_video(session, question, answer)
+        cache.set_cached(session, cache_key, answer)
+        return {**answer, "cached": False}
+
+    # composed is None (quota exhausted or the call failed) - Gemini WAS expected to run,
+    # so this is B2's "paused" case, not a silent fallback.
+    return {"text": text_format.strip_markdown(plain_text + AI_PAUSED_NOTE), "sources": sources, "mode": "db", "cached": False}
+
+
+def _wikipedia_answer(session: Session, question: str, wiki: dict) -> dict | None:
+    """Returns None specifically when Gemini looked at this Wikipedia article and
+    concluded it doesn't answer the question (a search-relevance miss, not a real "nothing
+    exists" - see wikipedia.py's stopword-stripping note) - callers should treat that as
+    "Wikipedia had nothing usable" and fall through to the broader reasoning path, not
+    surface a decline sourced from the wrong article."""
+    sources = [{"type": "wikipedia", "title": wiki["title"], "url": wiki["url"], "license": wiki["source"]}]
+    facts = f"Wikipedia article: {wiki['title']}\n\n{wiki['extract']}"
+    plain_text = f"From Wikipedia ({wiki['title']}): {wiki['extract'][:1000]}\n\nSource: {wiki['url']}"
+
+    if not _gemini_lookup_ready():
+        # B2: no AI available/enabled at all - show the extract + link directly, no
+        # "paused" note (nothing was interrupted; this is simply how it's configured).
+        return {"text": text_format.strip_markdown(plain_text), "sources": sources, "mode": "fallback", "cached": False}
+
+    cache_key = _fact_cache_key(question, facts)
+    cached = cache.get_cached(session, cache_key)
+    if cached is not None:
+        return {**cached, "cached": True}
+
+    composed = gemini_client.ask_gemini_with_context(session, question, facts, f"Wikipedia article: {wiki['title']}")
+    if composed is None:
+        return {"text": text_format.strip_markdown(plain_text + AI_PAUSED_NOTE), "sources": sources, "mode": "fallback", "cached": False}
+    if _looks_like_decline(composed["text"]):
+        return None
+
+    answer = {"text": text_format.strip_markdown(composed["text"]), "sources": sources, "mode": "wikipedia+gemini"}
+    answer = _maybe_attach_video(session, question, answer)
+    cache.set_cached(session, cache_key, answer)
+    return {**answer, "cached": False}
+
+
 def ask(session: Session, question: str) -> dict:
     question = question.strip()
     if not question:
         return {"text": "Ask me something about a team, fixture, table, or prediction.", "sources": [], "mode": "invalid", "cached": False}
 
-    cached = cache.get_cached(session, question)
-    if cached is not None:
-        return {**cached, "cached": True}
-
-    # Route pure DB lookups (next match, last result, table position, head-to-head
-    # prediction) straight to the DB with zero Gemini calls: an LLM would just call the
-    # same tools.py functions to produce the exact same fact, at the cost of real quota.
+    # 1. A plain DB lookup (next match, last result, table position, head-to-head
+    # prediction): get the facts from our own tools first, always.
     if fallback.is_simple_lookup(session, question):
         fb = fallback.answer(session, question)
-        return {"text": text_format.strip_markdown(fb["text"]), "sources": fb["sources"], "mode": "db_lookup", "cached": False}
+        if not fb["found"]:
+            # Nothing to phrase - an honest "not on record" is already the whole answer,
+            # and spending a Gemini call to rephrase "I don't have that" adds no value.
+            return {"text": text_format.strip_markdown(fb["text"]), "sources": fb["sources"], "mode": "db", "cached": False}
+        return _db_lookup_answer(session, question, fb)
 
+    # 2. Not a plain lookup: try Wikipedia facts (free, no quota) before any Gemini call -
+    # DB -> Wikipedia -> Gemini, in that order (see MORNING_REPORT.md's prior session,
+    # which found this backwards and fixed the ordering).
+    wiki = wikipedia.lookup(session, question)
+    if wiki is not None and wiki.get("found"):
+        wiki_answer = _wikipedia_answer(session, question, wiki)
+        if wiki_answer is not None:
+            return wiki_answer
+        # else: wrong/irrelevant article for this question - fall through below.
+
+    # 3. Genuine open-ended reasoning (e.g. "who is the best young player right now") -
+    # the DB-tools-plus-reasoning path. Cached by the raw question (no separate "facts"
+    # exist for this path - it's whatever Gemini's own tool-calling turns up).
     if gemini_client.available():
-        # DB -> Wikipedia -> Gemini: for everything that isn't a simple lookup (write-ups,
-        # historical context, "how did X happen"), try the free Wikipedia source BEFORE
-        # spending a Gemini tool-calling round trip that our narrow DB tools can't answer
-        # anyway. Only treated as final if it didn't come back a decline (a generic/
-        # opinion question can hit a wrong or empty Wikipedia article; in that case fall
-        # through to Gemini's own reasoning below instead of surfacing a bad decline).
-        wiki = _try_wikipedia(session, question)
-        if wiki is not None and not _looks_like_decline(wiki["text"]):
-            answer = _maybe_attach_video(session, question, wiki)
-            answer = {"text": text_format.strip_markdown(answer["text"]), "sources": answer["sources"], "mode": "gemini"}
-            cache.set_cached(session, question, answer)
-            return {**answer, "cached": False}
+        cached = cache.get_cached(session, question)
+        if cached is not None:
+            return {**cached, "cached": True}
 
         result = gemini_client.ask_gemini(session, question)
         if result is not None:
@@ -123,9 +191,9 @@ def ask(session: Session, question: str) -> dict:
                 if outside_db is not None:
                     result = outside_db
             result = _maybe_attach_video(session, question, result)
-            answer = {"text": text_format.strip_markdown(result["text"]), "sources": result["sources"], "mode": "gemini"}
+            answer = {"text": text_format.strip_markdown(result["text"]), "sources": result["sources"], "mode": "gemini+db"}
             cache.set_cached(session, question, answer)  # only Gemini answers are cached - they cost quota
             return {**answer, "cached": False}
 
     fb = fallback.answer(session, question)
-    return {"text": text_format.strip_markdown(fb["text"]), "sources": fb["sources"], "mode": "db_fallback", "cached": False}
+    return {"text": text_format.strip_markdown(fb["text"]), "sources": fb["sources"], "mode": "fallback", "cached": False}

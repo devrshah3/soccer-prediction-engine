@@ -94,13 +94,42 @@ def is_simple_lookup(session: Session, question: str) -> bool:
     return has_table
 
 
+def _next_match_facts(session: Session, session_team: dict, m: dict) -> str:
+    """The base "next match" fact, plus a couple of cheap, genuinely useful extras
+    (opponent's recent form, our model's prediction) using the SAME tool calls the
+    Gemini function-calling path would use - gathered once here instead, so a hybrid
+    Gemini-phrased answer (B1) has real material for "a short useful extra" without
+    Gemini ever being allowed to invent one itself."""
+    lines = [
+        f"{session_team['name']}'s next match: {m['home_team']['name']} vs {m['away_team']['name']} "
+        f"on {m['date']}" + (f" ({m['round']})" if m["round"] else "") + "."
+    ]
+    opponent = m["away_team"] if m["home_team"]["id"] == session_team["id"] else m["home_team"]
+    pos = tools.team_league_position(session, opponent["id"])
+    if pos["found"] and pos.get("form"):
+        lines.append(f"{opponent['name']}'s recent form (last 5, oldest first): {' '.join(pos['form'])}.")
+    pred = tools.match_prediction_lookup(session, m["home_team"]["id"], m["away_team"]["id"])
+    if pred["found"]:
+        p = pred["prediction"]["probabilities"]
+        lines.append(
+            f"Our model's prediction for this match: {m['home_team']['name']} {p['home']:.0%} to win, "
+            f"draw {p['draw']:.0%}, {m['away_team']['name']} {p['away']:.0%} to win "
+            f"(evidence tier {pred['prediction']['evidence']})."
+        )
+    return " ".join(lines)
+
+
 def answer(session: Session, question: str) -> dict:
+    """Returns {"text", "sources", "found", "facts"}. "facts" is a plain-language,
+    complete write-up of everything actually retrieved (never more than that) - safe to
+    hand an LLM as strict grounding (see gemini_client.compose_from_facts): it must
+    never state anything beyond what's written here."""
     q = question.lower()
     teams = _mentioned_teams(session, question)
 
     other_year = _references_other_season(question)
     if other_year is not None:
-        return {"text": _DECLINE_SPECIFIC_YEAR.format(year=other_year), "sources": [], "found": False}
+        return {"text": _DECLINE_SPECIFIC_YEAR.format(year=other_year), "sources": [], "found": False, "facts": None}
 
     if any(w in q for w in _PREDICT_WORDS) and len(teams) == 2:
         r = tools.match_prediction_lookup(session, teams[0]["id"], teams[1]["id"])
@@ -111,8 +140,14 @@ def answer(session: Session, question: str) -> dict:
                 f"and {teams[1]['name']} {p['away']:.0%} (as of {r['prediction']['as_of']}, "
                 f"evidence tier {r['prediction']['evidence']}). Not a promise of accuracy."
             )
-            return {"text": text, "sources": [{"type": "kickcast_prediction", "data": r}], "found": True}
-        return {"text": f"I don't have enough data to predict that matchup: {r['reason']}.", "sources": [], "found": False}
+            facts = (
+                f"Matchup: {teams[0]['name']} vs {teams[1]['name']}. Our model's prediction: "
+                f"{teams[0]['name']} {p['home']:.0%}, draw {p['draw']:.0%}, {teams[1]['name']} {p['away']:.0%} "
+                f"(evidence tier {r['prediction']['evidence']}, as of {r['prediction']['as_of']})."
+            )
+            return {"text": text, "sources": [{"type": "kickcast_prediction", "data": r}], "found": True, "facts": facts}
+        text = f"I don't have enough data to predict that matchup: {r['reason']}."
+        return {"text": text, "sources": [], "found": False, "facts": text}
 
     if any(w in q for w in _NEXT_WORDS) and teams:
         r = tools.team_next_match(session, teams[0]["id"])
@@ -122,35 +157,45 @@ def answer(session: Session, question: str) -> dict:
                 f"{m['home_team']['name']} vs {m['away_team']['name']} on {m['date']}"
                 + (f" ({m['round']})" if m["round"] else "") + "."
             )
-            return {"text": text, "sources": [{"type": "kickcast_match", "data": m}], "found": True}
-        return {"text": f"I don't have a scheduled next match for {teams[0]['name']} in our database.", "sources": [], "found": False}
+            facts = _next_match_facts(session, teams[0], m)
+            return {"text": text, "sources": [{"type": "kickcast_match", "data": m}], "found": True, "facts": facts}
+        text = f"I don't have a scheduled next match for {teams[0]['name']} in our database."
+        return {"text": text, "sources": [], "found": False, "facts": text}
 
     if any(w in q for w in _RESULT_WORDS) and teams:
         r = tools.team_recent_results(session, teams[0]["id"], limit=1)
         if r["found"]:
             m = r["matches"][0]
             text = f"{m['home_team']['name']} {m['home_goals']} - {m['away_goals']} {m['away_team']['name']} ({m['date']})."
-            return {"text": text, "sources": [{"type": "kickcast_match", "data": m}], "found": True}
-        return {"text": f"I don't have a finished match on record for {teams[0]['name']}.", "sources": [], "found": False}
+            facts = f"{teams[0]['name']}'s most recent finished match: {text}"
+            return {"text": text, "sources": [{"type": "kickcast_match", "data": m}], "found": True, "facts": facts}
+        text = f"I don't have a finished match on record for {teams[0]['name']}."
+        return {"text": text, "sources": [], "found": False, "facts": text}
 
     if any(w in q for w in _TABLE_WORDS):
         if teams:
             r = tools.team_league_position(session, teams[0]["id"])
             if r["found"]:
                 text = f"{teams[0]['name']} are {r['position']}{_ordinal(r['position'])} in {r['league_code']} ({r['season']}) with {r['pts']} points."
-                return {"text": text, "sources": [{"type": "kickcast_standings", "data": r}], "found": True}
-        return {
-            "text": "I couldn't tell which league or team you mean - try naming a specific team, "
-                    "or check the league standings page directly.",
-            "sources": [], "found": False,
-        }
+                facts = (
+                    f"{teams[0]['name']} standing: position {r['position']} in {r['league_code']} ({r['season']}), "
+                    f"{r['pts']} points, played {r['played']}"
+                    + (f", recent form (last 5, oldest first): {' '.join(r['form'])}" if r.get("form") else "")
+                    + "."
+                )
+                return {"text": text, "sources": [{"type": "kickcast_standings", "data": r}], "found": True, "facts": facts}
+        text = (
+            "I couldn't tell which league or team you mean - try naming a specific team, "
+            "or check the league standings page directly."
+        )
+        return {"text": text, "sources": [], "found": False, "facts": None}
 
-    return {
-        "text": "I can only answer from our own database right now (no AI assistant configured/available) - "
-                "try asking about a specific team's next match, last result, league position, or a head-to-head "
-                "prediction, naming the team(s) by name.",
-        "sources": [], "found": False,
-    }
+    text = (
+        "I can only answer from our own database right now (no AI assistant configured/available) - "
+        "try asking about a specific team's next match, last result, league position, or a head-to-head "
+        "prediction, naming the team(s) by name."
+    )
+    return {"text": text, "sources": [], "found": False, "facts": None}
 
 
 def _ordinal(n: int) -> str:

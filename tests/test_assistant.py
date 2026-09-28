@@ -195,23 +195,104 @@ def test_quota_decrements_and_records(session):
 # ---------------------------------------------------------------- service.py orchestration
 
 
-def test_service_routes_simple_lookup_to_db_with_zero_gemini_calls(session, monkeypatch):
-    """The core Issue 2.2 fix: a recognized DB-lookup question skips Gemini entirely -
-    proven here by making gemini_client.available() blow up if it's even checked."""
+def test_service_hybrid_phrases_a_db_lookup_with_gemini_using_only_given_facts(session, monkeypatch):
+    """B1: a recognized DB-lookup question is now phrased by Gemini (when available/
+    enabled), grounded strictly on the facts fallback.answer() already looked up -
+    verified here by asserting the exact facts string reaches ask_gemini_with_context,
+    and that ask_gemini (the free-form tool-calling path) is never touched for it."""
+    seen = {}
 
-    def _must_not_be_called():
-        raise AssertionError("gemini_client.available() should not even be checked for a simple lookup")
+    def fake_context(sess, question, context, label):
+        seen["context"] = context
+        seen["label"] = label
+        return {"text": "Ridgeway United host Rovers 1 next.", "used_search": False}
 
-    monkeypatch.setattr(service.gemini_client, "available", _must_not_be_called)
+    def _must_not_be_called(sess, question):
+        raise AssertionError("ask_gemini (tool-calling) should not run for a plain DB lookup")
+
+    monkeypatch.setattr(service.gemini_client, "available", lambda: True)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini_with_context", fake_context)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini", _must_not_be_called)
+
     result = service.ask(session, "When does Ridgeway United play next?")
-    assert result["mode"] == "db_lookup"
+    assert result["mode"] == "gemini+db"
+    assert result["text"] == "Ridgeway United host Rovers 1 next."
+    assert "Ridgeway United's next match" in seen["context"]
+    assert seen["label"] == "KickCast database facts"
+
+
+def test_service_db_lookup_falls_back_to_plain_template_when_gemini_disabled_for_lookups(session, monkeypatch):
+    """B3: ASSISTANT_GEMINI_FOR_LOOKUPS=false must skip Gemini for a lookup even though a
+    key is configured and available - mode "db", plain template, no "paused" note (this
+    is an intentional setting, not an outage)."""
+
+    def _must_not_be_called(*a, **k):
+        raise AssertionError("Gemini must not be called when ASSISTANT_GEMINI_FOR_LOOKUPS=false")
+
+    monkeypatch.setenv("ASSISTANT_GEMINI_FOR_LOOKUPS", "false")
+    monkeypatch.setattr(service.gemini_client, "available", lambda: True)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini_with_context", _must_not_be_called)
+
+    result = service.ask(session, "When does Ridgeway United play next?")
+    assert result["mode"] == "db"
     assert "Ridgeway United" in result["text"]
+    assert "paused" not in result["text"].lower()
 
 
-def test_service_uses_db_fallback_when_no_gemini_key_and_question_is_unrecognized(session, monkeypatch):
+def test_service_db_lookup_shows_paused_note_when_gemini_call_fails(session, monkeypatch):
+    """B2: Gemini is enabled and available but the call itself fails (or quota is
+    exhausted - ask_gemini_with_context returns None either way) - answer from the plain
+    template, with the "AI phrasing paused" note, mode stays "db"."""
+    monkeypatch.setattr(service.gemini_client, "available", lambda: True)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini_with_context", lambda *a, **k: None)
+
+    result = service.ask(session, "When does Ridgeway United play next?")
+    assert result["mode"] == "db"
+    assert "Ridgeway United" in result["text"]
+    assert "AI phrasing paused for today" in result["text"]
+
+
+def test_service_db_lookup_answer_is_cached_by_question_plus_facts(session, monkeypatch):
+    """B1: repeat questions cost no further Gemini calls - and the cache key includes the
+    facts, so it naturally invalidates if the underlying data (and therefore the facts
+    string) ever changes, with no explicit invalidation step needed."""
+    calls = {"n": 0}
+
+    def fake_context(sess, question, context, label):
+        calls["n"] += 1
+        return {"text": "Ridgeway United host Rovers 1 next.", "used_search": False}
+
+    monkeypatch.setattr(service.gemini_client, "available", lambda: True)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini_with_context", fake_context)
+
+    r1 = service.ask(session, "When does Ridgeway United play next?")
+    r2 = service.ask(session, "When does Ridgeway United play next?")
+    assert calls["n"] == 1
+    assert r1["text"] == r2["text"]
+    assert r1["cached"] is False and r2["cached"] is True
+
+
+def test_service_skips_gemini_for_a_not_found_lookup(session, monkeypatch):
+    """A recognized lookup shape with nothing on record (team-7 is never scheduled) is
+    already a complete, honest answer - no Gemini call is worth spending on rephrasing
+    "I don't have that"."""
+
+    def _must_not_be_called(*a, **k):
+        raise AssertionError("Gemini should not be called for a not-found lookup")
+
+    monkeypatch.setattr(service.gemini_client, "available", lambda: True)
+    monkeypatch.setattr(service.gemini_client, "ask_gemini_with_context", _must_not_be_called)
+
+    result = service.ask(session, "When does Rovers 7 play next?")
+    assert result["mode"] == "db"
+    assert "don't have a scheduled next match" in result["text"]
+
+
+def test_service_uses_fallback_mode_when_no_gemini_key_and_question_is_unrecognized(session, monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setattr(service.wikipedia, "lookup", lambda s, q: None)  # Wikipedia also has nothing
     result = service.ask(session, "What's the meaning of life?")
-    assert result["mode"] == "db_fallback"
+    assert result["mode"] == "fallback"
 
 
 def test_service_never_fabricates_when_gemini_and_search_both_miss(session, monkeypatch):
@@ -238,7 +319,7 @@ def test_service_never_fabricates_when_gemini_and_search_both_miss(session, monk
     monkeypatch.setattr(service.wikipedia, "lookup", lambda s, q: None)  # simulates: Wikipedia also has nothing
 
     result = service.ask(session, "What happened in a match that doesn't exist?")
-    assert result["mode"] == "gemini"
+    assert result["mode"] == "gemini+db"
     assert "don't have" in result["text"] or "couldn't find" in result["text"]
     assert not any(w in result["text"].lower() for w in ("scored", "final score was", "the result was"))
 
@@ -288,7 +369,7 @@ def test_service_tries_wikipedia_before_gemini_tool_calling(session, monkeypatch
     monkeypatch.setattr(service.gemini_client, "ask_gemini_with_context", fake_context)
 
     result = service.ask(session, "Who won the 2016 Champions League final?")
-    assert result["mode"] == "gemini"
+    assert result["mode"] == "wikipedia+gemini"
     assert result["text"] == "Real Madrid won on penalties, per the Wikipedia article."
     assert "**" not in result["text"]  # markdown stripped
     wiki_sources = [s for s in result["sources"] if s["type"] == "wikipedia"]
