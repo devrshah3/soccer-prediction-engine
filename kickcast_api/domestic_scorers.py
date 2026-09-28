@@ -37,6 +37,8 @@ from pathlib import Path
 from kickcast_engine.data.api_football_crosswalk import crosswalk_id
 from kickcast_engine.models.goalscorers import likely_scorers
 
+from . import settings
+
 CACHE_DIR = Path(__file__).resolve().parents[1] / "data" / "api_football_cache"
 SEASON_LABEL = "2024-25"  # API-Football's season=2024
 SOURCE = "API-Football (free tier, 2024-25 season - most recent this plan can access)"
@@ -78,6 +80,8 @@ def _clean_entries(league_code: str) -> list[dict]:
 
 
 def available(league_code: str) -> bool:
+    if not settings.enable_api_football():  # public build: provider terms don't clear public display
+        return False
     return league_code in LEAGUE_CACHE_NAMES and (CACHE_DIR / f"topscorers_{LEAGUE_CACHE_NAMES[league_code]}.json").exists()
 
 

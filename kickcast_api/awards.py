@@ -23,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from . import domestic_scorers, golden_boot_projection
+from . import artifacts, domestic_scorers, golden_boot_projection, settings
 from .models import Goalscorer, Team
 from .serialize import latest_season
 
@@ -68,12 +68,22 @@ def _final_domestic_golden_boot(league_code: str) -> dict:
     }
 
 
+def golden_boot_payload_key(league_code: str) -> str:
+    return f"golden_boot:{league_code}"
+
+
 def golden_boot_for_league(session: Session, league_code: str, season: str) -> dict:
     """Never silently substitutes a different season - a season either has real data
     (current, live; or the one past season we have a real cache for) or it says so."""
     current = latest_season(session, league_code)
     if current is not None and season == current:
-        result = golden_boot_projection.project(session, league_code)
+        if settings.precomputed_only():
+            # written by the build step / nightly job; a page view never calls football-data.org
+            result = artifacts.get_payload(session, golden_boot_payload_key(league_code)) or {
+                "available": False, "reason": "the current-season scorer data hasn't been built yet.",
+            }
+        else:
+            result = golden_boot_projection.project(session, league_code)
         if result["available"]:
             result["tag"] = "Current season"
         return result

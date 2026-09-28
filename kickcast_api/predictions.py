@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from kickcast_engine.models.dixon_coles import DixonColes, MatchResult
 
+from . import artifacts, settings
 from .model_cache import cache_key, data_version
 from .models import Match
 
@@ -75,16 +76,37 @@ def get_model(session: Session, league_code: str) -> DixonColes | None:
     version = data_version(session)
     key = cache_key(session, "goals", league_code)
     cached = _cache.get(key)
+    if settings.precomputed_only():
+        # Public deployment: a request never fits a model. Serve the one built at deploy time (or
+        # refit by the nightly job, which replaces the in-process copy) even if data_version has
+        # moved on since - slightly stale beats a 20-second request on a 512 MB instance.
+        if cached is not None:
+            return cached[1]
+        bundle = artifacts.load_model("goals", league_code)
+        if bundle is None:
+            return None
+        _cache[key] = (version, bundle["model"], bundle["computed_at"])
+        return bundle["model"]
     if cached is not None and cached[0] == version:
         return cached[1]
+    return fit_model(session, league_code)
 
+
+def fit_model(session: Session, league_code: str, persist: bool = False) -> DixonColes | None:
+    """Fit (the expensive part). Called lazily in development, and explicitly with persist=True by
+    the build step and the nightly job, which write the pickled artifact the public site serves."""
+    version = data_version(session)
+    key = cache_key(session, "goals", league_code)
     matches = _training_matches(session, league_code)
     if len(matches) < 10:
         return None
     as_of = max(m.date for m in matches) + timedelta(days=1)
     params = INTERNATIONAL_HYPERPARAMS if league_code == "international" else DOMESTIC_HYPERPARAMS
     model = DixonColes(xi=params["xi"], l2=params["l2"]).fit(matches, as_of)
-    _cache[key] = (version, model, datetime.now(UTC).isoformat())
+    computed_at = datetime.now(UTC).isoformat()
+    _cache[key] = (version, model, computed_at)
+    if persist:
+        artifacts.save_model("goals", league_code, {"model": model, "computed_at": computed_at})
     return model
 
 

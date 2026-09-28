@@ -13,8 +13,8 @@ from __future__ import annotations
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from .. import build, catchup, settings
 from ..db import SessionLocal
-from ..precompute import precompute_predictions
 from . import api_football
 from .poller import POLL_INTERVAL_MINUTES, poll_live_matches
 from .results_updater import POLL_INTERVAL_MINUTES as RESULTS_POLL_INTERVAL_MINUTES
@@ -41,22 +41,44 @@ def _results_job() -> None:
         session.close()
 
 
-def _precompute_job() -> None:
+def _nightly_build_job() -> None:
+    """The ONLY place (besides the build step) that refits models and reruns the Monte Carlo."""
     session = SessionLocal()
     try:
-        precompute_predictions(session)
+        build.build_everything(session, network=settings.enable_football_data_org())
     finally:
         session.close()
+
+
+def _scorers_job() -> None:
+    """Refresh the Golden Boot projections every few hours while awake (football-data.org's 10 calls
+    per minute are respected by its client; the scorer cache has a 6-hour TTL, so this is at most
+    6 calls per run)."""
+    if not settings.enable_football_data_org():
+        return
+    session = SessionLocal()
+    try:
+        build.build_golden_boot(session, network=True)
+    finally:
+        session.close()
+
+
+def _catchup_job() -> None:
+    catchup.run_catchup()
 
 
 def start() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is not None:
         return _scheduler
-    _scheduler = BackgroundScheduler()
+    _scheduler = BackgroundScheduler(job_defaults={"coalesce": True, "max_instances": 1, "misfire_grace_time": 3600})
     _scheduler.add_job(
-        _precompute_job, CronTrigger(hour=NIGHTLY_PRECOMPUTE_HOUR_UTC, minute=0), id="nightly_precompute_predictions"
+        _nightly_build_job, CronTrigger(hour=NIGHTLY_PRECOMPUTE_HOUR_UTC, minute=0), id="nightly_build"
     )
+    if settings.startup_catchup():
+        # while the instance is awake: new results/fixtures/predictions every few hours
+        _scheduler.add_job(_catchup_job, "interval", hours=catchup.MIN_AGE_HOURS, id="catchup_refresh")
+        _scheduler.add_job(_scorers_job, "interval", hours=6, id="refresh_scorers")
     if api_football.available():
         _scheduler.add_job(_job, "interval", minutes=POLL_INTERVAL_MINUTES, id="poll_live_matches")
         _scheduler.add_job(_results_job, "interval", minutes=RESULTS_POLL_INTERVAL_MINUTES, id="update_todays_results")

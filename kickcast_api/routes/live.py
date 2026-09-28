@@ -23,7 +23,7 @@ def match_live_state(match_id: int, session: Session = Depends(get_session)) -> 
         raise HTTPException(404, f"unknown match {match_id!r}")
 
     if not api_football.available():
-        return {"available": False, "reason": "no API_FOOTBALL_KEY configured - live scores/events need it"}
+        return {"available": False, "reason": "live scores/events are not enabled on this deployment"}
 
     state = session.get(LiveMatchState, match_id)
     if state is None:

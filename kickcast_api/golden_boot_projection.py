@@ -60,8 +60,8 @@ def _prior_rate(league_code: str, live_scorers: list[dict]) -> tuple[float, str]
     return (sum(rates) / len(rates) if rates else 0.0), "this season's own live leaderboard (no historical season available)"
 
 
-def project(session: Session, league_code: str) -> dict:
-    live = football_data_scorers.fetch_scorers(league_code)
+def project(session: Session, league_code: str, network: bool = True) -> dict:
+    live = football_data_scorers.fetch_scorers(league_code, network=network)
     if live is None:
         return {
             "available": False,

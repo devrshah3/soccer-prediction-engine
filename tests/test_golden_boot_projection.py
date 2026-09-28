@@ -96,7 +96,7 @@ def test_project_shrinks_outlier_rate_and_uses_real_remaining_matches(tmp_path, 
     ]
     monkeypatch.setattr(
         football_data_scorers, "fetch_scorers",
-        lambda code, limit=15: {"season_label": "2026-27", "scorers": fake_scorers},
+        lambda code, limit=15, network=True: {"season_label": "2026-27", "scorers": fake_scorers},
     )
     s = seeded_session(tmp_path)
     result = golden_boot_projection.project(s, "test.1")
@@ -124,7 +124,7 @@ def test_project_shrinks_outlier_rate_and_uses_real_remaining_matches(tmp_path, 
 
 
 def test_project_reports_unavailable_when_live_source_has_nothing(tmp_path, monkeypatch):
-    monkeypatch.setattr(football_data_scorers, "fetch_scorers", lambda code, limit=15: None)
+    monkeypatch.setattr(football_data_scorers, "fetch_scorers", lambda code, limit=15, network=True: None)
     s = seeded_session(tmp_path, "gbp2.db")
     result = golden_boot_projection.project(s, "test.1")
     assert result["available"] is False

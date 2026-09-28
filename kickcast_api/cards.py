@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from kickcast_engine.models.cards import CardModel, CardObservation
 
+from . import artifacts, settings
 from .model_cache import cache_key, data_version
 from .models import Match, MatchStats
 
@@ -49,13 +50,28 @@ def get_card_model(session: Session, league_code: str) -> CardModel | None:
     version = data_version(session)
     key = cache_key(session, "cards", league_code)
     cached = _cache.get(key)
+    if settings.precomputed_only():
+        if cached is not None:
+            return cached[1]
+        bundle = artifacts.load_model("cards", league_code)
+        if bundle is None:
+            return None
+        _cache[key] = (version, bundle["model"])
+        return bundle["model"]
     if cached is not None and cached[0] == version:
         return cached[1]
+    return fit_card_model(session, league_code)
 
+
+def fit_card_model(session: Session, league_code: str, persist: bool = False) -> CardModel | None:
+    version = data_version(session)
+    key = cache_key(session, "cards", league_code)
     obs = _observations(session, league_code)
     if len(obs) < 20:
         return None
     as_of = max(o.date for o in obs) + timedelta(days=1)
     model = CardModel(xi=CARD_HYPERPARAMS["xi"], l2=CARD_HYPERPARAMS["l2"]).fit(obs, as_of)
     _cache[key] = (version, model)
+    if persist:
+        artifacts.save_model("cards", league_code, {"model": model})
     return model

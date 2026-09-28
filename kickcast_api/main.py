@@ -14,6 +14,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
+from . import catchup, settings
 from .db import get_session
 from .live import scheduler as live_scheduler
 from .models import Meta
@@ -22,16 +23,25 @@ from .routes import assistant, awards, batch, leagues, live, matches, replay, te
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    live_scheduler.start()  # nightly precompute always runs; API-Football jobs only if a key is set
+    live_scheduler.start()  # nightly build always; API-Football jobs only if enabled AND a key is set
+    if settings.startup_catchup():
+        catchup.start_background()  # serve immediately from the built DB; catch up in the background
     yield
     live_scheduler.stop()
 
 
-app = FastAPI(title="Soccer Prediction Engine API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="Soccer Prediction Engine API",
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url="/docs" if settings.enable_docs() else None,
+    redoc_url="/redoc" if settings.enable_docs() else None,
+    openapi_url="/openapi.json" if settings.enable_docs() else None,
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=settings.frontend_origins(),
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
@@ -44,6 +54,12 @@ app.include_router(awards.router)
 app.include_router(live.router)
 app.include_router(replay.router)
 app.include_router(batch.router)
+
+
+@app.get("/health")
+def health() -> dict:
+    """For uptime pingers and the host's health check: no database, no provider, no work at all."""
+    return {"status": "ok"}
 
 
 @app.get("/")

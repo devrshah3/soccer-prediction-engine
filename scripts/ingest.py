@@ -17,6 +17,7 @@ finding in reports/backtest_openfootball.json.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -424,8 +425,12 @@ def main() -> None:
         # B.8: precompute predictions for every scheduled match in the next 90 days right
         # after ingest, rather than waiting for the first request (or the nightly
         # schedule) to compute them - keeps GET /matches?date=... a fast DB read.
-        precomputed = precompute_predictions(session)
-        print(f"precompute: {precomputed} prediction(s) stored for the next {PRECOMPUTE_WINDOW_DAYS} days")
+        if os.environ.get("INGEST_SKIP_PRECOMPUTE") == "1":
+            # the running API's catch-up job precomputes in-process from the already-loaded models
+            print("precompute: skipped (INGEST_SKIP_PRECOMPUTE=1)")
+        else:
+            precomputed = precompute_predictions(session)
+            print(f"precompute: {precomputed} prediction(s) stored for the next {PRECOMPUTE_WINDOW_DAYS} days")
     finally:
         session.close()
     engine.dispose()

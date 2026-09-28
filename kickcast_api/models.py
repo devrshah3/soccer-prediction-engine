@@ -157,6 +157,18 @@ class YoutubeSearchCache(Base):
     created_at: Mapped[str] = mapped_column(String)
 
 
+class Payload(Base):
+    """A precomputed JSON payload (trophy odds, Golden Boot projections) written at build time or by
+    the nightly job and only READ by requests, so a page view never runs a Monte Carlo or calls a
+    provider. Ships inside the built database."""
+
+    __tablename__ = "payloads"
+
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    json: Mapped[str] = mapped_column(String)
+    computed_at: Mapped[str] = mapped_column(String)
+
+
 class WikipediaCache(Base):
     """Cached Wikipedia lookups (search + extract), keyed by a hash of the normalized
     query, so a repeated question never re-hits the MediaWiki API. Free/keyless, but

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from kickcast_engine.models.simulation import StandingsState, simulate_season
 
+from . import artifacts, settings
 from .model_cache import cache_key, data_version
 from .models import Match
 from .predictions import get_model
@@ -25,13 +26,27 @@ def get_trophy_odds(session: Session, league_code: str, season: str | None = Non
         season = latest_season(session, league_code)
     if season is None:
         return None
+    if settings.precomputed_only():
+        return artifacts.get_payload(session, payload_key(league_code, season))  # never simulate per request
 
     version = data_version(session)
     key = cache_key(session, f"trophy:{season}", league_code)
     cached = _cache.get(key)
     if cached is not None and cached[0] == version:
         return cached[1]
+    out = compute_trophy_odds(session, league_code, season)
+    if out is not None:
+        _cache[key] = (version, out)
+    return out
 
+
+def payload_key(league_code: str, season: str) -> str:
+    return f"trophy:{league_code}:{season}"
+
+
+def compute_trophy_odds(session: Session, league_code: str, season: str) -> dict | None:
+    """The Monte Carlo itself (20,000 simulations per remaining fixture): development computes it
+    lazily; production only ever runs it from the build step / nightly job."""
     model = get_model(session, league_code)
     if model is None:
         return None
@@ -56,5 +71,4 @@ def get_trophy_odds(session: Session, league_code: str, season: str | None = Non
         "remaining_fixtures": len(remaining), "model_as_of": model.as_of.isoformat() if model.as_of else None,
         "teams": teams,
     }
-    _cache[key] = (version, out)
     return out

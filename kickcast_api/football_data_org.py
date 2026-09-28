@@ -29,6 +29,8 @@ from collections.abc import Mapping
 
 import requests
 
+from . import settings
+
 BASE_URL = "https://api.football-data.org/v4"
 
 # module-level, single-process throttle state - see docstring
@@ -36,7 +38,7 @@ _state: dict[str, float | None] = {"available_minute": None, "reset_at": None}
 
 
 def available() -> bool:
-    return bool(os.environ.get("FOOTBALL_DATA_ORG_API_KEY"))
+    return bool(os.environ.get("FOOTBALL_DATA_ORG_API_KEY")) and settings.enable_football_data_org()
 
 
 def _headers() -> dict[str, str]:

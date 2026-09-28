@@ -155,7 +155,12 @@ def find_entities(session: Session, question: str) -> list[Entity]:
     for year in find_years(question):
         out.append(Entity("year", year, (year,)))
     seen: set[str] = set()
-    return [e for e in out if not (e.display in seen or seen.add(e.display))]
+    deduped: list[Entity] = []
+    for e in out:
+        if e.display not in seen:
+            seen.add(e.display)
+            deduped.append(e)
+    return deduped
 
 
 def recognised_terms(session: Session, question: str) -> list[str]:

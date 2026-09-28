@@ -39,7 +39,7 @@ def _cache_path(league_code: str) -> Path:
     return CACHE_DIR / f"{league_code.replace('.', '_')}.json"
 
 
-def fetch_scorers(league_code: str, limit: int = 15) -> dict | None:
+def fetch_scorers(league_code: str, limit: int = 15, network: bool = True) -> dict | None:
     """Returns {"season_label": str, "scorers": [{player, team_id, team_name, goals,
     played_matches}]}, or None if unavailable (no key, this competition isn't on the
     free tier, throttled, or errored) - callers must show an honest "not available"
@@ -51,10 +51,10 @@ def fetch_scorers(league_code: str, limit: int = 15) -> dict | None:
     path = _cache_path(league_code)
     if path.exists():
         cached = json.loads(path.read_text())
-        if time.time() - cached["fetched_at"] < CACHE_TTL_SECONDS:
+        if not network or time.time() - cached["fetched_at"] < CACHE_TTL_SECONDS:
             return cached["data"]
 
-    if not football_data_org.available():
+    if not network or not football_data_org.available():
         return None
     payload = football_data_org.get(f"/competitions/{fd_code}/scorers", params={"limit": limit})
     if payload is None or "scorers" not in payload:

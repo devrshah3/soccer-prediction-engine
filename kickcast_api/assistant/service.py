@@ -275,13 +275,13 @@ def ask(session: Session, question: str, conversation_id: str | None = None) -> 
         if cached is not None:
             return {**cached, "cached": True}
 
-        result = gemini_client.ask_gemini(session, question)
-        if result is not None:
-            if _all_tools_missed(result["sources"]) or _looks_like_decline(result["text"]):
+        gemini_result = gemini_client.ask_gemini(session, question)
+        if gemini_result is not None:
+            if _all_tools_missed(gemini_result["sources"]) or _looks_like_decline(gemini_result["text"]):
                 outside_db = gemini_client.ask_gemini_with_search(session, question)
                 if outside_db is not None:
-                    result = outside_db
-            answer = {"text": text_format.strip_markdown(result["text"]), "sources": result["sources"], "mode": "gemini+db"}
+                    gemini_result = outside_db
+            answer = {"text": text_format.strip_markdown(gemini_result["text"]), "sources": gemini_result["sources"], "mode": "gemini+db"}
             cache.set_cached(session, question, answer)  # only Gemini answers are cached - they cost quota
             return {**answer, "cached": False}
 

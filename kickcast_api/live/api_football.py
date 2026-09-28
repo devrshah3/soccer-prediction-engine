@@ -28,13 +28,14 @@ import os
 import requests
 from sqlalchemy.orm import Session
 
+from .. import settings
 from . import quota
 
 BASE_URL = "https://v3.football.api-sports.io"
 
 
 def available() -> bool:
-    return bool(os.environ.get("API_FOOTBALL_KEY"))
+    return bool(os.environ.get("API_FOOTBALL_KEY")) and settings.enable_api_football()
 
 
 def _headers() -> dict[str, str]:
