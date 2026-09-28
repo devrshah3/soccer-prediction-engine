@@ -100,6 +100,71 @@ def test_unknown_league_404(client):
     assert client.get("/leagues/nope/standings").status_code == 404
 
 
+def test_standings_sort_order_is_points_then_goal_difference_then_goals_for(tmp_path):
+    """A3: explicit lock-in for the tie-break rule (points, then GD, then GF) - a real,
+    live example of exactly this tie existed in production La Liga standings (two teams
+    tied on points, correctly separated by goal difference) while verifying against
+    real-world data, so this is worth a dedicated test rather than relying on the
+    points-only check in test_standings_shape_and_ordering."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'test_sort.db'}")
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine)
+    session = TestSession()
+    session.add(League(code="sort.1", name="Sort League", country="Testland", kind="domestic_league"))
+    for name in ("A", "B", "C", "D", "E"):
+        session.add(Team(id=f"t-{name}", name=f"Team {name}", country="Testland"))
+    session.commit()
+
+    # A, B, and C each finish on 6 points (2 wins, 0 draws, 0 losses) against a padding
+    # opponent, so points alone can't separate them:
+    #   A: GF 8, GA 1, GD +7  (5-0, 3-1)
+    #   B: GF 3, GA 1, GD +2  (2-1, 1-0)
+    #   C: GF 5, GA 3, GD +2  (3-2, 2-1)
+    # A must rank above B/C on GD. B and C are tied on both points AND GD, so C (more
+    # goals for) must rank above B.
+    fixtures = [
+        ("t-A", "t-Z", 5, 0), ("t-A", "t-Z", 3, 1),
+        ("t-B", "t-Z", 2, 1), ("t-B", "t-Z", 1, 0),
+        ("t-C", "t-Z", 3, 2), ("t-C", "t-Z", 2, 1),
+    ]
+    session.add(Team(id="t-Z", name="Padding Opponent", country="Testland"))
+    session.commit()
+    d = date(2024, 8, 1)
+    for i, (home, away, hg, ag) in enumerate(fixtures):
+        session.add(
+            Match(
+                league_code="sort.1", season="2024-25", date=d, kickoff=None,
+                home_team_id=home, away_team_id=away, home_goals=hg, away_goals=ag,
+                status="finished", round=f"Matchday {i + 1}", neutral=False,
+                source="synthetic", source_id=f"synthetic:sort-{i}",
+            )
+        )
+        d += timedelta(days=1)
+    session.commit()
+
+    def override():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_session] = override
+    try:
+        c = TestClient(app)
+        table = {row["team_id"]: row for row in c.get("/leagues/sort.1/standings").json()["table"]}
+    finally:
+        app.dependency_overrides.clear()
+
+    a, b, cc = table["t-A"], table["t-B"], table["t-C"]
+    assert a["pts"] == b["pts"] == cc["pts"] == 6
+    assert a["gd"] == 7 and b["gd"] == 2 and cc["gd"] == 2
+    assert a["position"] < b["position"] and a["position"] < cc["position"]  # A: best GD, ranks 1st
+    assert b["gd"] == cc["gd"]  # B and C tied on points AND GD - must fall through to GF
+    assert cc["gf"] > b["gf"]  # C: 5 vs B: 3
+    assert cc["position"] < b["position"]
+
+
 def test_league_fixtures_default_scheduled(client):
     r = client.get("/leagues/test.1/fixtures")
     assert r.status_code == 200

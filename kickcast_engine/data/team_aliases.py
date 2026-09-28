@@ -55,6 +55,15 @@ OVERRIDES: dict[str, str] = {
     # Spain
     "Ath Bilbao": "athletic club", "Athletic Bilbao": "athletic club",
     "Ath Madrid": "atletico madrid",
+    # canonical_id()'s generic " de madrid" suffix strip turns "Club Atlético de Madrid"
+    # into "atletico" (dropping "de madrid" the same way it should for a bare "X de
+    # Madrid" name) - a real bug found while verifying standings against real data: it
+    # split this club's Match rows across two ids ("atletico" from openfootball's newer
+    # seasons, "atletico madrid" from football-data.co.uk + Ath Madrid), each showing up
+    # as its own row in the standings table. See scripts/merge_atletico_madrid_ids.py for
+    # the one-time cleanup of rows already ingested before this override existed.
+    "Club Atlético de Madrid": "atletico madrid", "Atlético de Madrid": "atletico madrid",
+    "Atlético Madrid": "atletico madrid", "Atletico Madrid": "atletico madrid",
     "La Coruna": "deportivo la coruna",
     "Espanol": "espanyol",
     "Sp Gijon": "sporting gijon",
