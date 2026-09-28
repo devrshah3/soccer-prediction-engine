@@ -84,7 +84,8 @@ export type TeamDetail = {
 
 export type Prediction = {
   model_version: string;
-  as_of: string;
+  as_of: string; // data cutoff used for recency weighting - NOT when this was computed, see computed_at
+  computed_at: string | null; // real wall-clock time the model was last actually fit - use this for "updated X ago"
   home: string;
   away: string;
   neutral: boolean;
@@ -127,6 +128,7 @@ export type Prediction = {
 export type PredictionSummary = {
   model_version: string;
   as_of: string;
+  computed_at: string | null;
   evidence: "A" | "B" | "C";
   probabilities: { home: number; draw: number; away: number };
 };

@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_session
 from ..models import League, Match
-from ..predictions import get_model
+from ..predictions import get_model, get_model_computed_at
 from ..serialize import match_dict
 
 router = APIRouter(tags=["batch"])
@@ -121,5 +121,7 @@ def predictions_summary(match_ids: str, session: Session = Depends(get_session))
         if model is None:
             out[str(match_id)] = None
             continue
-        out[str(match_id)] = model.predict(m.home_team_id, m.away_team_id, neutral=m.neutral)
+        pred = model.predict(m.home_team_id, m.away_team_id, neutral=m.neutral)
+        pred["computed_at"] = get_model_computed_at(session, m.league_code)
+        out[str(match_id)] = pred
     return out

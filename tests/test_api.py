@@ -255,6 +255,30 @@ def test_prediction_has_valid_probabilities(client):
     assert body["evidence"] in ("A", "B", "C")
     assert body["model_version"]
     assert body["as_of"]
+    assert body["computed_at"]
+
+
+def test_prediction_computed_at_reflects_a_real_refit_not_just_the_data_cutoff(client):
+    """A4: computed_at is the real wall-clock refit time, distinct from as_of (a data
+    cutoff date used for recency weighting - see predictions.py's module-level _cache
+    comment). Real bug this fixes: a prediction refit today with no NEW finished matches
+    still showed "updated 32d ago" because the old code used as_of for that display -
+    as_of only moves when new results arrive, computed_at moves on every real refit."""
+    import re
+    from datetime import UTC, datetime
+
+    m = client.get("/leagues/test.1/fixtures").json()[0]
+    body = client.get(f"/matches/{m['id']}/prediction").json()
+    assert re.match(r"^\d{4}-\d{2}-\d{2}T", body["computed_at"])  # ISO8601
+    computed = datetime.fromisoformat(body["computed_at"])
+    assert (datetime.now(UTC) - computed).total_seconds() < 60  # just fit, within this test run
+
+
+def test_prediction_summary_batch_includes_computed_at(client):
+    m = client.get("/leagues/test.1/fixtures").json()[0]
+    r = client.get(f"/predictions/summary?match_ids={m['id']}")
+    assert r.status_code == 200
+    assert r.json()[str(m["id"])]["computed_at"]
 
 
 def test_prediction_includes_goal_timing_and_scorer_gating(client):

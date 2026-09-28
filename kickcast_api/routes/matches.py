@@ -9,7 +9,7 @@ from .. import domestic_scorers
 from ..cards import get_card_model
 from ..db import get_session
 from ..models import Goalscorer, Match
-from ..predictions import get_model
+from ..predictions import get_model, get_model_computed_at
 from ..scorers import team_likely_scorers
 from ..serialize import match_dict, team_names
 
@@ -59,6 +59,7 @@ def match_prediction(match_id: int, session: Session = Depends(get_session)) -> 
             503, f"not enough finished-match history for {m.league_code!r} to fit a model yet"
         )
     pred = model.predict(m.home_team_id, m.away_team_id, neutral=m.neutral)
+    pred["computed_at"] = get_model_computed_at(session, m.league_code)
     names = team_names(session, {m.home_team_id, m.away_team_id})
     pred["home_team"] = {"id": m.home_team_id, "name": names.get(m.home_team_id, m.home_team_id)}
     pred["away_team"] = {"id": m.away_team_id, "name": names.get(m.away_team_id, m.away_team_id)}

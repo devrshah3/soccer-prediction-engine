@@ -74,7 +74,8 @@ export function MatchRow({
             awayLabel={match.away_team.name}
           />
           <p className="mt-2 text-[11px] text-muted-2">
-            {timeAgo(prediction.as_of)} &middot; evidence {prediction.evidence} &middot; {prediction.model_version}
+            {timeAgo(prediction.computed_at ?? prediction.as_of)} &middot; evidence {prediction.evidence} &middot;{" "}
+            {prediction.model_version}
           </p>
         </div>
       )}

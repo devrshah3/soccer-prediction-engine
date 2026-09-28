@@ -13,7 +13,7 @@ Hyperparameters are the ones validated in reports/backtest_openfootball.json (do
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -26,7 +26,15 @@ DOMESTIC_HYPERPARAMS = {"xi": 0.0022, "l2": 2.0}
 INTERNATIONAL_HYPERPARAMS = {"xi": 0.001, "l2": 0.1}
 INTERNATIONAL_FRIENDLY_WEIGHT = 0.5
 
-_cache: dict[tuple[str, str, str], tuple[str, DixonColes]] = {}
+# (data_version, model, computed_at) - computed_at is the real wall-clock time this
+# competition's model was last actually fit, kept separate from DixonColes.as_of (a data
+# cutoff date used for recency weighting, not a timestamp - see fit()'s docstring). A4:
+# these were being conflated before - a prediction's "updated" display used as_of, which
+# only moves when NEW finished matches arrive, so a prediction freshly refit today still
+# showed "updated 32d ago" whenever the underlying results feed itself was stale (see
+# MORNING_REPORT.md's A3 for why martj42 specifically lags). computed_at always reflects
+# a real refit, so it correctly reads "just now" right after one, even if as_of doesn't move.
+_cache: dict[tuple[str, str, str], tuple[str, DixonColes, str]] = {}
 
 
 def _training_matches(session: Session, league_code: str) -> list[MatchResult]:
@@ -76,5 +84,16 @@ def get_model(session: Session, league_code: str) -> DixonColes | None:
     as_of = max(m.date for m in matches) + timedelta(days=1)
     params = INTERNATIONAL_HYPERPARAMS if league_code == "international" else DOMESTIC_HYPERPARAMS
     model = DixonColes(xi=params["xi"], l2=params["l2"]).fit(matches, as_of)
-    _cache[key] = (version, model)
+    _cache[key] = (version, model, datetime.now(UTC).isoformat())
     return model
+
+
+def get_model_computed_at(session: Session, league_code: str) -> str | None:
+    """Real wall-clock time this competition's model was last actually fit (ISO8601 UTC) -
+    what a prediction's "updated X ago" display should use, not DixonColes.as_of (see
+    module-level _cache comment). Calling get_model() first guarantees the cache entry is
+    current for this request."""
+    if get_model(session, league_code) is None:
+        return None
+    cached = _cache.get(cache_key(session, "goals", league_code))
+    return cached[2] if cached else None

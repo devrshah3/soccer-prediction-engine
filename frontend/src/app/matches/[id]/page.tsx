@@ -5,6 +5,7 @@ import { ProbabilityBar } from "@/components/ProbabilityBar";
 import { TeamCrest } from "@/components/TeamCrest";
 import { api, ApiError } from "@/lib/api";
 import { matchState } from "@/lib/matchState";
+import { timeAgo } from "@/lib/time";
 
 export default async function MatchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -133,7 +134,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
               )}
 
               <p className="mt-5 text-xs text-muted-2">
-                as of {prediction.as_of} &middot; {prediction.model_version} &middot; trained on{" "}
+                {prediction.computed_at ? `${timeAgo(prediction.computed_at)} · ` : ""}
+                data cutoff {prediction.as_of} &middot; {prediction.model_version} &middot; trained on{" "}
                 {prediction.train_matches.total} matches ({prediction.train_matches.home} for{" "}
                 {match.home_team.name}, {prediction.train_matches.away} for {match.away_team.name})
               </p>
