@@ -30,9 +30,9 @@ export function MatchRow({
       href={`/matches/${match.id}`}
       // A card in a (potentially long) list gets the cheap flat translucent fill
       // (.glass-row, no blur) rather than the full blurred .glass recipe - see globals.css.
-      className="group glass-row block p-4 transition-all hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.08]"
+      className="group glass-row block min-w-0 p-4 transition-all hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.08]"
     >
-      <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
         {league ? <LeagueChip name={league.name} country={league.country} /> : <span />}
         <span className="text-xs text-muted">
           {match.round ? <span className="mr-1.5">{match.round}</span> : null}

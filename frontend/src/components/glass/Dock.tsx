@@ -20,7 +20,7 @@ export function Dock() {
   return (
     <nav
       aria-label="Primary"
-      className="glass fixed inset-x-0 bottom-4 z-40 mx-auto flex w-fit items-center gap-1 !rounded-full p-1.5 sm:bottom-6"
+      className="glass glass-float fixed inset-x-0 bottom-4 z-40 mx-auto flex w-fit items-center gap-1 !rounded-full p-1.5 sm:bottom-6"
     >
       {ITEMS.map((item) => {
         const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);

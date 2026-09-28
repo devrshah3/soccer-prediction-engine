@@ -21,6 +21,14 @@ export function slugForCode(code: string): string {
   return CODE_TO_SLUG[code] ?? code;
 }
 
+// The clean URL an old code-based one (/leagues/en.1) should permanently redirect to, or
+// null when the segment is already a clean slug. A code whose slug is identical to itself
+// ("international") must NOT redirect - that is the redirect loop this guards against.
+export function legacyCodeRedirect(segment: string): string | null {
+  const slug = CODE_TO_SLUG[segment];
+  return slug !== undefined && slug !== segment ? slug : null;
+}
+
 // Item 4: a raw code (e.g. "en.1") must never reach a rendered page - this is the
 // fallback for the handful of call sites that only have the code, not a fetched League
 // object (api.leagues() already returns the real name and is preferred wherever it's

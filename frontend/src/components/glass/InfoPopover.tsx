@@ -27,7 +27,7 @@ export function InfoPopover({ label, title, lines }: { label: string; title: str
         <div
           role="dialog"
           onClick={(e) => e.stopPropagation()}
-          className="glass absolute right-0 z-20 mt-1.5 w-60 space-y-1.5 !rounded-xl p-3 text-left text-xs"
+          className="glass glass-float absolute right-0 z-20 mt-1.5 w-60 space-y-1.5 !rounded-xl p-3 text-left text-xs"
         >
           <p className="font-medium text-foreground">{title}</p>
           {lines.map((line) => (

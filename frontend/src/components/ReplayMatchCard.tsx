@@ -98,10 +98,12 @@ export function ReplayMatchCard({ match, noEventsNote }: { match: ReplayMatch; n
         </div>
       )}
 
-      <div className="mt-4 border-t border-white/10 pt-3">
-        <p className="text-sm text-muted">{match.recap.text}</p>
-        <p className="mt-1.5 text-[11px] text-muted-2">{match.recap.label}</p>
-      </div>
+      {match.has_result && (
+        <div className="mt-4 border-t border-white/10 pt-3">
+          <p className="text-sm text-muted">{match.recap.text}</p>
+          <p className="mt-1.5 text-[11px] text-muted-2">{match.recap.label}</p>
+        </div>
+      )}
 
       <Link href={`/matches/${match.id}`} className="mt-3 inline-block text-xs font-medium text-accent hover:underline">
         Full match page &rarr;

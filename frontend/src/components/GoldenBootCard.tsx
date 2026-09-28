@@ -7,7 +7,7 @@ import type { GoldenBootLeague, League } from "@/lib/api";
 // behind the (i) popover, not as a long grey disclaimer line under every card.
 export function GoldenBootCard({ league, code, entry }: { league?: League; code: string; entry: GoldenBootLeague }) {
   return (
-    <div className="glass p-4">
+    <div className="glass min-w-0 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         {league ? <LeagueChip name={league.name} country={league.country} /> : <span className="text-sm text-muted">{code}</span>}
         {entry.available && (
@@ -47,7 +47,7 @@ export function GoldenBootCard({ league, code, entry }: { league?: League; code:
           <Tag tone="accent">Current season &middot; {entry.season}</Tag>
           <ol className="mt-3 space-y-1.5">
             {entry.scorers.slice(0, 5).map((s, i) => (
-              <li key={`${s.player}-${s.team_id}`} className="glass-row px-3 py-2">
+              <li key={`${s.player}-${s.team_id}`} className="glass-row min-w-0 px-3 py-2">
                 <div className="flex items-center justify-between gap-3">
                   <span className="flex min-w-0 items-center gap-2.5 text-sm text-foreground">
                     <RankBadge rank={i + 1} />

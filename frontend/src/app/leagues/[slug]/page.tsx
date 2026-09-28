@@ -6,7 +6,7 @@ import { Flag } from "@/components/Flag";
 import { LeagueTableSheet } from "@/components/LeagueTableSheet";
 import { SeasonSelect } from "@/components/SeasonSelect";
 import { api, ApiError, type League, type MatchOnDate } from "@/lib/api";
-import { CODE_TO_SLUG, SLUG_TO_CODE } from "@/lib/leagueSlugs";
+import { legacyCodeRedirect, SLUG_TO_CODE } from "@/lib/leagueSlugs";
 import { isTodaySettled } from "@/lib/rollover";
 import { matchState } from "@/lib/matchState";
 import { formatShortDate } from "@/lib/time";
@@ -28,13 +28,14 @@ export default async function LeaguePage({
   const { season, date, view } = await searchParams;
 
   // Old code-based URL (e.g. /leagues/en.1) -> the clean slug, permanently.
-  if (CODE_TO_SLUG[slug]) {
+  const cleanSlug = legacyCodeRedirect(slug);
+  if (cleanSlug) {
     const qs = new URLSearchParams();
     if (season) qs.set("season", season);
     if (date) qs.set("date", date);
     if (view) qs.set("view", view);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    permanentRedirect(`/leagues/${CODE_TO_SLUG[slug]}${suffix}`);
+    permanentRedirect(`/leagues/${cleanSlug}${suffix}`);
   }
   const code = SLUG_TO_CODE[slug];
   if (!code) notFound();

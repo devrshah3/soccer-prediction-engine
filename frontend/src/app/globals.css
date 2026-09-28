@@ -17,6 +17,7 @@
      used directly by components that build their own glass rule (Dock, Sheet, popovers). */
   --glass-fill-1: rgba(255, 255, 255, 0.17);
   --glass-fill-2: rgba(255, 255, 255, 0.05);
+  --glass-blur: blur(18px) saturate(150%);
   --glass-border: rgba(255, 255, 255, 0.16);
   --glass-highlight: rgba(255, 255, 255, 0.35);
   --glass-fallback: rgba(18, 26, 48, 0.92); /* solid fallback when backdrop-filter is unsupported */
@@ -74,6 +75,10 @@ body {
   overflow-x: hidden;
 }
 
+html {
+  background-color: var(--background);
+}
+
 body {
   background: linear-gradient(160deg, var(--scene-1) 0%, var(--scene-2) 55%, var(--scene-3) 100%) fixed;
   color: var(--foreground);
@@ -112,48 +117,59 @@ body {
    backdrop-filter support (@supports not (...)). Applied to CONTAINERS only (cards,
    panels, the dock, sheets, popovers) - never per-row in a long list, where a flat
    translucent fill is used instead so scrolling stays smooth (see .glass-row). */
-.glass {
-  position: relative;
-  background: linear-gradient(135deg, var(--glass-fill-1), var(--glass-fill-2));
-  border: 1px solid var(--glass-border);
-  border-radius: 22px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    0 20px 40px -20px rgba(0, 0, 20, 0.6);
-  isolation: isolate;
-}
-.glass::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(120% 80% at 12% 0%, var(--glass-highlight), transparent 55%);
-  opacity: 0.35;
-  pointer-events: none;
-  z-index: -1;
-}
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+/* In the components layer so Tailwind utilities (fixed, rounded-*, ...) still win. */
+@layer components {
   .glass {
-    backdrop-filter: blur(18px) saturate(150%);
-    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    position: relative;
+    background: linear-gradient(135deg, var(--glass-fill-1), var(--glass-fill-2));
+    border: 1px solid var(--glass-border);
+    border-radius: 22px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      0 20px 40px -20px rgba(0, 0, 20, 0.6);
+    isolation: isolate;
   }
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass {
-    background: var(--glass-fallback);
+  .glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(120% 80% at 12% 0%, var(--glass-highlight), transparent 55%);
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: -1;
   }
-}
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .glass {
+      -webkit-backdrop-filter: var(--glass-blur);
+      backdrop-filter: var(--glass-blur);
+    }
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass {
+      background: var(--glass-fallback);
+    }
+  }
 
-/* Flat, cheap translucent fill for rows inside a long scrolling list - no blur. */
-.glass-row {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-}
+  /* Floating surfaces (dock, assistant, popovers, sheets) sit over arbitrary page content, so
+     they get a denser navy base under the glass sheen to keep text behind from bleeding in. */
+  .glass-float {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03)),
+      rgba(9, 18, 44, 0.86);
+  }
 
-@media (max-width: 640px) {
-  .glass {
-    border-radius: 18px;
+  /* Flat, cheap translucent fill for rows inside a long scrolling list - no blur. */
+  .glass-row {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+
+  @media (max-width: 640px) {
+    .glass {
+      border-radius: 18px;
+    }
   }
 }
 
