@@ -40,11 +40,12 @@ export type LiveInfo = {
 
 // team_id is the team CREDITED with the goal (null if the source's team couldn't be resolved).
 export type GoalEvent = { team_id: string | null; scorer: string; minute: number | null; own_goal: boolean; penalty: boolean };
+export type CardEvent = { team_id: string | null; player: string; minute: number | null; card: "yellow" | "red" };
 
 // GET /matches/{id} only - goal_events is attached for a finished match (empty if we
 // genuinely have none on record, e.g. any domestic match - see kickcast_api/routes/
 // matches.py), never present at all for a scheduled one.
-export type MatchDetail = Match;
+export type MatchDetail = Match & { card_events?: CardEvent[] };
 
 // GET /matches?date=... only - prediction/long_range/date_may_change are only present
 // for a scheduled match (see kickcast_api/routes/matches.py's matches_by_date).

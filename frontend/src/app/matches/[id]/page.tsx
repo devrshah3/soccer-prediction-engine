@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CardList } from "@/components/CardList";
 import { GoalTimeline } from "@/components/GoalList";
 import { KickoffTime } from "@/components/KickoffTime";
 import { MatchStatusLine } from "@/components/MatchStatusLine";
@@ -174,6 +175,10 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
             </p>
           )}
         </section>
+      )}
+
+      {state.kind !== "scheduled" && (
+        <CardList cards={match.card_events} home={match.home_team} away={match.away_team} />
       )}
 
       <p className="text-xs text-muted-2">source: {match.source}</p>
