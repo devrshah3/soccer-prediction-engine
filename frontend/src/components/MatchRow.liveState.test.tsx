@@ -71,7 +71,7 @@ describe("MatchRow live/finished display", () => {
 
   it("renders Finished with no bar via the 150-minute fallback: kickoff 200 min ago, no flag", () => {
     render(<MatchRow match={matchKickedOff(200)} prediction={prediction} />);
-    expect(screen.getByText(/Full time/)).toBeTruthy();
+    expect(screen.getByText("Final score not available yet")).toBeTruthy();
     expect(bar()).toBeNull();
   });
 });

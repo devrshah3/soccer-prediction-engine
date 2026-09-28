@@ -172,7 +172,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
             {state.score ? (
               <>Full time {state.score.home} &ndash; {state.score.away}.</>
             ) : (
-              <>Full time, score pending.</>
+              <>Final score not available yet.</>
             )}
           </p>
           <GoalTimeline goals={match.goal_events} home={match.home_team} away={match.away_team} />

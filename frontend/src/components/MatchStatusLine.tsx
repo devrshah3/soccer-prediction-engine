@@ -12,7 +12,7 @@ export function MatchStatusLine({ state, className = "" }: { state: MatchState; 
   if (state.kind === "finished") {
     return (
       <p className={`text-xs font-medium uppercase tracking-wide text-muted-2 ${className}`}>
-        {state.score ? "Full time" : "Full time, score pending"}
+        {state.score ? "Full time" : "Final score not available yet"}
       </p>
     );
   }
