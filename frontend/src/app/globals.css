@@ -17,6 +17,16 @@
      used directly by components that build their own glass rule (Dock, Sheet, popovers). */
   --glass-fill-1: rgba(255, 255, 255, 0.17);
   --glass-fill-2: rgba(255, 255, 255, 0.05);
+  /* Prediction-bar outcome colours - change them here, every bar follows. */
+  --out-home-from: #3d7bff;
+  --out-home-to: #7db2ff;
+  --out-home-glow: rgba(61, 123, 255, 0.55);
+  --out-draw-from: #f5b942;
+  --out-draw-to: #ffd98a;
+  --out-draw-glow: rgba(245, 185, 66, 0.5);
+  --out-away-from: #ff5d7a;
+  --out-away-to: #ff9aae;
+  --out-away-glow: rgba(255, 93, 122, 0.5);
   --glass-blur: blur(18px) saturate(150%);
   --glass-border: rgba(255, 255, 255, 0.16);
   --glass-highlight: rgba(255, 255, 255, 0.35);
